@@ -1,0 +1,12 @@
+version: '2.1'
+services:
+  server:
+    build: .
+#    image: haproxy:1.7
+    restart: unless-stopped
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+      - /var/lib/docker/volumes/caddy_ssl/_data/acme/acme-v01.api.letsencrypt.org/sites:/etc/ssl/letsencrypt
