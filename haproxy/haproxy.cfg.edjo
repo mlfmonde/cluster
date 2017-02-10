@@ -1,0 +1,17 @@
+global
+    daemon
+    maxconn 256
+    crt-base "/etc/ssl/letsencrypt"
+
+defaults
+    mode http
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+
+frontend http-in
+    bind *:443 ssl crt "/etc/ssl/bundles/lyceetestmlf.anybox.eu.pem"
+    default_backend servers
+
+backend servers
+    server nepri 163.172.101.141:443 weight 1 maxconn 32 check ssl verify none
