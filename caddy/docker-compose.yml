@@ -1,0 +1,21 @@
+version: '2.1'
+services:
+  server:
+    image: abiosoft/caddy
+    restart: unless-stopped
+    ports:
+      - 1080:80
+      - 1443:443
+    networks:
+      - haproxy_default
+    volumes:
+      - ssl:/root/.caddy
+      - log:/var/log
+      - ./Caddyfile:/etc/Caddyfile
+volumes:
+  log:
+  ssl:
+networks:
+  haproxy_default:
+    external: true
+
