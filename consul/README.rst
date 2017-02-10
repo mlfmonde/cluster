@@ -24,14 +24,21 @@ This example does nothing because the "plop" event does not exist::
 
     >>> from handler import handle
     >>> events = '[{"ID":"0","Name":"plop","Payload":"cGxvcDI=","Version":1,"LTime":1}]'
-    >>> handle(events)
+    >>> handle(events, 'nowhere')
 
 As a Python library in **test mode**, which we use for the doctests.
 
-First try with a deploy::
+First try with a deploy, pretending we are 'nepri'::
 
     >>> from base64 import b64encode
-    >>> payload = b64encode(b"nepri git.mlfmonde.org/plop/plop")
+    >>> payload = "nepri git.mlfmonde.org/plop/plop"
+    >>> payload = b64encode(payload.encode()).decode()
     >>> events = '[{"ID":"0","Name": "deploymaster","Payload": "%s","Version":1,"LTime":1}]' % payload
-    >>> handle(events, test=True)
-    plop
+    >>> handle(events, 'nepri', test=True)
+    cd /tmp
+    && git clone git.mlfmonde.org/plop/plop
+
+Same deploy on tayt::
+
+    >>> handle(events, 'tayt', test=True)
+    No action
