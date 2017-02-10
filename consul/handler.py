@@ -46,9 +46,13 @@ def deploymaster(payload, host, test):
                   'you should specify a hostname and repository')
         raise(e)
     if host == target:
-        do("""
-            cd /tmp
-            && git clone {}""".format(repo), test)
+        do("cd /tmp "
+           "&& rm -rf repo"
+           "&& git clone {} repo"
+           "&& cd repo" 
+           "&& docker-compose up -d"
+           "&& cd .. && rm -rf repo"
+           .format(repo), test)
     else:
         do("No action", test)
 

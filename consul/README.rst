@@ -31,12 +31,12 @@ As a Python library in **test mode**, which we use for the doctests.
 First try with a deploy, pretending we are 'nepri'::
 
     >>> from base64 import b64encode
-    >>> payload = "nepri git.mlfmonde.org/plop/plop"
+    >>> payload = "nepri ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
     >>> payload = b64encode(payload.encode()).decode()
     >>> events = '[{"ID":"0","Name": "deploymaster","Payload": "%s","Version":1,"LTime":1}]' % payload
     >>> handle(events, 'nepri', test=True)
     cd /tmp
-    && git clone git.mlfmonde.org/plop/plop
+    && git clone ssh://git@git.mlfmonde.org:2222/hebergement/cluster
 
 Same deploy on tayt::
 
