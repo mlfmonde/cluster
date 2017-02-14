@@ -5,20 +5,34 @@ from base64 import b64decode
 import logging
 from sys import stdin, argv
 from subprocess import run, CalledProcessError, PIPE
+from os.path import basename
 import json
 logging.basicConfig()
 log = logging.getLogger(__name__)
 
 
-def do(command, test):
-    try:
-        if test:
-            command = "echo '{}'".format(command)
-        out = run(command, shell=True, check=True, stderr=PIPE, stdout=PIPE)
-    except CalledProcessError as e:
-        log.warning("Error running {}: {}".format(e.cmd, e.stderr.decode()))
-        return
-    print(out.stdout.decode())
+class Do(object):
+    """Chain several commands
+    """
+    def __init__(self, cmd, test=False, cwd=None):
+        self.test = test
+        self.cwd = cwd
+        self.then(cmd, cwd)
+
+    def then(self, cmd, cwd=None):
+        cwd = cwd or self.cwd
+        self.cwd = cwd
+        try:
+            if cwd:
+                cmd = 'cd "{}" && {}'.format(cwd, cmd)
+            if self.test:
+                cmd = "echo '{}'".format(cmd)
+            out = run(cmd, shell=True, check=True, stderr=PIPE, stdout=PIPE)
+        except CalledProcessError as e:
+            log.error("Failed to run {}: {}".format(e.cmd, e.stderr.decode()))
+            return None  # TODO
+        print(out.stdout.decode().strip())
+        return self
 
 
 def handle_one(event, host, test=False):
@@ -41,20 +55,19 @@ def deploymaster(payload, host, test):
     try:
         target = payload.split()[0].decode()
         repo = payload.split()[1].decode()
+        name = basename(repo.strip('/'))
+        name = name[:-4] if name.endswith('.git') else name
     except Exception as e:
         log.error('deploymaster error: '
                   'you should specify a hostname and repository')
         raise(e)
     if host == target:
-        do("cd /tmp "
-           "&& rm -rf repo"
-           "&& git clone {} repo"
-           "&& cd repo" 
-           "&& docker-compose up -d"
-           "&& cd .. && rm -rf repo"
-           .format(repo), test)
+        Do('rm -rf "/deploy/{}"'.format(name), cwd='/deploy', test=test) \
+          .then('git clone {}'.format(repo)) \
+          .then('docker-compose up -d', cwd='/deploy/{}'.format(name)) \
+          .then('rm -rf "/deploy/{}"'.format(name), cwd='/deploy')
     else:
-        do("No action", test)
+        Do("No action", test)
 
 
 if __name__ == '__main__':
