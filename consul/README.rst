@@ -7,11 +7,15 @@ Events are transmitted from one member to all other cluster members,
 and each node handler should manage it accordingly.
 It receives json through stdin, as a list of events.
 
-Usage
-*****
+Test
+****
 
-From the shell
---------------
+Run this doctest with::
+
+    $ python3 test.py
+
+Using from the shell
+********************
 
 From Consul (the expected way), just configure a watcher (see the docker-compose.yml of the consul MLF docker).
 
@@ -25,8 +29,8 @@ The same **test mode** ::
 
 The test mode just prints the commands that should be executed.
 
-As a Python library
--------------------
+Using as a Python library
+*************************
 
 This example does nothing because the "plop" event does not exist::
 
@@ -36,7 +40,7 @@ This example does nothing because the "plop" event does not exist::
 
 As a Python library in **test mode**, which we use for the doctests.
 
-First try with a deploy, pretending we are 'nepri'::
+First try to deploy a master, pretending we are 'nepri'::
 
     >>> from base64 import b64encode
     >>> payload = "nepri ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
@@ -44,11 +48,71 @@ First try with a deploy, pretending we are 'nepri'::
     >>> events = '[{"ID":"0","Name": "deploymaster","Payload": "%s","Version":1,"LTime":1}]' % payload
     >>> handle(events, 'nepri', test=True)
     cd "/deploy" && rm -rf "/deploy/lycee-test-mlf"
-    cd "/deploy" && git clone ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf
+    cd "/deploy" && git clone "ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
     cd "/deploy/lycee-test-mlf" && docker-compose up -d
     cd "/deploy" && rm -rf "/deploy/lycee-test-mlf"
+    cd "/deploy" && buttervolume snapshot lycee-test-mlf
+    cd "/deploy" && buttervolume schedule snapshot {} 60
+    run function: Consul.register_service
 
-Same deploy on tayt::
+The register_service expects a consul definition file to be present in the
+repository of the service::
+
+    >>> import tempfile, handler, requests
+    >>> from os.path import join
+    >>> import os, json
+    >>> requests.post = print
+    >>> handler.DEPLOY = tempfile.mkdtemp()
+    >>> service = join(handler.DEPLOY, 'plop.com')
+    >>> os.makedirs(service)
+    >>> with open(join(service, 'service.json'), 'w') as f:
+    ...     _ = f.write(json.dumps({'Name': 'plop'}))
+    >>> _ = handler.Do(handler.Consul.register_service('plop.com'))
+    http://localhost:8500/v1/agent/register/service {"Name": "plop"}
+    >>> _ = handler.Do(handler.Consul.register_service('invalid.com'))
+    Traceback (most recent call last):
+    ...
+    FileNotFoundError...
+
+At the same time, the same deployment is run on tayt, it does nothing::
 
     >>> handle(events, 'tayt', test=True)
     No action
+
+Then we deploy a slave on edjo::
+
+    >>>
+
+The slave already pulled a first snapshot from the master::
+
+    >>>
+
+Next snapshot pulls are already scheduled::
+
+    >>>
+
+We can redeploy a new version the same way. docker-compose is responsible to recreate the image.
+We notice the current version is first stored in consul::
+
+    >>>
+
+If something goes wrong with the new version, we can downgrade to the latest
+stable revision, by relaunching the deployment with a specified revision::
+
+    >>> 
+
+
+future TODO ?
+Now we want to upgrade the app currently on nepri with a new image, and run a
+potential complex upgrade procedure. We just send an upgrade event to the cluster with
+a choice of the upgrading slave.  Then the master should stop, (todo put a
+maintenance page) trigger a snapshot and send it to the slaves, and at the same
+time the upgrading slave waits for the incoming snapshot. Once received, the
+slave snapshots it as a volume, deploys the new image, run the potential
+upgrade procedure, and register it in consul.
+
+Now we want to switch the master to another machine. We just promote the specified slave::
+
+    >>>
+
+
