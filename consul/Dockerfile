@@ -7,7 +7,11 @@ RUN apk add --no-cache \
       py-pip \
       python3 \
     && pip install --upgrade pip \
-    && pip install docker-compose
+    && pip install docker-compose \
+    && git clone http://github.com/anybox/buttervolume \
+    && cd buttervolume \
+    && python3 setup.py install
+
 USER consul
 COPY ssh /home/consul/.ssh
 COPY handler.py /
