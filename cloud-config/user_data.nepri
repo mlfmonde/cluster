@@ -55,3 +55,17 @@ coreos:
               Where=/var/lib/docker/volumes
               Type=btrfs
               Options=discard,ssd,subvol=volumes
+        -
+            name: var-lib-docker-snapshots.mount
+            enable: true
+            content: |
+              [Unit]
+              Before=docker.service
+              [Install]
+              RequiredBy=docker.service
+              [Mount]
+              What=/dev/sdb
+              Where=/var/lib/docker/snapshots
+              Type=btrfs
+              Options=discard,ssd,subvol=snapshots
+
