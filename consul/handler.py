@@ -14,6 +14,7 @@ DEPLOY = '/deploy'
 
 
 def run(cmd):
+    print(cmd)
     return srun(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
 
 
@@ -89,8 +90,11 @@ class Consul(object):
             except Exception as e:
                 log.error('Could not read %s', path)
                 raise
-            requests.post('http://localhost:8500/v1/agent/register/service',
-                          json.dumps(json.loads(compose)))
+            res = requests.post(
+                'http://localhost:8500/v1/agent/service/register', compose)
+            if res.status_code != 200:
+                raise RuntimeError('Consul service register failed: {}'
+                                   .format(res.reason))
         return closure
 
 
@@ -109,7 +113,6 @@ class DockerCompose(object):
             [run('cd "{}" && docker-compose ps -q {}'
                  .format(self.project, s)).stdout.strip().decode().split('\n')
              for s in services])
-        print(containers)
         inspects = concat(
             [json.loads(run('docker inspect {}'.format(c)).stdout.decode())
              for c in containers])
