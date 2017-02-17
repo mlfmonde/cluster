@@ -8,13 +8,17 @@ from base64 import b64decode
 from os.path import basename, join
 from subprocess import run as srun, CalledProcessError, PIPE
 from sys import stdin, argv
-logging.basicConfig()
+logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 DEPLOY = '/deploy'
 
 
 def run(cmd):
     return srun(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
+
+
+def concat(xs):
+    return [y for x in xs for y in x]
 
 
 class Do(object):
@@ -26,6 +30,7 @@ class Do(object):
         self.then(cmd, cwd)
 
     def then(self, cmd, cwd=None):
+        # cmd is a function
         if hasattr(cmd, '__call__'):
             try:
                 if self.test:
@@ -38,6 +43,7 @@ class Do(object):
                           cmd.__name__, str(e))
                 raise
             return self
+        # cmd is a shell instruction
         cwd = cwd or self.cwd
         self.cwd = cwd
         try:
@@ -45,6 +51,7 @@ class Do(object):
                 cmd = 'cd "{}" && {}'.format(cwd, cmd)
             if self.test:
                 cmd = "echo '{}'".format(cmd)
+            print(cmd)
             print(run(cmd).stdout.decode().strip())
             return self
         except CalledProcessError as e:
@@ -98,9 +105,17 @@ class DockerCompose(object):
         """
         out = run('cd "{}" && docker-compose config --services'.format(path))
         services = [s.strip() for s in out.stdout.decode().split('\n')]
-        return [run('cd "{}" && docker-compose ps -q {}'
-                .format(s)).stdout.strip()
-                for s in services]
+        containers = concat(
+            [run('cd "{}" && docker-compose ps -q {}'
+                 .format(self.project, s)).stdout.strip().decode().split('\n')
+             for s in services])
+        print(containers)
+        inspects = concat(
+            [json.loads(run('docker inspect {}'.format(c)).stdout.decode())
+             for c in containers])
+        volumes = [m['Name'] for m in concat([c['Mounts']
+                   for c in inspects]) if m['Driver'] == 'btrfs']
+        return volumes
 
     def snapshot(self):
         """snapshot all volumes of a running compose
@@ -121,7 +136,7 @@ class DockerCompose(object):
             try:
                 for volume in self._volumes(self.project):
                     run("buttervolume schedule snapshot {} {}"
-                        .format(volume, timer))
+                        .format(timer, volume))
             except CalledProcessError as e:
                 log.error("Failed to run %s: %s", e.cmd, e.stderr.decode())
                 raise
@@ -149,10 +164,10 @@ def deploymaster(payload, host, test):
         Do('rm -rf "{}"'.format(project), cwd=DEPLOY, test=test) \
          .then('git clone "{}"'.format(repo)) \
          .then('docker-compose up -d', cwd=project) \
-         .then('rm -rf "{}"'.format(project), cwd=DEPLOY) \
          .then(DockerCompose(project).snapshot()) \
          .then(DockerCompose(project).schedule_snapshots(60)) \
-         .then(Consul().register_service(project))
+         .then(Consul().register_service(project)) \
+         .then('rm -rf "{}"'.format(project), cwd=DEPLOY)
     else:
         Do("No action", test)
 

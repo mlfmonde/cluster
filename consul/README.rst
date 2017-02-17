@@ -50,12 +50,12 @@ First try to deploy a master, pretending we are 'nepri'::
     cd "/deploy" && rm -rf "/deploy/lycee-test-mlf"
     cd "/deploy" && git clone "ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
     cd "/deploy/lycee-test-mlf" && docker-compose up -d
-    cd "/deploy" && rm -rf "/deploy/lycee-test-mlf"
     run function: DockerCompose.snapshot
     run function: DockerCompose.schedule_snapshots
     run function: Consul.register_service
+    cd "/deploy" && rm -rf "/deploy/lycee-test-mlf"
 
-The register_service expects a consul definition file to be present in the
+The ``Consul.register_service`` function expects a consul definition file to be present in the
 repository of the service::
 
     >>> import tempfile, handler, requests
