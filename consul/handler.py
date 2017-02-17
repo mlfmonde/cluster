@@ -5,12 +5,16 @@ import logging
 import requests
 import socket
 from base64 import b64decode
-from os.path import basename
-from subprocess import run, CalledProcessError, PIPE
+from os.path import basename, join
+from subprocess import run as srun, CalledProcessError, PIPE
 from sys import stdin, argv
 logging.basicConfig()
 log = logging.getLogger(__name__)
 DEPLOY = '/deploy'
+
+
+def run(cmd):
+    return srun(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
 
 
 class Do(object):
@@ -41,12 +45,11 @@ class Do(object):
                 cmd = 'cd "{}" && {}'.format(cwd, cmd)
             if self.test:
                 cmd = "echo '{}'".format(cmd)
-            out = run(cmd, shell=True, check=True, stderr=PIPE, stdout=PIPE)
+            print(run(cmd).stdout.decode().strip())
+            return self
         except CalledProcessError as e:
             log.error("Failed to run %s: %s", e.cmd, e.stderr.decode())
             raise
-        print(out.stdout.decode().strip())
-        return self
 
 
 def handle_one(event, host, test=False):
@@ -68,11 +71,12 @@ def handle(events, host, test=False):
 class Consul(object):
     """consul http endpoint wrapper for the Do class
     """
-    @staticmethod
-    def register_service(name):
-        def func():
+    def register_service(self, project):
+        """register a service in consul
+        """
+        def closure():
             try:
-                path = '{}/{}/service.json'.format(DEPLOY, name)
+                path = '{}/service.json'.format(project)
                 with open(path) as f:
                     compose = f.read()
             except Exception as e:
@@ -80,7 +84,48 @@ class Consul(object):
                 raise
             requests.post('http://localhost:8500/v1/agent/register/service',
                           json.dumps(json.loads(compose)))
-        return func
+        return closure
+
+
+class DockerCompose(object):
+    """run commands against all volumes of a compose
+    """
+    def __init__(self, project):
+        self.project = project
+
+    def _volumes(self, path):
+        """return all the volumes of a running compose
+        """
+        out = run('cd "{}" && docker-compose config --services'.format(path))
+        services = [s.strip() for s in out.stdout.decode().split('\n')]
+        return [run('cd "{}" && docker-compose ps -q {}'
+                .format(s)).stdout.strip()
+                for s in services]
+
+    def snapshot(self):
+        """snapshot all volumes of a running compose
+        """
+        def closure():
+            try:
+                for volume in self._volumes(self.project):
+                    run("buttervolume snapshot {}".format(volume))
+            except CalledProcessError as e:
+                log.error("Failed to run %s: %s", e.cmd, e.stderr.decode())
+                raise
+        return closure
+
+    def schedule_snapshots(self, timer):
+        """schedule snapshots of all volumes of a running compose
+        """
+        def closure():
+            try:
+                for volume in self._volumes(self.project):
+                    run("buttervolume schedule snapshot {} {}"
+                        .format(volume, timer))
+            except CalledProcessError as e:
+                log.error("Failed to run %s: %s", e.cmd, e.stderr.decode())
+                raise
+        return closure
 
 
 def deploymaster(payload, host, test):
@@ -94,19 +139,20 @@ def deploymaster(payload, host, test):
         repo = payload.split()[1].decode()
         name = basename(repo.strip('/'))
         name = name[:-4] if name.endswith('.git') else name
+        project = join(DEPLOY, name)
     except Exception as e:
         log.error('deploymaster error: '
                   'you should specify a hostname and repository')
         raise(e)
-    # ACTIONS
+    # CHAINED ACTIONS
     if host == target:
-        Do('rm -rf "{}/{}"'.format(DEPLOY, name), cwd=DEPLOY, test=test) \
-          .then('git clone "{}"'.format(repo)) \
-          .then('docker-compose up -d', cwd='{}/{}'.format(DEPLOY, name)) \
-          .then('rm -rf "{}/{}"'.format(DEPLOY, name), cwd=DEPLOY) \
-          .then('buttervolume snapshot {}'.format(name)) \
-          .then('buttervolume schedule snapshot {} 60') \
-          .then(Consul.register_service(name))
+        Do('rm -rf "{}"'.format(project), cwd=DEPLOY, test=test) \
+         .then('git clone "{}"'.format(repo)) \
+         .then('docker-compose up -d', cwd=project) \
+         .then('rm -rf "{}"'.format(project), cwd=DEPLOY) \
+         .then(DockerCompose(project).snapshot()) \
+         .then(DockerCompose(project).schedule_snapshots(60)) \
+         .then(Consul().register_service(project))
     else:
         Do("No action", test)
 

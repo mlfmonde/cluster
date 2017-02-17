@@ -51,8 +51,8 @@ First try to deploy a master, pretending we are 'nepri'::
     cd "/deploy" && git clone "ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
     cd "/deploy/lycee-test-mlf" && docker-compose up -d
     cd "/deploy" && rm -rf "/deploy/lycee-test-mlf"
-    cd "/deploy" && buttervolume snapshot lycee-test-mlf
-    cd "/deploy" && buttervolume schedule snapshot {} 60
+    run function: DockerCompose.snapshot
+    run function: DockerCompose.schedule_snapshots
     run function: Consul.register_service
 
 The register_service expects a consul definition file to be present in the
@@ -67,9 +67,13 @@ repository of the service::
     >>> os.makedirs(service)
     >>> with open(join(service, 'service.json'), 'w') as f:
     ...     _ = f.write(json.dumps({'Name': 'plop'}))
-    >>> _ = handler.Do(handler.Consul.register_service('plop.com'))
+    >>> _ = handler.Do(handler.Consul().register_service(service))
     http://localhost:8500/v1/agent/register/service {"Name": "plop"}
-    >>> _ = handler.Do(handler.Consul.register_service('invalid.com'))
+
+Same with an invalid service::
+
+    >>> service = join(handler.DEPLOY, 'invalid.com')
+    >>> _ = handler.Do(handler.Consul().register_service(service))
     Traceback (most recent call last):
     ...
     FileNotFoundError...
