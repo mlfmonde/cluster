@@ -10,7 +10,9 @@ RUN apk add --no-cache \
     && pip install docker-compose \
     && git clone http://github.com/anybox/buttervolume \
     && cd buttervolume \
-    && python3 setup.py install
+    && python3 setup.py install \
+    && mkdir /deploy \
+    && chown consul: /deploy
 
 USER consul
 COPY ssh /home/consul/.ssh
