@@ -57,7 +57,7 @@ First try to deploy a master, pretending we are 'nepri'::
     POST http://localhost:8500/v1/agent/register/service {}
     rm -rf "/deploy/lycee-test-mlf"
 
-The register_service expects a consul definition file to be present in the
+The ``Consul.register_service`` function expects a consul definition file to be present in the
 repository of the service::
 
     >>> import tempfile, handler, requests

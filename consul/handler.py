@@ -8,7 +8,7 @@ from base64 import b64decode
 from os.path import basename, join
 from subprocess import run as srun, CalledProcessError, PIPE
 from sys import stdin, argv
-logging.basicConfig()
+logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 DEPLOY = '/deploy'
 
