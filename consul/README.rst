@@ -47,13 +47,15 @@ First try to deploy a master, pretending we are 'nepri'::
     >>> payload = b64encode(payload.encode()).decode()
     >>> events = '[{"ID":"0","Name": "deploymaster","Payload": "%s","Version":1,"LTime":1}]' % payload
     >>> handle(events, 'nepri', test=True)
-    cd "/deploy" && rm -rf "/deploy/lycee-test-mlf"
+    rm -rf "/deploy/lycee-test-mlf"
     cd "/deploy" && git clone "ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
     cd "/deploy/lycee-test-mlf" && docker-compose up -d
-    cd "/deploy" && rm -rf "/deploy/lycee-test-mlf"
-    run function: DockerCompose.snapshot
-    run function: DockerCompose.schedule_snapshots
-    run function: Consul.register_service
+    cd "/deploy/lycee-test-mlf" && docker-compose config --services
+    docker-compose ps -q 
+    buttervolume snapshot 
+    buttervolume schedule snapshot 60 
+    POST http://localhost:8500/v1/agent/register/service {}
+    rm -rf "/deploy/lycee-test-mlf"
 
 The register_service expects a consul definition file to be present in the
 repository of the service::
@@ -67,13 +69,12 @@ repository of the service::
     >>> os.makedirs(service)
     >>> with open(join(service, 'service.json'), 'w') as f:
     ...     _ = f.write(json.dumps({'Name': 'plop'}))
-    >>> _ = handler.Do(handler.Consul().register_service(service))
+    >>> _ = handler.Repository('nepri', 'http://truc/plop.com.git').register_consul()
     http://localhost:8500/v1/agent/register/service {"Name": "plop"}
 
 Same with an invalid service::
 
-    >>> service = join(handler.DEPLOY, 'invalid.com')
-    >>> _ = handler.Do(handler.Consul().register_service(service))
+    >>> _ = handler.Repository('nepri', 'http://truc/invalid.com.git').register_consul()
     Traceback (most recent call last):
     ...
     FileNotFoundError...

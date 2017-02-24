@@ -13,148 +13,157 @@ log = logging.getLogger(__name__)
 DEPLOY = '/deploy'
 
 
-def run(cmd):
-    return srun(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
+def concat(xs):
+    return [y for x in xs for y in x]
 
 
-class Do(object):
-    """Chain several commands (in a shell or as a function)
+def _run(cmd, cwd=None, test=False):
+    try:
+        if cwd:
+            cmd = 'cd "{}" && {}'.format(cwd, cmd)
+        if test:
+            print(cmd)
+            return ''
+        else:
+            res = srun(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
+            out = res.stdout.decode().strip()
+            return out
+    except CalledProcessError as e:
+        log.error("Failed to run %s: %s", e.cmd, e.stderr.decode())
+        raise
+
+
+class Repository(object):
+    """commands
     """
-    def __init__(self, cmd, test=False, cwd=None):
+    def __init__(self, hostname, url, test=False, cwd=None):
+        self.hostname = hostname
+        self.url = url
+        self.cwd = cwd
         self.test = test
-        self.cwd = cwd
-        self.then(cmd, cwd)
+        name = basename(url.strip('/'))
+        self.name = name[:-4] if name.endswith('.git') else name
+        self.path = join(DEPLOY, self.name)
 
-    def then(self, cmd, cwd=None):
-        if hasattr(cmd, '__call__'):
-            try:
-                if self.test:
-                    fname = cmd.__qualname__.rsplit('.', 2)[0]
-                    print('run function: {}'.format(fname))
-                else:
-                    cmd()
-            except Exception as e:
-                log.error("Failed to run %s: %s",
-                          cmd.__name__, str(e))
-                raise
-            return self
-        cwd = cwd or self.cwd
-        self.cwd = cwd
-        try:
-            if cwd:
-                cmd = 'cd "{}" && {}'.format(cwd, cmd)
-            if self.test:
-                cmd = "echo '{}'".format(cmd)
-            print(run(cmd).stdout.decode().strip())
-            return self
-        except CalledProcessError as e:
-            log.error("Failed to run %s: %s", e.cmd, e.stderr.decode())
-            raise
+    def run(self, cmd, cwd=None):
+        return _run(cmd, cwd=cwd, test=self.test)
 
-
-def handle_one(event, host, test=False):
-    name = event.get('Name')
-    payload = event.get('Payload')
-    if not payload:
-        return
-    if name == 'deploymaster':
-        deploymaster(b64decode(payload), host, test)
-    else:
-        log.error('Unknown event name: {}'.format(name))
-
-
-def handle(events, host, test=False):
-    for event in json.loads(events):
-        handle_one(event, host, test)
-
-
-class Consul(object):
-    """consul http endpoint wrapper for the Do class
-    """
-    def register_service(self, project):
-        """register a service in consul
-        """
-        def closure():
-            try:
-                path = '{}/service.json'.format(project)
-                with open(path) as f:
-                    compose = f.read()
-            except Exception as e:
-                log.error('Could not read %s', path)
-                raise
-            requests.post('http://localhost:8500/v1/agent/register/service',
-                          json.dumps(json.loads(compose)))
-        return closure
-
-
-class DockerCompose(object):
-    """run commands against all volumes of a compose
-    """
-    def __init__(self, project):
-        self.project = project
-
-    def _volumes(self, path):
+    def volumes(self):
         """return all the volumes of a running compose
         """
-        out = run('cd "{}" && docker-compose config --services'.format(path))
-        services = [s.strip() for s in out.stdout.decode().split('\n')]
-        return [run('cd "{}" && docker-compose ps -q {}'
-                .format(s)).stdout.strip()
+        out = self.run('docker-compose config --services', cwd=self.path)
+        services = [s.strip() for s in out.split('\n')]
+        return [Volume(self.run('docker-compose ps -q {}'.format(s)),
+                       test=self.test)
                 for s in services]
+        containers = concat(
+            [_run('cd "{}" && docker-compose ps -q {}'
+                  .format(self.project, s)).split('\n')
+             for s in services])
+        inspects = concat(
+            [json.loads(_run('docker inspect {}'.format(c)))
+             for c in containers])
+        volumes = [m['Name'] for m in concat([c['Mounts']
+                   for c in inspects]) if m['Driver'] == 'btrfs']
+        return volumes
+
+    def clean(self):
+        self.run('rm -rf "{}"'.format(self.path))
+
+    def fetch(self):
+        self.run('git clone "{}"'.format(self.url), cwd=DEPLOY)
+
+    def start(self):
+        self.run('docker-compose up -d', cwd=self.path)
+
+    def update_haproxy(self):
+        pass
+
+    def register_consul(self):
+        """register a service in consul
+        """
+        try:
+            path = '{}/service.json'.format(self.path)
+            compose = '{}'
+            if not self.test:
+                with open(path) as f:
+                    compose = f.read()
+        except Exception:
+            log.error('Could not read %s', path)
+            raise
+        url = 'http://localhost:8500/v1/agent/register/service'
+        svc = json.dumps(json.loads(compose))
+        if self.test:
+            print('POST', url, svc)
+        else:
+            requests.post(url, svc)
+
+
+class Volume(object):
+    """wrapper for buttervolume
+    """
+    def __init__(self, volume, test=False):
+        self.test = test
+        self.volume = volume
+
+    def run(self, cmd, cwd=None):
+        return _run(cmd, cwd=cwd, test=self.test)
 
     def snapshot(self):
         """snapshot all volumes of a running compose
         """
-        def closure():
-            try:
-                for volume in self._volumes(self.project):
-                    run("buttervolume snapshot {}".format(volume))
-            except CalledProcessError as e:
-                log.error("Failed to run %s: %s", e.cmd, e.stderr.decode())
-                raise
-        return closure
+        self.run("buttervolume snapshot {}".format(self.volume))
 
     def schedule_snapshots(self, timer):
         """schedule snapshots of all volumes of a running compose
         """
-        def closure():
-            try:
-                for volume in self._volumes(self.project):
-                    run("buttervolume schedule snapshot {} {}"
-                        .format(volume, timer))
-            except CalledProcessError as e:
-                log.error("Failed to run %s: %s", e.cmd, e.stderr.decode())
-                raise
-        return closure
+        self.run("buttervolume schedule snapshot {} {}"
+                 .format(timer, self.volume))
 
 
-def deploymaster(payload, host, test):
+def handle_one(event, hostname, test=False):
+    event_name = event.get('Name')
+    payload = event.get('Payload')
+    if not payload:
+        return
+    if event_name == 'deploymaster':
+        deploymaster(b64decode(payload), hostname, test)
+    else:
+        log.error('Unknown event name: {}'.format(event_name))
+
+
+def handle(events, hostname, test=False):
+    for event in json.loads(events):
+        handle_one(event, hostname, test)
+
+
+def deploymaster(payload, hostname, test):
     """Keep in mind this is executed in the consul container
     Deployments are done in the DEPLOY folder.
     Any remaining stuff in this folder are a sign of a failed deploy
     """
-    # CHECKS
+    # check
     try:
         target = payload.split()[0].decode()
-        repo = payload.split()[1].decode()
-        name = basename(repo.strip('/'))
-        name = name[:-4] if name.endswith('.git') else name
-        project = join(DEPLOY, name)
+        repo_url = payload.split()[1].decode()
     except Exception as e:
         log.error('deploymaster error: '
-                  'you should specify a hostname and repository')
+                  'you should specify a hostname and URL')
         raise(e)
-    # CHAINED ACTIONS
-    if host == target:
-        Do('rm -rf "{}"'.format(project), cwd=DEPLOY, test=test) \
-         .then('git clone "{}"'.format(repo)) \
-         .then('docker-compose up -d', cwd=project) \
-         .then('rm -rf "{}"'.format(project), cwd=DEPLOY) \
-         .then(DockerCompose(project).snapshot()) \
-         .then(DockerCompose(project).schedule_snapshots(60)) \
-         .then(Consul().register_service(project))
+    # deploy
+    if hostname == target:
+        project = Repository(hostname, repo_url, test=test)
+        project.clean()
+        project.fetch()
+        project.start()
+        for volume in project.volumes():
+            volume.snapshot()
+            volume.schedule_snapshots(60)
+        project.update_haproxy()
+        project.register_consul()
+        project.clean()
     else:
-        Do("No action", test)
+        print("No action")
 
 
 if __name__ == '__main__':
@@ -164,6 +173,6 @@ if __name__ == '__main__':
     except:
         test = False
     # hostname?
-    host = socket.gethostname()
+    hostname = socket.gethostname()
     # read json from stdin
-    handle(stdin.read(), host, test)
+    handle(stdin.read(), hostname, test)
