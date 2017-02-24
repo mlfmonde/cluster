@@ -17,4 +17,5 @@ RUN apk add --no-cache \
 USER consul
 COPY ssh /home/consul/.ssh
 COPY handler.py /
+USER root
 CMD ["agent", "-server", "-retry-join=10.91.210.57", "-bootstrap-expect=3"]
