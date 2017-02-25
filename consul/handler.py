@@ -76,7 +76,25 @@ class Repository(object):
     def start(self):
         self.run('docker-compose up -d', cwd=self.path)
 
+    def _members(self):
+        if not self.test:
+            return self.run('consul members')
+        else:
+            return (
+                'Node   Address            Status  Type       DC\n'
+                'edjo   10.91.210.58:8301  alive   server     dc1\n'
+                'nepri  10.91.210.57:8301  alive   server     dc1\n'
+                'tayt   10.91.210.59:8301  alive   server     dc1')
+
+    def members(self):
+        members = {}
+        for m in self._members()[1:]:
+            name, ip, status = m[:2]
+            members[name] = {'ip': ip.split(':')[0], 'status': status}
+
     def update_haproxy(self):
+        #members = self.members()
+        # template + ip master + url → fichier haproxy.cfg + haproxy.cfg.old → restart haproxy → si fail, reprendre le old.
         pass
 
     def register_consul(self):
