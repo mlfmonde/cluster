@@ -53,17 +53,14 @@ class Repository(object):
         """
         out = self.run('docker-compose config --services', cwd=self.path)
         services = [s.strip() for s in out.split('\n')]
-        return [Volume(self.run('docker-compose ps -q {}'.format(s)),
-                       test=self.test)
-                for s in services]
         containers = concat(
-            [_run('cd "{}" && docker-compose ps -q {}'
-                  .format(self.project, s)).split('\n')
+            [self.run('docker-compose ps -q {}'
+                      .format(s), cwd=self.path).split('\n')
              for s in services])
         inspects = concat(
             [json.loads(_run('docker inspect {}'.format(c)))
              for c in containers])
-        volumes = [m['Name'] for m in concat([c['Mounts']
+        volumes = [Volume(m['Name']) for m in concat([c['Mounts']
                    for c in inspects]) if m['Driver'] == 'btrfs']
         return volumes
 
