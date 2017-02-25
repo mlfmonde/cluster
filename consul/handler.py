@@ -106,7 +106,7 @@ class Repository(object):
         except Exception:
             log.error('Could not read %s', path)
             raise
-        url = 'http://localhost:8500/v1/agent/register/service'
+        url = 'http://localhost:8500/v1/agent/service/register'
         svc = json.dumps(json.loads(compose))
         if self.test:
             print('POST', url, svc)
