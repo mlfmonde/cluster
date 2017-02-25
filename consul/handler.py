@@ -111,7 +111,10 @@ class Repository(object):
         if self.test:
             print('POST', url, svc)
         else:
-            requests.post(url, svc)
+            res = requests.post(url, svc)
+            if res.status_code != 200:
+                raise RuntimeError('Consul service register failed: {}'
+                                   .format(res.reason))
 
 
 class Volume(object):
