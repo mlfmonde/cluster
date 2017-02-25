@@ -14,8 +14,7 @@ RUN apk add --no-cache \
     && mkdir /deploy \
     && chown consul: /deploy
 
-USER consul
-COPY ssh /home/consul/.ssh
+COPY ssh /root/.ssh
 COPY handler.py /
 USER root
 CMD ["agent", "-server", "-retry-join=10.91.210.57", "-bootstrap-expect=3"]
