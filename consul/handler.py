@@ -118,7 +118,7 @@ class Repository(object):
 
 
 class Volume(object):
-    """wrapper for buttervolume
+    """wrapper for buttervolume cli
     """
     def __init__(self, volume, test=False):
         self.test = test
