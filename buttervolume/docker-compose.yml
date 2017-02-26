@@ -1,9 +1,11 @@
 version: '2.1'
 services:
   plugin:
-    image: anybox/buttervolume
+    build: .
     restart: unless-stopped
     privileged: true
+    ports:
+      - "1122:22"
     volumes:
       - /var/lib/docker:/var/lib/docker
       - /run/docker/plugins:/run/docker/plugins
