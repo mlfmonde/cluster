@@ -1,12 +1,13 @@
 version: '2.1'
 services:
   plugin:
+    hostname: nepri
     build: .
     restart: unless-stopped
     privileged: true
     network_mode: host
     ports:
-      - "1122:22"
+      - "1122"
     volumes:
       - /var/lib/docker:/var/lib/docker
       - /run/docker/plugins:/run/docker/plugins
