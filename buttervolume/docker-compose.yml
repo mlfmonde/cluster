@@ -4,6 +4,7 @@ services:
     build: .
     restart: unless-stopped
     privileged: true
+    network_mode: host
     ports:
       - "1122:22"
     volumes:
