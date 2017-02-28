@@ -51,10 +51,9 @@ First try to deploy a master, pretending we are 'nepri'::
     cd "/deploy" && git clone "ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
     cd "/deploy/lycee-test-mlf" && docker-compose up -d
     cd "/deploy/lycee-test-mlf" && docker-compose config --services
-    docker-compose ps -q 
-    buttervolume snapshot 
-    buttervolume schedule snapshot 60 
-    POST http://localhost:8500/v1/agent/register/service {}
+    cd "/deploy/lycee-test-mlf" && docker-compose ps -q 
+    docker inspect 
+    POST http://localhost:8500/v1/agent/service/register {}
     rm -rf "/deploy/lycee-test-mlf"
 
 The ``Consul.register_service`` function expects a consul definition file to be present in the
@@ -70,7 +69,7 @@ repository of the service::
     >>> with open(join(service, 'service.json'), 'w') as f:
     ...     _ = f.write(json.dumps({'Name': 'plop'}))
     >>> _ = handler.Repository('nepri', 'http://truc/plop.com.git').register_consul()
-    http://localhost:8500/v1/agent/register/service {"Name": "plop"}
+    POST http://localhost:8500/v1/agent/service/register {}
 
 Same with an invalid service::
 

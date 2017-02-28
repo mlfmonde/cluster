@@ -36,8 +36,7 @@ def _run(cmd, cwd=None, test=False):
 class Repository(object):
     """commands
     """
-    def __init__(self, hostname, url, test=False, cwd=None):
-        self.hostname = hostname
+    def __init__(self, url, test=False, cwd=None):
         self.url = url
         self.cwd = cwd
         self.test = test
@@ -58,7 +57,7 @@ class Repository(object):
                       .format(s), cwd=self.path).split('\n')
              for s in services])
         inspects = concat(
-            [json.loads(_run('docker inspect {}'.format(c)))
+            [self.run('docker inspect {}'.format(c))
              for c in containers])
         volumes = [Volume(m['Name']) for m in concat([c['Mounts']
                    for c in inspects]) if m['Driver'] == 'btrfs']
@@ -170,16 +169,16 @@ def deploymaster(payload, hostname, test):
         raise(e)
     # deploy
     if hostname == target:
-        project = Repository(hostname, repo_url, test=test)
+        project = Repository(repo_url, test=test)
         project.clean()
         project.fetch()
         project.start()
         for volume in project.volumes():
             volume.snapshot()
             volume.schedule_snapshots(60)
-        project.update_haproxy()
+        project.update_haproxy()  # TODO
         project.register_consul()
-        project.clean()
+        project.clean()  # ?
     else:
         print("No action")
 
