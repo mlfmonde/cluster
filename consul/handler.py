@@ -57,7 +57,7 @@ class Repository(object):
                       .format(s), cwd=self.path).split('\n')
              for s in services])
         inspects = concat(
-            [self.run('docker inspect {}'.format(c))
+            [json.loads(self.run('docker inspect {}'.format(c)))
              for c in containers])
         volumes = [Volume(m['Name']) for m in concat([c['Mounts']
                    for c in inspects]) if m['Driver'] == 'btrfs']
