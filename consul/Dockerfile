@@ -14,7 +14,15 @@ RUN apk add --no-cache \
     && mkdir /deploy \
     && chown consul: /deploy
 
-COPY ssh /root/.ssh
-COPY handler.py /
+USER consul
+COPY ssh /home/consul/.ssh
 USER root
+RUN chown -R consul: /home/consul \
+    && delgroup docker \
+    && addgroup -g 233 docker \
+    && mkdir -p /run/docker/plugins/ \
+    && adduser -S -u 233 -G root docker \
+    && adduser consul root
+
+COPY handler.py /
 CMD ["agent", "-server", "-retry-join=10.91.210.57", "-bootstrap-expect=3"]
