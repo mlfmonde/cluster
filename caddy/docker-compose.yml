@@ -8,7 +8,6 @@ services:
       - 443:443
     networks:
       - caddy_default
-      - haproxy_default
     volumes:
       - ssl:/root/.caddy
       - log:/var/log
@@ -18,6 +17,3 @@ volumes:
   ssl:
 networks:
   caddy_default:
-  haproxy_default:
-    external: true
-
