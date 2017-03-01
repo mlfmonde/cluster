@@ -1,4 +1,4 @@
-https://lyceetestmlf.anybox.eu:1443 {
+https://lyceetestmlf.anybox.eu:443 {
   proxy / http://lyceetestmlf_wordpress_1/ {
 header_upstream Host {host}
 header_upstream X-Real-IP {remote}
