@@ -12,4 +12,6 @@ services:
       - ./Caddyfile:/etc/Caddyfile
 volumes:
   log:
+    driver: btrfs
   ssl:
+    driver: btrfs
