@@ -4,8 +4,8 @@ services:
     image: abiosoft/caddy
     restart: unless-stopped
     ports:
-      - 1080:80
-      - 1443:443
+      - 80:80
+      - 443:443
     networks:
       - caddy_default
       - haproxy_default
