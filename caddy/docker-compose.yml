@@ -4,8 +4,10 @@ services:
     image: abiosoft/caddy
     restart: unless-stopped
     ports:
-      - 80:80
-      - 443:443
+      - 1080:80
+      - 1443:443
+    networks:
+      - haproxy_default
     volumes:
       - ssl:/root/.caddy
       - log:/var/log
@@ -15,3 +17,6 @@ volumes:
     driver: btrfs
   ssl:
     driver: btrfs
+networks:
+  haproxy_default:
+    external: true

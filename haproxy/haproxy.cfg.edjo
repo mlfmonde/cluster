@@ -1,24 +1,27 @@
 global
     daemon
     maxconn 256
-    crt-base "/etc/ssl/letsencrypt"
 
 defaults
-    mode http
+    mode tcp
     timeout connect 5000ms
     timeout client 50000ms
     timeout server 50000ms
 
 frontend http-in
-    mode http
-    bind *:443 ssl crt "/etc/ssl/bundles/"
-    use_backend lyceetestmlf.anybox.eu if { ssl_fc_sni lyceetestmlf.anybox.eu }
-    use_backend lyceetest2mlf.anybox.eu if { ssl_fc_sni lyceetest2mlf.anybox.eu }
+    mode tcp
+    bind *:443
+    option socket-stats
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req_ssl_hello_type 1 }
+
+    use_backend lyceetestmlf.anybox.eu if { req_ssl_sni -i lyceetestmlf.anybox.eu }
+    use_backend lyceetest2mlf.anybox.eu if { req_ssl_sni -i lyceetest2mlf.anybox.eu }
 
 backend lyceetestmlf.anybox.eu
-  mode http
-  server nepri 163.172.101.141:443 weight 1 maxconn 32 check ssl verify none
+  mode tcp
+  server nepri 163.172.101.141:443
 
 backend lyceetest2mlf.anybox.eu
-  mode http
-  server edjo caddy_server_1:1443 weight 1 maxconn 32 check ssl verify none
+  mode tcp
+  server nepri caddy_server_1:443
