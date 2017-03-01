@@ -3,9 +3,6 @@ services:
   server:
     image: abiosoft/caddy
     restart: unless-stopped
-    ports:
-      - 1080:80
-      - 1443:443
     networks:
       - haproxy_default
     volumes:

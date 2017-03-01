@@ -1,4 +1,4 @@
-https://lyceetest2mlf.anybox.eu:1443 {
+https://lyceetest2mlf.anybox.eu:443 {
   tls self_signed
   proxy / http://lyceetest2mlf_wordpress_1/ {
 header_upstream Host {host}

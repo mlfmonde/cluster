@@ -20,8 +20,8 @@ frontend http-in
 
 backend lyceetestmlf.anybox.eu
   mode tcp
-  server nepri 163.172.101.141:1443
+  server nepri 163.172.101.141:443
 
 backend lyceetest2mlf.anybox.eu
   mode tcp
-  server edjo caddy_server_1:1443
+  server edjo caddy_server_1:443
