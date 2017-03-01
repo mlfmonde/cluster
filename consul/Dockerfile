@@ -22,8 +22,8 @@ RUN chown -R consul: /home/consul \
     && addgroup -g 233 docker \
     && mkdir -p /run/docker/plugins/ \
     && adduser -S -u 233 -G docker docker \
-    && adduser consul root \  # for buttervolume :-/
-    && adduser consul docker  # for docker
+    && adduser consul root \
+    && adduser consul docker
 
 COPY handler.py /
 CMD ["agent", "-server", "-retry-join=10.91.210.57", "-bootstrap-expect=3"]
