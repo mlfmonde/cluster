@@ -1,4 +1,4 @@
-https://lyceetestmlf.anybox.eu:1443 {
+https://lyceetestmlf.anybox.eu:443 {
   tls self_signed
   proxy / http://lyceetestmlfanyboxeu_wordpress_1/ {
 header_upstream Host {host}
@@ -19,9 +19,9 @@ header_upstream X-Forwarded-Proto "https"
       }
   }
 }
-https://lyceetest2mlf.anybox.eu:1443 {
+https://lyceetest2mlf.anybox.eu:443 {
   tls self_signed
-  proxy / http://lyceetest2mlfanyboxeu_wordpress_1/ {
+  proxy / https://163.172.101.142/ {
 header_upstream Host {host}
 header_upstream X-Real-IP {remote}
 header_upstream X-Forwarded-For {remote}
