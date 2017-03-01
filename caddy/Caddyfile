@@ -1,4 +1,5 @@
 https://lyceetestmlf.anybox.eu:1443 {
+  tls self_signed
   proxy / http://lyceetestmlfanyboxeu_wordpress_1/ {
 header_upstream Host {host}
 header_upstream X-Real-IP {remote}
@@ -11,6 +12,27 @@ header_upstream X-Forwarded-Proto "https"
     }
   gzip
   log /var/log/lyceetestmlf.anybox.eu.access.log {
+      rotate {
+          size 100 # Rotate after 100 MB
+          age  14  # Keep log files for 14 days
+          keep 10  # Keep at most 10 log files
+      }
+  }
+}
+https://lyceetest2mlf.anybox.eu:1443 {
+  tls self_signed
+  proxy / http://lyceetest2mlfanyboxeu_wordpress_1/ {
+header_upstream Host {host}
+header_upstream X-Real-IP {remote}
+header_upstream X-Forwarded-For {remote}
+header_upstream X-Forwarded-Proto "https"
+#header_upstream Front-End-Https "on"
+#header_upstream Strict-Transport-Security "max-age=63072000; includeSubdomains; preload"
+#header_upstream Accept-Encoding ""
+
+    }
+  gzip
+  log /var/log/lyceetest2mlf.anybox.eu.access.log {
       rotate {
           size 100 # Rotate after 100 MB
           age  14  # Keep log files for 14 days
