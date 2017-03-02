@@ -10,9 +10,19 @@ It receives json through stdin, as a list of events.
 Test
 ****
 
+WARNING: this is an intrusive test that depends on some containers running.
+Before the test you should make sure you run on BTRFS filesystem, then::
+
+    $ sudo -s
+    # docker network create haproxy_default
+    # cd ../buttervolume
+    # docker-compose up -d
+
 Run this doctest with::
 
-    $ python3 test.py
+    $ sudo -E python3 test.py
+
+(-E is to keep the environment so that pulling from the gitlab works like with your normal user)
 
 Using from the shell
 ********************
@@ -34,53 +44,44 @@ Using as a Python library
 
 This example does nothing because the "plop" event does not exist::
 
-    >>> from handler import handle
+    >>> import handler
     >>> events = '[{"ID":"0","Name":"plop","Payload":"cGxvcDI=","Version":1,"LTime":1}]'
-    >>> handle(events, 'nowhere')
+    >>> handler.handle(events, 'nowhere')
 
 As a Python library in **test mode**, which we use for the doctests.
 
 First try to deploy a master, pretending we are 'nepri'::
 
+    >>> import tempfile
+    >>> handler.DEPLOY = tempfile.mkdtemp()
     >>> from base64 import b64encode
     >>> payload = "nepri ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
     >>> payload = b64encode(payload.encode()).decode()
     >>> events = '[{"ID":"0","Name": "deploymaster","Payload": "%s","Version":1,"LTime":1}]' % payload
-    >>> handle(events, 'nepri', test=True)
-    rm -rf "/deploy/lycee-test-mlf"
-    cd "/deploy" && git clone "ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
-    cd "/deploy/lycee-test-mlf" && docker-compose up -d
-    cd "/deploy/lycee-test-mlf" && docker-compose config --services
-    cd "/deploy/lycee-test-mlf" && docker-compose ps -q 
-    docker inspect 
-    POST http://localhost:8500/v1/agent/service/register {}
-    rm -rf "/deploy/lycee-test-mlf"
-
-The ``Consul.register_service`` function expects a consul definition file to be present in the
-repository of the service::
-
-    >>> import tempfile, handler, requests
-    >>> from os.path import join
-    >>> import os, json
-    >>> requests.post = print
-    >>> handler.DEPLOY = tempfile.mkdtemp()
-    >>> service = join(handler.DEPLOY, 'plop.com')
-    >>> os.makedirs(service)
-    >>> with open(join(service, 'service.json'), 'w') as f:
-    ...     _ = f.write(json.dumps({'Name': 'plop'}))
-    >>> _ = handler.Repository('nepri', 'http://truc/plop.com.git').register_consul()
-    POST http://localhost:8500/v1/agent/service/register {}
+    >>> handler.handle(events, 'nepri', test=True)
+    buttervolume snapshot lyceetestmlf_dbdata
+    buttervolume schedule snapshot 60 lyceetestmlf_dbdata
+    buttervolume snapshot lyceetestmlf_wwwdata
+    buttervolume schedule snapshot 60 lyceetestmlf_wwwdata
+    consul kv put lyceetestmlf.anybox.eu nepri:lyceetestmlf_wordpress_1
+    POST http://localhost:8500/v1/agent/service/register {
+        "Name": "lyceetestmlf.anybox.eu",
+        "Check": {
+            "HTTP": "https://lyceetestmlf.anybox.eu/",
+            "Interval": "30s"
+        }
+    }
 
 Same with an invalid service::
 
-    >>> _ = handler.Repository('nepri', 'http://truc/invalid.com.git').register_consul()
+    >>> _ = handler.Repository('http://truc/invalid.com.git').register_consul()
     Traceback (most recent call last):
     ...
     FileNotFoundError...
 
 At the same time, the same deployment is run on tayt, it does nothing::
 
-    >>> handle(events, 'tayt', test=True)
+    >>> handler.handle(events, 'tayt', test=True)
     No action
 
 Then we deploy a slave on edjo::
