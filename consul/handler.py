@@ -178,7 +178,7 @@ def deploymaster(payload, hostname, test):
             volume.schedule_snapshots(60)
         project.update_haproxy()  # TODO
         project.register_consul()
-        project.clean()  # ?
+        #project.clean()  # ?
     else:
         print("No action")
 

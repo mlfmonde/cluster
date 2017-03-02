@@ -15,3 +15,4 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /run/docker/plugins:/run/docker/plugins
+      - ~/deploy:/deploy
