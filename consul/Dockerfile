@@ -12,7 +12,12 @@ RUN apk add --no-cache \
     && cd buttervolume \
     && python3 setup.py install \
     && mkdir /deploy \
-    && chown consul: /deploy
+    && chown consul: /deploy \
+    && cd /bin \
+    && curl -o consul-template.zip https://releases.hashicorp.com/consul-template/0.18.1/consul-template_0.18.1_linux_amd64.zip \
+    && unzip consul-template.zip \
+    && rm consul-template.zip \
+    && mkdir /consul/template
 
 USER consul
 COPY ssh /home/consul/.ssh
@@ -26,4 +31,6 @@ RUN chown -R consul: /home/consul \
     && adduser consul docker
 
 COPY handler.py /
+COPY docker-entrypoint.sh /
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["agent", "-server", "-retry-join=10.91.210.57", "-bootstrap-expect=3"]
