@@ -8,5 +8,5 @@ services:
       - 80:80
       - 443:443
     volumes:
-      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+      - ./conf/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
       - /var/lib/docker/volumes/caddy_ssl/_data/acme/acme-v01.api.letsencrypt.org/sites:/etc/ssl/letsencrypt
