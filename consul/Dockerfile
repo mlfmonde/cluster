@@ -21,6 +21,7 @@ USER consul
 COPY ssh /home/consul/.ssh
 USER root
 RUN chown -R consul: /home/consul \
+    && chmod go-rwx /home/consul/.ssh/id_rsa \
     && delgroup docker \
     && addgroup -g 233 docker \
     && mkdir -p /run/docker/plugins/ \
