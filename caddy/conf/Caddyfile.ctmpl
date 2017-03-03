@@ -1,6 +1,6 @@
-{ range tree "site"  }}
+{{ range tree "site"  }}
 https://{{ .Key  }}:443 {
-proxy / http://{{ index (.Value | split ":") 1  }}/ {
+proxy / http://{{ with $d := .Value | parseJSON  }}{{ $d.ct  }}{{ end  }}/ {
 header_upstream Host {host}
 header_upstream X-Real-IP {remote}
 header_upstream X-Forwarded-For {remote}
@@ -20,3 +20,4 @@ header_upstream X-Forwarded-Proto "https"
   }
 }
 {{ end  }}
+

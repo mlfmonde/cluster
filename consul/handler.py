@@ -101,7 +101,7 @@ class Repository(object):
         ps = self.run('docker-compose ps {}'.format(service), cwd=self.path)
         return ps.split('\n')[-1].split()
 
-    def register_kv(self, hostname):
+    def register_kv(self, target, hostname):
         """register a service in the kv store
         so that consul-template can regenerate the
         caddy and haproxy conf files
@@ -114,8 +114,12 @@ class Repository(object):
             container_name, _, state = self.ps(service)
             if state == 'Up':
                 # store the url and name in the kv
-                self.run('consul kv put {} {}:{}'
-                         .format(site_url, hostname, container_name),
+                value = {
+                    'url': site_url,
+                    'node': target,
+                    'ct': container_name}
+                self.run('consul kv put site/{} {}'
+                         .format(site_url, json.dumps(value)),
                          runintest=False)
             else:
                 raise RuntimeError('%s deployment failed', self.name)
@@ -202,7 +206,7 @@ def deploymaster(payload, hostname, test):
         for volume in repo.volumes():
             volume.snapshot()
             volume.schedule_snapshots(60)
-        repo.register_kv(hostname)  # for consul-template
+        repo.register_kv(target, hostname)  # for consul-template
         repo.register_consul()  # for consul check
     else:
         print("No action")

@@ -1,0 +1,26 @@
+global
+    daemon
+    maxconn 256
+
+defaults
+    mode tcp
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+
+frontend http-in
+    mode tcp
+    bind *:443
+    option socket-stats
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req_ssl_hello_type 1  }
+
+    {{ range tree "site"  }}use_backend {{ .Key  }} if { req_ssl_sni -i {{ .Key  }}  }
+    {{ end  }}
+
+{{ range tree "site"  }}backend {{ .Key  }}
+  mode tcp
+  server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}{{ $d.ct  }}{{ else  }}{{ $d.ip  }}{{ end  }}:443{{ end  }}
+
+{{ end  }}
+

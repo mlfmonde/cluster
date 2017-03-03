@@ -63,7 +63,7 @@ First try to deploy a master, pretending we are 'nepri'::
     buttervolume schedule snapshot 60 lyceetestmlf_dbdata
     buttervolume snapshot lyceetestmlf_wwwdata
     buttervolume schedule snapshot 60 lyceetestmlf_wwwdata
-    consul kv put lyceetestmlf.anybox.eu nepri:lyceetestmlf_wordpress_1
+    consul kv put site/lyceetestmlf.anybox.eu {"ct": "lyceetestmlf_wordpress_1", "url": "lyceetestmlf.anybox.eu", "node": "nepri"}
     POST http://localhost:8500/v1/agent/service/register {
         "Name": "lyceetestmlf.anybox.eu",
         "Check": {
