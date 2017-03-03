@@ -90,9 +90,10 @@ class Repository(object):
 
     def members(self):
         members = {}
-        for m in self._members()[1:]:
-            name, ip, status = m[:2]
+        for m in self._members().split('\n')[2:]:
+            name, ip, status = m.split()[:3]
             members[name] = {'ip': ip.split(':')[0], 'status': status}
+        return members
 
     def site_url(self, service):
         return self.run("docker-compose exec -T {} sh -c 'echo $URL'"
@@ -119,6 +120,7 @@ class Repository(object):
                 value = {
                     'url': site_url,
                     'node': target,
+                    'ip': self.members()[target]['ip'],
                     'ct': container_name}
                 cmd = ("consul kv put site/{} '{}'"
                        .format(site_url, json.dumps(value)))
