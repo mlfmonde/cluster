@@ -8,20 +8,20 @@ from base64 import b64decode
 from os.path import basename, join
 from subprocess import run as srun, CalledProcessError, PIPE
 from sys import stdin, argv
-logging.basicConfig(level=logging.DEBUG)
-log = logging.getLogger(__name__)
 DEPLOY = '/deploy'
+logging.basicConfig(level=logging.DEBUG, filename=join(DEPLOY, 'handler.log'))
+log = logging.getLogger(__name__)
 
 
 def concat(xs):
     return [y for x in xs for y in x]
 
 
-def _run(cmd, cwd=None, test=False):
+def _run(cmd, cwd=None, fake=False):
     try:
         if cwd:
             cmd = 'cd "{}" && {}'.format(cwd, cmd)
-        if test:
+        if fake:
             print(cmd)
             return ''
         else:
@@ -36,32 +36,37 @@ def _run(cmd, cwd=None, test=False):
 class Repository(object):
     """commands
     """
-    def __init__(self, url, test=False, cwd=None):
+    def __init__(self, url, cwd=None, test=False):
+        self.test = test
         self.url = url
         self.cwd = cwd
-        self.test = test
         name = basename(url.strip('/'))
         self.name = name[:-4] if name.endswith('.git') else name
         self.path = join(DEPLOY, self.name)
 
-    def run(self, cmd, cwd=None):
-        return _run(cmd, cwd=cwd, test=self.test)
+    def run(self, cmd, cwd=None, runintest=True):
+        return _run(cmd, cwd=cwd, fake=(not runintest))
+
+    def services(self):
+        out = self.run('docker-compose config --services', cwd=self.path)
+        return [s.strip() for s in out.split('\n')]
+
+    def containers(self):
+        return concat(
+            [self.run('docker-compose ps -q {}'
+                      .format(s), cwd=self.path).split('\n')
+             for s in self.services()])
+
+    def inspects(self):
+        return concat(
+            [json.loads(self.run('docker inspect {}'.format(c)))
+             for c in self.containers()])
 
     def volumes(self):
         """return all the volumes of a running compose
         """
-        out = self.run('docker-compose config --services', cwd=self.path)
-        services = [s.strip() for s in out.split('\n')]
-        containers = concat(
-            [self.run('docker-compose ps -q {}'
-                      .format(s), cwd=self.path).split('\n')
-             for s in services])
-        inspects = concat(
-            [json.loads(self.run('docker inspect {}'.format(c)))
-             for c in containers])
-        volumes = [Volume(m['Name']) for m in concat([c['Mounts']
-                   for c in inspects]) if m['Driver'] == 'btrfs']
-        return volumes
+        return [Volume(m['Name'], test=self.test) for m in concat([c['Mounts']
+                for c in self.inspects()]) if m['Driver'] == 'btrfs']
 
     def clean(self):
         self.run('rm -rf "{}"'.format(self.path))
@@ -88,27 +93,52 @@ class Repository(object):
             name, ip, status = m[:2]
             members[name] = {'ip': ip.split(':')[0], 'status': status}
 
-    def update_haproxy(self):
-        #members = self.members()
-        # template + ip master + url → fichier haproxy.cfg + haproxy.cfg.old → restart haproxy → si fail, reprendre le old.
-        pass
+    def site_url(self, service):
+        return self.run("docker-compose exec {} sh -c 'echo $URL'"
+                        .format(service), cwd=self.path)
+
+    def ps(self, service):
+        ps = self.run('docker-compose ps {}'.format(service), cwd=self.path)
+        return ps.split('\n')[-1].split()
+
+    def register_kv(self, target, hostname):
+        """register a service in the kv store
+        so that consul-template can regenerate the
+        caddy and haproxy conf files
+        """
+        # get the configured URL directly in the container
+        for service in self.services():
+            site_url = self.site_url(service)
+            if not site_url:
+                continue
+            container_name, _, state = self.ps(service)
+            if state == 'Up':
+                # store the url and name in the kv
+                value = {
+                    'url': site_url,
+                    'node': target,
+                    'ct': container_name}
+                self.run('consul kv put site/{} {}'
+                         .format(site_url, json.dumps(value)),
+                         runintest=False)
+            else:
+                raise RuntimeError('%s deployment failed', self.name)
 
     def register_consul(self):
         """register a service in consul
         """
         try:
             path = '{}/service.json'.format(self.path)
-            compose = '{}'
-            if not self.test:
-                with open(path) as f:
-                    compose = f.read()
+            content = '{}'
+            with open(path) as f:
+                content = f.read()
         except Exception:
             log.error('Could not read %s', path)
             raise
         url = 'http://localhost:8500/v1/agent/service/register'
-        svc = json.dumps(json.loads(compose))
+        svc = json.dumps(json.loads(content))
         if self.test:
-            print('POST', url, svc)
+            print('POST', url, content)
         else:
             res = requests.post(url, svc)
             if res.status_code != 200:
@@ -124,7 +154,7 @@ class Volume(object):
         self.volume = volume
 
     def run(self, cmd, cwd=None):
-        return _run(cmd, cwd=cwd, test=self.test)
+        return _run(cmd, cwd=cwd, fake=self.test)
 
     def snapshot(self):
         """snapshot all volumes of a running compose
@@ -169,16 +199,15 @@ def deploymaster(payload, hostname, test):
         raise(e)
     # deploy
     if hostname == target:
-        project = Repository(repo_url, test=test)
-        project.clean()
-        project.fetch()
-        project.start()
-        for volume in project.volumes():
+        repo = Repository(repo_url, test=test)
+        repo.clean()
+        repo.fetch()
+        repo.start()
+        for volume in repo.volumes():
             volume.snapshot()
             volume.schedule_snapshots(60)
-        project.update_haproxy()  # TODO
-        project.register_consul()
-        #project.clean()  # ?
+        repo.register_kv(target, hostname)  # for consul-template
+        repo.register_consul()  # for consul check
     else:
         print("No action")
 

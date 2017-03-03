@@ -1,6 +1,6 @@
-https://lyceetest2mlf.anybox.eu:443 {
-  tls self_signed
-  proxy / http://lyceetest2mlf_wordpress_1/ {
+{{ range tree "site"  }}
+https://{{ .Key  }}:443 {
+proxy / http://{{ with $d := .Value | parseJSON  }}{{ $d.ct  }}{{ end  }}/ {
 header_upstream Host {host}
 header_upstream X-Real-IP {remote}
 header_upstream X-Forwarded-For {remote}
@@ -11,7 +11,7 @@ header_upstream X-Forwarded-Proto "https"
 
     }
   gzip
-  log /var/log/lyceetest2mlf.anybox.eu.access.log {
+  log /var/log/{{ .Key  }}.access.log {
       rotate {
           size 100 # Rotate after 100 MB
           age  14  # Keep log files for 14 days
@@ -19,3 +19,5 @@ header_upstream X-Forwarded-Proto "https"
       }
   }
 }
+{{ end  }}
+
