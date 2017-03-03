@@ -1,14 +1,14 @@
 version: '2.1'
 services:
   server:
-    image: abiosoft/caddy
+    build: .
     restart: unless-stopped
     networks:
       - haproxy_default
     volumes:
       - ssl:/root/.caddy
       - log:/var/log
-      - ./conf/Caddyfile:/etc/Caddyfile
+      - ./conf/:/etc/caddy
 volumes:
   log:
     driver: btrfs
