@@ -90,7 +90,7 @@ class Repository(object):
 
     def members(self):
         members = {}
-        for m in self._members().split('\n')[2:]:
+        for m in self._members().split('\n')[1:]:
             name, ip, status = m.split()[:3]
             members[name] = {'ip': ip.split(':')[0], 'status': status}
         return members
