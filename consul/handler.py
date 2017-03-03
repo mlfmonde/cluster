@@ -122,7 +122,7 @@ class Repository(object):
                     'node': target,
                     'ip': self.members()[target]['ip'],
                     'ct': container_name}
-                cmd = ("consul kv delete site/{}".format(site_url))
+                cmd = "consul kv delete site/{}".format(site_url)
                 self.run(cmd, runintest=False)
                 cmd = ("consul kv put site/{} '{}'"
                        .format(site_url, json.dumps(value)))
