@@ -5,7 +5,7 @@ import logging
 import requests
 import socket
 from base64 import b64decode
-from os.path import basename, join
+from os.path import basename, join, exists
 from subprocess import run as srun, CalledProcessError, PIPE
 from sys import stdin, argv
 DEPLOY = '/deploy'
@@ -33,7 +33,7 @@ def _run(cmd, cwd=None, test=False):
         raise
 
 
-class Repository(object):
+class Application(object):
     """commands
     """
     def __init__(self, url, cwd=None, test=False):
@@ -44,22 +44,22 @@ class Repository(object):
         self.name = name[:-4] if name.endswith('.git') else name
         self.path = join(DEPLOY, self.name)
 
-    def run(self, cmd, cwd=None, runintest=True):
+    def do(self, cmd, cwd=None, runintest=True):
         return _run(cmd, cwd=cwd, test=self.test and not runintest)
 
     def services(self):
-        out = self.run('docker-compose config --services', cwd=self.path)
+        out = self.do('docker-compose config --services', cwd=self.path)
         return [s.strip() for s in out.split('\n')]
 
     def containers(self):
         return concat(
-            [self.run('docker-compose ps -q {}'
-                      .format(s), cwd=self.path).split('\n')
+            [self.do('docker-compose ps -q {}'
+                     .format(s), cwd=self.path).split('\n')
              for s in self.services()])
 
     def inspects(self):
         return concat(
-            [json.loads(self.run('docker inspect {}'.format(c)))
+            [json.loads(self.do('docker inspect {}'.format(c)))
              for c in self.containers()])
 
     def volumes(self):
@@ -69,18 +69,32 @@ class Repository(object):
                 for c in self.inspects()]) if m['Driver'] == 'btrfs']
 
     def clean(self):
-        self.run('rm -rf "{}"'.format(self.path))
+        self.do('rm -rf "{}"'.format(self.path))
 
-    def fetch(self):
-        self.run('git clone "{}"'.format(self.url), cwd=DEPLOY)
+    def fetch(self, retrying=False):
+        try:
+            if not exists(self.path):
+                self.do('git clone "{}"'.format(self.url), cwd=DEPLOY)
+            else:
+                self.do('git pull', cwd=self.path)
+        except CalledProcessError:
+            if not retrying:
+                log.warn("Failed to fetch %s, retrying", self.name)
+                self.fetch(retrying=True)
+            else:
+                raise
 
     def start(self):
         log.info("Starting the project %s", self.name)
-        self.run('docker-compose up -d', cwd=self.path)
+        self.do('docker-compose up -d', cwd=self.path)
+
+    def stop(self):
+        log.info("Stopping the project %s", self.name)
+        self.do('docker-compose down', cwd=self.path)
 
     def _members(self):
         if not self.test:
-            return self.run('consul members')
+            return self.do('consul members')
         else:
             return (
                 'Node   Address            Status  Type       DC\n'
@@ -96,11 +110,11 @@ class Repository(object):
         return members
 
     def site_url(self, service):
-        return self.run("docker-compose exec -T {} sh -c 'echo $URL'"
-                        .format(service), cwd=self.path)
+        return self.do("docker-compose exec -T {} sh -c 'echo $URL'"
+                       .format(service), cwd=self.path)
 
     def ps(self, service):
-        ps = self.run('docker-compose ps {}'.format(service), cwd=self.path)
+        ps = self.do('docker-compose ps {}'.format(service), cwd=self.path)
         return ps.split('\n')[-1].split()
 
     def register_kv(self, target, hostname):
@@ -124,7 +138,7 @@ class Repository(object):
                     'ct': container_name}
                 cmd = ("consul kv put site/{} '{}'"
                        .format(site_url, json.dumps(value)))
-                self.run(cmd, runintest=False)
+                self.do(cmd, runintest=False)
                 log.info("Registered %s", cmd)
             else:
                 raise RuntimeError('%s deployment failed', self.name)
@@ -160,19 +174,19 @@ class Volume(object):
         self.test = test
         self.volume = volume
 
-    def run(self, cmd, cwd=None):
+    def do(self, cmd, cwd=None):
         return _run(cmd, cwd=cwd, test=self.test)
 
     def snapshot(self):
         """snapshot all volumes of a running compose
         """
-        self.run("buttervolume snapshot {}".format(self.volume))
+        self.do("buttervolume snapshot {}".format(self.volume))
 
     def schedule_snapshots(self, timer):
         """schedule snapshots of all volumes of a running compose
         """
-        self.run("buttervolume schedule snapshot {} {}"
-                 .format(timer, self.volume))
+        self.do("buttervolume schedule snapshot {} {}"
+                .format(timer, self.volume))
 
 
 def handle_one(event, hostname, test=False):
@@ -205,18 +219,21 @@ def deploymaster(payload, hostname, test):
                   'you should specify a hostname and URL')
         raise(e)
     # deploy
+    app = Application(repo_url, test=test)
     if hostname == target:
-        repo = Repository(repo_url, test=test)
-        repo.clean()
-        repo.fetch()
-        repo.start()
-        for volume in repo.volumes():
+        app.fetch()
+        app.start()
+        for volume in app.volumes():
             volume.snapshot()
             volume.schedule_snapshots(60)
-        repo.register_kv(target, hostname)  # for consul-template
-        repo.register_consul()  # for consul check
+        app.register_kv(target, hostname)  # for consul-template
+        app.register_consul()  # for consul check
     else:
-        print("No action")
+        app.fetch()
+        app.stop()
+        for volume in app.volumes():
+            volume.snapshot()
+            volume.schedule_snapshots(0)
 
 
 if __name__ == '__main__':
