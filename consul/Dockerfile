@@ -1,4 +1,4 @@
-FROM consul
+FROM consul:0.7.5
 RUN apk add --no-cache \
       docker \
       git \
@@ -11,8 +11,6 @@ RUN apk add --no-cache \
     && git clone http://github.com/anybox/buttervolume \
     && cd buttervolume \
     && python3 setup.py install \
-    && mkdir /deploy \
-    && chown consul: /deploy \
     && cd /bin \
     && curl -o consul-template.zip https://releases.hashicorp.com/consul-template/0.18.1/consul-template_0.18.1_linux_amd64.zip \
     && unzip consul-template.zip \

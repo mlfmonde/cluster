@@ -17,11 +17,11 @@ def concat(xs):
     return [y for x in xs for y in x]
 
 
-def _run(cmd, cwd=None, fake=False):
+def _run(cmd, cwd=None, test=False):
     try:
         if cwd:
             cmd = 'cd "{}" && {}'.format(cwd, cmd)
-        if fake:
+        if test:
             print(cmd)
             return ''
         else:
@@ -45,7 +45,7 @@ class Repository(object):
         self.path = join(DEPLOY, self.name)
 
     def run(self, cmd, cwd=None, runintest=True):
-        return _run(cmd, cwd=cwd, fake=(not runintest))
+        return _run(cmd, cwd=cwd, test=self.test and not runintest)
 
     def services(self):
         out = self.run('docker-compose config --services', cwd=self.path)
@@ -75,6 +75,7 @@ class Repository(object):
         self.run('git clone "{}"'.format(self.url), cwd=DEPLOY)
 
     def start(self):
+        log.info("Starting the project %s", self.name)
         self.run('docker-compose up -d', cwd=self.path)
 
     def _members(self):
@@ -94,7 +95,7 @@ class Repository(object):
             members[name] = {'ip': ip.split(':')[0], 'status': status}
 
     def site_url(self, service):
-        return self.run("docker-compose exec {} sh -c 'echo $URL'"
+        return self.run("docker-compose exec -T {} sh -c 'echo $URL'"
                         .format(service), cwd=self.path)
 
     def ps(self, service):
@@ -107,6 +108,7 @@ class Repository(object):
         caddy and haproxy conf files
         """
         # get the configured URL directly in the container
+        log.info("Registering URLs of %s in the kv store", self.name)
         for service in self.services():
             site_url = self.site_url(service)
             if not site_url:
@@ -118,9 +120,10 @@ class Repository(object):
                     'url': site_url,
                     'node': target,
                     'ct': container_name}
-                self.run('consul kv put site/{} {}'
-                         .format(site_url, json.dumps(value)),
-                         runintest=False)
+                cmd = ("consul kv put site/{} '{}'"
+                       .format(site_url, json.dumps(value)))
+                self.run(cmd, runintest=False)
+                log.info("Registered %s", cmd)
             else:
                 raise RuntimeError('%s deployment failed', self.name)
 
@@ -129,6 +132,7 @@ class Repository(object):
         """
         try:
             path = '{}/service.json'.format(self.path)
+            log.info("Registering %s in consul", self.path)
             content = '{}'
             with open(path) as f:
                 content = f.read()
@@ -144,6 +148,7 @@ class Repository(object):
             if res.status_code != 200:
                 raise RuntimeError('Consul service register failed: {}'
                                    .format(res.reason))
+            log.info("Registered %s in consul", self.path)
 
 
 class Volume(object):
@@ -154,7 +159,7 @@ class Volume(object):
         self.volume = volume
 
     def run(self, cmd, cwd=None):
-        return _run(cmd, cwd=cwd, fake=self.test)
+        return _run(cmd, cwd=cwd, test=self.test)
 
     def snapshot(self):
         """snapshot all volumes of a running compose
