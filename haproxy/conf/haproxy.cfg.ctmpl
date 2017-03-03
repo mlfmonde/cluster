@@ -8,19 +8,33 @@ defaults
     timeout client 50000ms
     timeout server 50000ms
 
-frontend http-in
+frontend https-in
     mode tcp
     bind *:443
     option socket-stats
     tcp-request inspect-delay 5s
     tcp-request content accept if { req_ssl_hello_type 1  }
 
-    {{ range tree "site"  }}use_backend {{ .Key  }} if { req_ssl_sni -i {{ .Key  }}  }
+    {{ range tree "site"  }}use_backend https-{{ .Key  }} if { req_ssl_sni -i {{ .Key  }}  }
     {{ end  }}
 
-{{ range tree "site"  }}backend {{ .Key  }}
+{{ range tree "site"  }}backend https-{{ .Key  }}
   mode tcp
   server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy_server_1{{ else  }}{{ $d.ip  }}{{ end  }}:443{{ end  }}
 
 {{ end  }}
 
+frontend http-in
+    mode tcp
+    bind *:80
+    option socket-stats
+    tcp-request inspect-delay 5s
+
+    {{ range tree "site"  }}use_backend http-{{ .Key  }} if { hdr(host) -i {{ .Key  }}  }
+    {{ end  }}
+
+{{ range tree "site"  }}backend http-{{ .Key  }}
+  mode tcp
+  server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy_server_1{{ else  }}{{ $d.ip  }}{{ end  }}:80{{ end  }}
+
+{{ end  }}
