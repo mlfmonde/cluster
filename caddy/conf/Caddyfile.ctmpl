@@ -1,6 +1,6 @@
-{{ range tree "site"  }}
-https://{{ .Key  }}:443 {
-proxy / http://{{ with $d := .Value | parseJSON  }}{{ $d.ct  }}{{ end  }}/ {
+{{ range tree "site" }}{{ $k := .Key }}{{ $v := .Value | parseJSON  }}{{ if eq $v.node (env "HOSTNAME")  }}
+https://{{ $k  }}:443 {
+proxy / http://{{ $v.ct  }}/ {
 header_upstream Host {host}
 header_upstream X-Real-IP {remote}
 header_upstream X-Forwarded-For {remote}
@@ -11,7 +11,7 @@ header_upstream X-Forwarded-Proto "https"
 
     }
   gzip
-  log /var/log/{{ .Key  }}.access.log {
+  log /var/log/{{ $k  }}.access.log {
       rotate {
           size 100 # Rotate after 100 MB
           age  14  # Keep log files for 14 days
@@ -19,5 +19,5 @@ header_upstream X-Forwarded-Proto "https"
       }
   }
 }
-{{ end  }}
+{{ end  }}{{ end  }}
 
