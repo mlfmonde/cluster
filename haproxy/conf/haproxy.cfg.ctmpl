@@ -20,7 +20,7 @@ frontend http-in
 
 {{ range tree "site"  }}backend {{ .Key  }}
   mode tcp
-  server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}{{ $d.ct  }}{{ else  }}{{ $d.ip  }}{{ end  }}:443{{ end  }}
+  server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy_server_1{{ else  }}{{ $d.ip  }}{{ end  }}:443{{ end  }}
 
 {{ end  }}
 
