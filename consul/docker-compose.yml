@@ -16,5 +16,5 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /run/docker/plugins:/run/docker/plugins
       - ~/deploy:/deploy
-      - ~/cluster/caddy/:/consul/template/caddy/
-      - ~/cluster/haproxy/:/consul/template/haproxy/
+      - ~/cluster/caddy/conf/:/consul/template/caddy/
+      - ~/cluster/haproxy/conf/:/consul/template/haproxy/
