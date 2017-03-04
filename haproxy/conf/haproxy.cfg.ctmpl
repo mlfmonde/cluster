@@ -21,11 +21,11 @@ frontend https-in
 
 backend https-consul-mlf.anybox.eu
   mode tcp
-  server nepri cluster_caddy_1:443
+  server nepri caddy:443
 
 {{ range tree "site"  }}backend https-{{ .Key  }}
   mode tcp
-  server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}cluster_caddy_1{{ else  }}{{ $d.ip  }}{{ end  }}:443{{ end  }}
+  server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy{{ else  }}{{ $d.ip  }}{{ end  }}:443{{ end  }}
 
 {{ end  }}
 
@@ -41,10 +41,10 @@ frontend http-in
 
 backend http-consul-mlf.anybox.eu
   mode tcp
-  server nepri cluster_caddy_1:80
+  server nepri caddy:80
 
 {{ range tree "site"  }}backend http-{{ .Key  }}
   mode tcp
-  server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}cluster_caddy_1{{ else  }}{{ $d.ip  }}{{ end  }}:80{{ end  }}
+  server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy{{ else  }}{{ $d.ip  }}{{ end  }}:80{{ end  }}
 
 {{ end  }}
