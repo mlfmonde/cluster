@@ -60,7 +60,7 @@ class Application(object):
     def inspects(self):
         return concat(
             [json.loads(self.do('docker inspect {}'.format(c)))
-             for c in self.containers()])
+             for c in self.containers() if c.strip()])
 
     def volumes(self):
         """return all the volumes of a running compose
