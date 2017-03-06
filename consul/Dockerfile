@@ -8,6 +8,7 @@ RUN apk add --no-cache \
       python3 \
     && pip install --upgrade pip \
     && pip install docker-compose \
+    && pip3 install pyyaml \
     && git clone http://github.com/anybox/buttervolume \
     && cd buttervolume \
     && python3 setup.py install \

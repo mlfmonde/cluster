@@ -4,6 +4,8 @@ import json
 import logging
 import requests
 import socket
+import time
+import yaml
 from base64 import b64decode
 from os.path import basename, join, exists
 from subprocess import run as srun, CalledProcessError, PIPE
@@ -37,36 +39,95 @@ class Application(object):
     """commands
     """
     def __init__(self, url, cwd=None, test=False):
-        self.test = test
-        self.url = url
-        self.cwd = cwd
+        self.test = test  # for unit tests
+        self.url = url  # of the git repository
         name = basename(url.strip('/'))
-        self.name = name[:-4] if name.endswith('.git') else name
-        self.path = join(DEPLOY, self.name)
+        self.name = name[:-4] if name.endswith('.git') else name  # repository
+        self.path = join(DEPLOY, self.name)  # path of the checkout
+        self._domain = None
+        self._services = None
+        self._containers = None
+        self._inspects = None
+        self._volumes = None
+        self._lock = False
 
     def do(self, cmd, cwd=None, runintest=True):
+        log.info(cmd)
         return _run(cmd, cwd=cwd, test=self.test and not runintest)
 
+    def lock(self):
+        self.do('consul kv put deploying/{}'.format(self.name))
+
+    def unlock(self):
+        self.do('consul kv delete deploying/{}'.format(self.name))
+
+    def wait_lock(self):
+        loops = 0
+        while loops < 60:
+            log.info('Waiting lock release for %s', self.name)
+            try:
+                self.do('consul kv get deploying/{}'.format(self.name))
+            except Exception:
+                log.info('Lock released')
+                break
+            time.sleep(1)
+            loops += 1
+        log.info('Waited too much :(')
+
+    @property
     def services(self):
-        out = self.do('docker-compose config --services', cwd=self.path)
-        return [s.strip() for s in out.split('\n')]
-
-    def containers(self):
-        return concat(
-            [self.do('docker-compose ps -q {}'
-                     .format(s), cwd=self.path).split('\n')
-             for s in self.services()])
-
-    def inspects(self):
-        return concat(
-            [json.loads(self.do('docker inspect {}'.format(c)))
-             for c in self.containers() if c.strip()])
-
-    def volumes(self):
-        """return all the volumes of a running compose
+        """name of the services in the compose file
         """
-        return [Volume(m['Name'], test=self.test) for m in concat([c['Mounts']
-                for c in self.inspects()]) if m['Driver'] == 'btrfs']
+        if self._services is None:
+            out = self.do('docker-compose config --services', cwd=self.path)
+            self._services = [s.strip() for s in out.split('\n')]
+        return self._services
+
+    @property
+    def containers(self):
+        """name of the running containers
+        """
+        if self._containers is None:
+            self._containers = concat(
+                [self.do('docker-compose ps -q {}'
+                         .format(s), cwd=self.path).split('\n')
+                 for s in self.services])
+        return self._containers
+
+    @property
+    def inspects(self):
+        """inspect data of the containers
+        """
+        if self._inspects is None:
+            self._inspects = concat(
+                [json.loads(self.do('docker inspect {}'.format(c)))
+                 for c in self.containers if c.strip()])
+        return self._inspects
+
+    @property
+    def volumes(self):
+        """active volumes of the running app
+        """
+        if self._volumes is None:
+            self._volumes = [
+                Volume(m['Name'], test=self.test)
+                for m in concat([c['Mounts'] for c in self.inspects])
+                if m['Driver'] == 'btrfs']
+        return self._volumes
+
+    @property
+    def active_node(self):
+        """active node for the current app
+        """
+        domains = [self.domain(s) for s in self.services]
+        domains = [d for d in domains if d is not None]
+        domain = domains[0] if domains else ''
+        try:
+            cmd = 'consul kv get site/{}'.format(domain)
+            return json.loads(self.do(cmd))['node']
+        except:
+            log.warn('Could not determine the active node for %s', domain)
+            return None
 
     def clean(self):
         self.do('rm -rf "{}"'.format(self.path))
@@ -109,9 +170,18 @@ class Application(object):
             members[name] = {'ip': ip.split(':')[0], 'status': status}
         return members
 
-    def site_url(self, service):
-        return self.do("docker-compose exec -T {} sh -c 'echo $URL'"
-                       .format(service), cwd=self.path)
+    def domain(self, service):
+        """DOMAIN configured in the compose for the service
+        """
+        try:
+            with open(join(self.path, 'docker-compose.yml')) as c:
+                compose = yaml.load(c.read())
+        except:
+            raise EnvironmentError('Could not read docker-compose.yml file')
+        try:
+            return compose['services'][service]['environment']['DOMAIN']
+        except:
+            log.warn('Could not find a DOMAIN env var in the compose file')
 
     def ps(self, service):
         ps = self.do('docker-compose ps {}'.format(service), cwd=self.path)
@@ -122,22 +192,21 @@ class Application(object):
         so that consul-template can regenerate the
         caddy and haproxy conf files
         """
-        # get the configured URL directly in the container
         log.info("Registering URLs of %s in the kv store", self.name)
-        for service in self.services():
-            site_url = self.site_url(service)
-            if not site_url:
+        for service in self.services:
+            domain = self.domain(service)
+            if not domain:
                 continue
             container_name, _, state = self.ps(service)
             if state == 'Up':
-                # store the url and name in the kv
+                # store the domain and name in the kv
                 value = {
-                    'url': site_url,
+                    'domain': domain,
                     'node': target,
                     'ip': self.members()[target]['ip'],
                     'ct': container_name}
                 cmd = ("consul kv put site/{} '{}'"
-                       .format(site_url, json.dumps(value)))
+                       .format(domain, json.dumps(value)))
                 self.do(cmd, runintest=False)
                 log.info("Registered %s", cmd)
             else:
@@ -180,13 +249,26 @@ class Volume(object):
     def snapshot(self):
         """snapshot all volumes of a running compose
         """
-        self.do("buttervolume snapshot {}".format(self.volume))
+        return self.do("buttervolume snapshot {}".format(self.volume))
 
     def schedule_snapshots(self, timer):
         """schedule snapshots of all volumes of a running compose
         """
         self.do("buttervolume schedule snapshot {} {}"
                 .format(timer, self.volume))
+
+    def delete(self, volume):
+        """destroy a volume
+        """
+        return self.do("docker volume rm {}".format(volume))
+
+    def restore(self, snapshot=None):
+        if snapshot is None:  # use the latest snapshot
+            snapshot = self.volume
+        self.do("buttervolume restore {}".format(snapshot))
+
+    def send(self, snapshot, target):
+        self.do("buttervolume send {} {}".format(target, snapshot))
 
 
 def handle_one(event, hostname, test=False):
@@ -216,33 +298,40 @@ def deploymaster(payload, hostname, test):
         repo_url = payload.split()[1].decode()
     except Exception as e:
         log.error('deploymaster error: '
-                  'you should specify a hostname and URL')
+                  'you should specify a hostname and repository URL')
         raise(e)
-    # deploy
+
     app = Application(repo_url, test=test)
     if hostname == target:
         app.fetch()
+        app.wait_lock()
+        for volume in app.volumes:
+            volume.restore()
         app.start()
-        for volume in app.volumes():
-            volume.snapshot()
+        for volume in app.volumes:
             volume.schedule_snapshots(60)
         app.register_kv(target, hostname)  # for consul-template
         app.register_consul()  # for consul check
-    else:
-        app.fetch()
-        app.stop()
-        for volume in app.volumes():
-            volume.snapshot()
+    elif hostname == app.active_node:
+        app.lock()
+        # first replicate live to lower downtime
+        for volume in app.volumes:
             volume.schedule_snapshots(0)
+            volume.send(volume.snapshot(), target)
+        # then stop and replicate again (should be faster)
+        app.stop()
+        for volume in app.volumes:
+            volume.send(volume.snapshot(), target)
+        app.unlock()
+        for volume in app.volumes:
+            volume.delete()
 
 
 if __name__ == '__main__':
-    # test mode?
-    try:
+    try:  # test mode?
         test = argv[0] == 'test'
     except:
         test = False
-    # hostname?
     hostname = socket.gethostname()
     # read json from stdin
     handle(stdin.read(), hostname, test)
