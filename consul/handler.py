@@ -287,7 +287,6 @@ def deploymaster(payload, hostname, test):
         log.error('deploymaster error: '
                   'you should specify a hostname and repository URL')
         raise(e)
-    import pdb; pdb.set_trace()
     app = Application(repo_url, test=test)
     if hostname == target:
         app.fetch()
