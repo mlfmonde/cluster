@@ -72,6 +72,7 @@ class Application(object):
             time.sleep(1)
             loops += 1
         log.info('Waited too much :(')
+        raise RuntimeError('%s deployment failed', self.name)
 
     @property
     def services(self):
@@ -181,7 +182,8 @@ class Application(object):
             return compose['services'][service]['environment']['DOMAIN']
         except:
             log.warn('Could not find a DOMAIN environment variable for '
-                     'service %s in the compose file of {}', service, self.name)
+                     'service %s in the compose file of {}',
+                     service, self.name)
 
     def ps(self, service):
         ps = self.do('docker-compose ps {}'.format(service), cwd=self.path)
