@@ -68,7 +68,7 @@ class Application(object):
                 self.do('consul kv get deploying/{}'.format(self.name))
             except Exception:
                 log.info('Lock released')
-                break
+                return
             time.sleep(1)
             loops += 1
         log.info('Waited too much :(')
