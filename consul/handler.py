@@ -2,6 +2,7 @@
 # coding: utf-8
 import json
 import logging
+import re
 import requests
 import socket
 import time
@@ -46,13 +47,24 @@ class Application(object):
         self.name = name[:-4] if name.endswith('.git') else name  # repository
         self.path = join(DEPLOY, self.name)  # path of the checkout
         self._services = None
-        self._containers = None
-        self._inspects = None
         self._volumes = None
         self._lock = False
+        self._compose = None
 
     def do(self, cmd, cwd=None, runintest=True):
         return _run(cmd, cwd=cwd, test=self.test and not runintest)
+
+    @property
+    def compose(self):
+        """read the compose file
+        """
+        if self._compose is None:
+            try:
+                with open(join(self.path, 'docker-compose.yml')) as c:
+                    self._compose = yaml.load(c.read())
+            except:
+                raise EnvironmentError('Could not read docker-compose.yml')
+        return self._compose
 
     def lock(self):
         self.do('consul kv put deploying/{}'.format(self.name))
@@ -79,40 +91,19 @@ class Application(object):
         """name of the services in the compose file
         """
         if self._services is None:
-            out = self.do('docker-compose config --services', cwd=self.path)
-            self._services = [s.strip() for s in out.split('\n')]
+            self._services = self.compose['services'].keys()
         return self._services
 
     @property
-    def containers(self):
-        """name of the running containers
-        """
-        if self._containers is None:
-            self._containers = concat(
-                [self.do('docker-compose ps -q {}'
-                         .format(s), cwd=self.path).split('\n')
-                 for s in self.services])
-        return self._containers
-
-    @property
-    def inspects(self):
-        """inspect data of the containers
-        """
-        if self._inspects is None:
-            self._inspects = concat(
-                [json.loads(self.do('docker inspect {}'.format(c)))
-                 for c in self.containers if c.strip()])
-        return self._inspects
-
-    @property
     def volumes(self):
-        """active volumes of the running app
+        """btrfs volumes defined in the compose
         """
         if self._volumes is None:
+            project = re.sub(r'[^a-z0-9]', '', self.name.lower())
             self._volumes = [
-                Volume(m['Name'], test=self.test)
-                for m in concat([c['Mounts'] for c in self.inspects])
-                if m['Driver'] == 'btrfs']
+                project + '_' + v
+                for v in self.compose['volumes']
+                if v.get('driver') == 'btrfs']
         return self._volumes
 
     @property
@@ -154,14 +145,13 @@ class Application(object):
         self.do('docker-compose down', cwd=self.path)
 
     def _members(self):
-        if not self.test:
-            return self.do('consul members')
-        else:
+        if self.test:
             return (
                 'Node   Address            Status  Type       DC\n'
                 'edjo   10.91.210.58:8301  alive   server     dc1\n'
                 'nepri  10.91.210.57:8301  alive   server     dc1\n'
                 'tayt   10.91.210.59:8301  alive   server     dc1')
+        return self.do('consul members')
 
     def members(self):
         members = {}
@@ -174,12 +164,7 @@ class Application(object):
         """DOMAIN configured in the compose for the service
         """
         try:
-            with open(join(self.path, 'docker-compose.yml')) as c:
-                compose = yaml.load(c.read())
-        except:
-            raise EnvironmentError('Could not read docker-compose.yml file')
-        try:
-            return compose['services'][service]['environment']['DOMAIN']
+            return self.compose['services'][service]['environment']['DOMAIN']
         except:
             log.warn('Could not find a DOMAIN environment variable for '
                      'service %s in the compose file of {}',
