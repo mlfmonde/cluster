@@ -44,7 +44,6 @@ class Application(object):
         name = basename(url.strip('/'))
         self.name = name[:-4] if name.endswith('.git') else name  # repository
         self.path = join(DEPLOY, self.name)  # path of the checkout
-        self._domain = None
         self._services = None
         self._containers = None
         self._inspects = None
@@ -257,10 +256,10 @@ class Volume(object):
         self.do("buttervolume schedule snapshot {} {}"
                 .format(timer, self.volume))
 
-    def delete(self, volume):
+    def delete(self):
         """destroy a volume
         """
-        return self.do("docker volume rm {}".format(volume))
+        return self.do("docker volume rm {}".format(self.volume))
 
     def restore(self, snapshot=None):
         if snapshot is None:  # use the latest snapshot
