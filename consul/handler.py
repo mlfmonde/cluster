@@ -27,6 +27,7 @@ def _run(cmd, cwd=None, test=False):
             print(cmd)
             return ''
         else:
+            log.info(cmd)
             res = srun(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
             out = res.stdout.decode().strip()
             return out
@@ -51,7 +52,6 @@ class Application(object):
         self._lock = False
 
     def do(self, cmd, cwd=None, runintest=True):
-        log.info(cmd)
         return _run(cmd, cwd=cwd, test=self.test and not runintest)
 
     def lock(self):
