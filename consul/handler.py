@@ -304,6 +304,8 @@ def deploymaster(payload, hostname, test):
     app = Application(repo_url, test=test)
     if hostname == target:
         app.fetch()
+        for volume in app.volumes:
+            volume.schedule_snapshots(0)
         app.wait_lock()
         for volume in app.volumes:
             volume.restore()
