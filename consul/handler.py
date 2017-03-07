@@ -316,11 +316,11 @@ def deploymaster(payload, hostname, test):
         # first replicate live to lower downtime
         for volume in app.volumes:
             volume.schedule_snapshots(0)
-            volume.send(volume.snapshot(), target)
+            volume.send(volume.snapshot(), self.members[target]['ip'])
         # then stop and replicate again (should be faster)
         app.stop()
         for volume in app.volumes:
-            volume.send(volume.snapshot(), target)
+            volume.send(volume.snapshot(), self.members[target]['ip'])
         app.unlock()
         for volume in app.volumes:
             volume.delete()
