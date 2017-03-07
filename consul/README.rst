@@ -14,7 +14,7 @@ WARNING: this is an intrusive test that depends on some containers running.
 Before the test you should make sure you run on BTRFS filesystem, then::
 
     $ sudo -s
-    # docker network create haproxy_default
+    # docker network create cluster_default
     # cd ../buttervolume
     # docker-compose up -d
 
@@ -74,7 +74,7 @@ First try to deploy a master, pretending we are 'nepri'::
 
 Same with an invalid service::
 
-    >>> _ = handler.Repository('http://truc/invalid.com.git').register_consul()
+    >>> _ = handler.Application('http://truc/invalid.com.git').register_consul()
     Traceback (most recent call last):
     ...
     FileNotFoundError...

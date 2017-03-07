@@ -2,6 +2,7 @@
 # coding: utf-8
 import json
 import logging
+import os
 import re
 import requests
 import socket
@@ -12,7 +13,6 @@ from os.path import basename, join, exists
 from subprocess import run as srun, CalledProcessError, PIPE
 from sys import stdin, argv
 DEPLOY = '/deploy'
-logging.basicConfig(level=logging.DEBUG, filename=join(DEPLOY, 'handler.log'))
 log = logging.getLogger(__name__)
 
 
@@ -101,9 +101,9 @@ class Application(object):
         if self._volumes is None:
             project = re.sub(r'[^a-z0-9]', '', self.name.lower())
             self._volumes = [
-                project + '_' + v
-                for v in self.compose['volumes']
-                if v.get('driver') == 'btrfs']
+                Volume(project + '_' + v[0], test=self.test)
+                for v in self.compose['volumes'].items()
+                if v[1] and v[1].get('driver') == 'btrfs']
         return self._volumes
 
     @property
@@ -287,7 +287,7 @@ def deploymaster(payload, hostname, test):
         log.error('deploymaster error: '
                   'you should specify a hostname and repository URL')
         raise(e)
-
+    import pdb; pdb.set_trace()
     app = Application(repo_url, test=test)
     if hostname == target:
         app.fetch()
@@ -317,10 +317,13 @@ def deploymaster(payload, hostname, test):
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG,
+                        filename=join(DEPLOY, 'handler.log'))
     try:  # test mode?
         test = argv[0] == 'test'
     except:
         test = False
+    test = os.environ.get('TEST', test) and True or False
     hostname = socket.gethostname()
     # read json from stdin
     handle(stdin.read(), hostname, test)
