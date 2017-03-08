@@ -119,6 +119,7 @@ class Application(object):
     def active_node(self):
         """active node for the current app
         """
+        domain = ''
         try:
             domains = [self.domain(s) for s in self.services]
             domains = [d for d in domains if d is not None]
