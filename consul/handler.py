@@ -94,6 +94,7 @@ class Application(object):
             self._services = self.compose['services'].keys()
         return self._services
 
+    @property
     def project(self):
         return re.sub(r'[^a-z0-9]', '', self.name.lower())
 
