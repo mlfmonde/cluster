@@ -180,8 +180,8 @@ class Application(object):
                      service, self.name)
 
     def ps(self, service):
-        ps = self.do('docker ps -f name={} --format "table {{.Status}}"',
-                     self.container_name(service))
+        ps = self.do('docker ps -f name={} --format "table {{.Status}}"'
+                     .format(self.container_name(service)))
         return ps.split('\n')[-1].strip()
 
     def register_kv(self, target, hostname):
