@@ -179,6 +179,18 @@ class Application(object):
                      'service %s in the compose file of %s',
                      service, self.name)
 
+    def port(self, service):
+        """frontend PORT configured in the compose for the service.
+        Defaults to 80 if unspecified
+        """
+        try:
+            return self.compose['services'][service]['environment']['PORT']
+        except:
+            log.warn('Could not find a PORT environment variable for '
+                     'service %s in the compose file of %s',
+                     service, self.name)
+            return '80'
+
     def ps(self, service):
         ps = self.do('docker ps -f name=%s --format "table {{.Status}}"'
                      % self.container_name(service))
@@ -197,11 +209,13 @@ class Application(object):
             state = self.ps(service)
             if state.startswith('Up '):
                 # store the domain and name in the kv
+                ct = self.container_name(service)
+                port = self.port(service)
                 value = {
                     'domain': domain,
                     'node': target,
                     'ip': self.members()[target]['ip'],
-                    'ct': self.container_name(service)}
+                    'ct': '{ct}:{port}'.format(**locals())}
                 cmd = ("consul kv put site/{} '{}'"
                        .format(domain, json.dumps(value)))
                 self.do(cmd, runintest=False)
