@@ -84,7 +84,7 @@ class Application(object):
             time.sleep(1)
             loops += 1
         log.info('Waited too much :(')
-        raise RuntimeError('%s deployment failed', self.name)
+        raise RuntimeError('deployment of {} failed'.format(self.name))
 
     @property
     def services(self):
@@ -207,7 +207,8 @@ class Application(object):
                 self.do(cmd, runintest=False)
                 log.info("Registered %s", cmd)
             else:
-                raise RuntimeError('%s deployment failed', self.name)
+                raise RuntimeError('deployment of {} failed: state={}'
+                                   .format(self.name, state))
 
     def register_consul(self):
         """register a service in consul
