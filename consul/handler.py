@@ -119,10 +119,10 @@ class Application(object):
     def active_node(self):
         """active node for the current app
         """
-        domains = [self.domain(s) for s in self.services]
-        domains = [d for d in domains if d is not None]
-        domain = domains[0] if domains else ''
         try:
+            domains = [self.domain(s) for s in self.services]
+            domains = [d for d in domains if d is not None]
+            domain = domains[0] if domains else ''
             cmd = 'consul kv get site/{}'.format(domain)
             return json.loads(self.do(cmd))['node']
         except:
