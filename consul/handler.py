@@ -94,17 +94,25 @@ class Application(object):
             self._services = self.compose['services'].keys()
         return self._services
 
+    def project(self):
+        return re.sub(r'[^a-z0-9]', '', self.name.lower())
+
     @property
     def volumes(self):
         """btrfs volumes defined in the compose
         """
         if self._volumes is None:
-            project = re.sub(r'[^a-z0-9]', '', self.name.lower())
             self._volumes = [
-                Volume(project + '_' + v[0], test=self.test)
+                Volume(self.project + '_' + v[0], test=self.test)
                 for v in self.compose['volumes'].items()
                 if v[1] and v[1].get('driver') == 'btrfs']
         return self._volumes
+
+    def container_name(self, service):
+        """did'nt find a way to query reliably so do it static
+        It assumes there is only 1 container for a project/service couple
+        """
+        return self.project + '_' + service + '_1'
 
     @property
     def active_node(self):
@@ -171,8 +179,9 @@ class Application(object):
                      service, self.name)
 
     def ps(self, service):
-        ps = self.do('docker-compose ps {}'.format(service), cwd=self.path)
-        return ps.split('\n')[-1].split()
+        ps = self.do('docker ps -f name={} --format "table {{.Status}}"',
+                     self.container_name(service))
+        return ps.split('\n')[-1].strip()
 
     def register_kv(self, target, hostname):
         """register a service in the kv store
@@ -184,14 +193,14 @@ class Application(object):
             domain = self.domain(service)
             if not domain:
                 continue
-            container_name, _, state = self.ps(service)
-            if state == 'Up':
+            state = self.ps(service)
+            if state.startswith('Up '):
                 # store the domain and name in the kv
                 value = {
                     'domain': domain,
                     'node': target,
                     'ip': self.members()[target]['ip'],
-                    'ct': container_name}
+                    'ct': self.container_name(service)}
                 cmd = ("consul kv put site/{} '{}'"
                        .format(domain, json.dumps(value)))
                 self.do(cmd, runintest=False)
