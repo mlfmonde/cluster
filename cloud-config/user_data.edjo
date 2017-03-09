@@ -69,4 +69,12 @@ coreos:
               Where=/var/lib/docker/snapshots
               Type=btrfs
               Options=discard,ssd,subvol=snapshots
-
+        -
+            name: mnt-nextcloud.mount
+            enable: false
+            content: |
+              [Mount]
+              What=/dev/sdd
+              Where=/mnt/nextcloud
+              Type=btrfs
+              Options=subvol=nextcloud
