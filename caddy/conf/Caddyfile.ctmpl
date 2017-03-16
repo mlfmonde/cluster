@@ -23,7 +23,7 @@ header_upstream X-Forwarded-Proto "https"
 
 {{ range tree "site" }}{{ $k := .Key }}{{ $v := .Value | parseJSON  }}{{ if eq $v.node (env "HOSTNAME")  }}
 https://{{ $k  }}:443 {
-tls self_signed
+#tls self_signed
 timeouts 300s
 proxy / http://{{ $v.ct  }}/ {
 header_upstream Host {host}
