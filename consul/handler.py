@@ -105,7 +105,7 @@ class Application(object):
         if self._volumes is None:
             self._volumes = [
                 Volume(self.project + '_' + v[0], test=self.test)
-                for v in self.compose['volumes'].items()
+                for v in self.compose.get('volumes', {}).items()
                 if v[1] and v[1].get('driver') == 'btrfs']
         return self._volumes
 
