@@ -30,7 +30,7 @@ backend https-consul-mlf.anybox.eu
 {{ end  }}
 
 frontend http-in
-    mode tcp
+    mode http
     bind *:80
     option socket-stats
     tcp-request inspect-delay 5s
@@ -40,11 +40,11 @@ frontend http-in
     {{ end  }}
 
 backend http-consul-mlf.anybox.eu
-  mode tcp
+  mode http
   server nepri caddy:80
 
 {{ range tree "site"  }}backend http-{{ .Key  }}
-  mode tcp
+  mode http
   server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy{{ else  }}{{ $d.ip  }}{{ end  }}:80{{ end  }}
 
 {{ end  }}
