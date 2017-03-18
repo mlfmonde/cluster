@@ -176,9 +176,21 @@ class Application(object):
         try:
             return self.compose['services'][service]['environment']['DOMAIN']
         except:
-            log.warn('Could not find a DOMAIN environment variable for '
+            log.error('Could not find a DOMAIN environment variable for '
+                      'service %s in the compose file of %s',
+                      service, self.name)
+
+    def proto(self, service):
+        """frontend PROTO configured in the compose for the service.
+        Defaults to http:// if unspecified
+        """
+        try:
+            return self.compose['services'][service]['environment']['PROTO']
+        except:
+            log.warn('Could not find a PROTO environment variable for '
                      'service %s in the compose file of %s',
                      service, self.name)
+            return 'http://'
 
     def port(self, service):
         """frontend PORT configured in the compose for the service.
@@ -212,11 +224,12 @@ class Application(object):
                 # store the domain and name in the kv
                 ct = self.container_name(service)
                 port = self.port(service)
+                proto = self.proto(service)
                 value = {
                     'domain': domain,
                     'node': target,
                     'ip': self.members()[target]['ip'],
-                    'ct': '{ct}:{port}'.format(**locals())}
+                    'ct': '{proto}{ct}:{port}'.format(**locals())}
                 cmd = ("consul kv put site/{} '{}'"
                        .format(domain, json.dumps(value)))
                 self.do(cmd, runintest=False)

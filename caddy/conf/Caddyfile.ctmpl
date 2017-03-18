@@ -1,16 +1,9 @@
 https://consul-mlf.anybox.eu:443 {
-tls self_signed
-timeouts 300s
-proxy / http://127.0.0.1:8500/ {
-header_upstream Host {host}
-header_upstream X-Real-IP {remote}
-header_upstream X-Forwarded-For {remote}
-header_upstream X-Forwarded-Proto "https"
-#header_upstream Front-End-Https "on"
-#header_upstream Strict-Transport-Security "max-age=63072000; includeSubdomains; preload"
-#header_upstream Accept-Encoding ""
-
-    }
+  tls self_signed
+  timeouts 300s
+  proxy / http://127.0.0.1:8500/ {
+    transparent
+  }
   gzip
   log /var/log/consul-mlf.anybox.eu.access.log {
       rotate {
@@ -23,18 +16,13 @@ header_upstream X-Forwarded-Proto "https"
 
 {{ range tree "site" }}{{ $k := .Key }}{{ $v := .Value | parseJSON  }}{{ if eq $v.node (env "HOSTNAME")  }}
 https://{{ $k  }}:443 {
-#tls self_signed
-timeouts 300s
-proxy / http://{{ $v.ct  }}/ {
-header_upstream Host {host}
-header_upstream X-Real-IP {remote}
-header_upstream X-Forwarded-For {remote}
-header_upstream X-Forwarded-Proto "https"
-#header_upstream Front-End-Https "on"
-#header_upstream Strict-Transport-Security "max-age=63072000; includeSubdomains; preload"
-#header_upstream Accept-Encoding ""
-
-    }
+  #tls self_signed
+  timeouts 300s
+  proxy / {{ $v.ct  }}/ {
+    transparent
+    websocket
+    insecure_skip_verify
+  }
   gzip
   log /var/log/{{ $k  }}.access.log {
       rotate {
