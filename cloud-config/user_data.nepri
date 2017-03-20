@@ -3,6 +3,7 @@
 hostname: nepri
 ssh_authorized_keys:
     - ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEAt5C+jF0KRK7VUBrfUjh4KDN6I2WnHMpDIEMXP0hw+1xyhSfp3fDjIeiUIEEV4TjjrrgbT9vXWB99Wb/ktUZZX5V27RKptnX5QWyjEzsH2ITaylyYY54IHvPRf4XBhXOmRgl9255sFZ7EIa++v1xE3bkTGB+EIzUNaRL9ykZ4/UE= ccomb@portouf
+
 write_files:
     -
         path: /etc/resolv.conf

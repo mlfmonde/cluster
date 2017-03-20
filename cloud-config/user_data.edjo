@@ -29,18 +29,18 @@ coreos:
       reboot-strategy: off
     units:
         -
-            name: 00-eno1.network
+            name: 00-enp1s0f0.network
             runtime: true
             content: "[Match]\nName=enp1s0f0\n\n[Network]\nDHCP=yes\n\n[DHCP]\nUseMTU=false\n"
         -
-            name: 00-eno2.network
+            name: 00-enp1s0f1.network
             runtime: true
             content: "[Match]\nName=enp1s0f1\n\n[Network]\nDHCP=yes\n\n[DHCP]\nUseMTU=false\n"
         - name: custom-mtu.service
           command: start
           content: |
             [Unit]
-            Requires=enp1s0f1.network
+            Requires=00-enp1s0f1.network
             [Service]
             Type=oneshot
             RemainAfterExit=yes
