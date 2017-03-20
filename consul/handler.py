@@ -327,9 +327,9 @@ def deploymaster(payload, hostname, test):
                   'you should specify a hostname and repository URL')
         raise(e)
     app = Application(repo_url, test=test)
-    active_node = app.active_node
     if hostname == target:
         app.fetch()
+        active_node = app.active_node
         for volume in app.volumes:
             volume.schedule_snapshots(0)
         if active_node is not None:
