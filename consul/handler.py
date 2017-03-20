@@ -177,8 +177,8 @@ class Application(object):
             return self.compose['services'][service]['environment']['DOMAIN']
         except:
             log.warn('Could not find a DOMAIN environment variable for '
-                      'service %s in the compose file of %s',
-                      service, self.name)
+                     'service %s in the compose file of %s',
+                     service, self.name)
 
     def proto(self, service):
         """frontend PROTO configured in the compose for the service.
