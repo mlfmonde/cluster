@@ -329,10 +329,10 @@ def deploymaster(payload, hostname, test):
     app = Application(repo_url, test=test)
     app.fetch()
     if hostname == target:
-        active_node = app.active_node
+        time.sleep(2)
         for volume in app.volumes:
             volume.schedule_snapshots(0)
-        if active_node is not None:
+        if app.active_node is not None:
             app.wait_lock()
             for volume in app.volumes:
                 volume.restore()
@@ -341,7 +341,7 @@ def deploymaster(payload, hostname, test):
             volume.schedule_snapshots(60)
         app.register_kv(target, hostname)  # for consul-template
         app.register_consul()  # for consul check
-    elif hostname == active_node:
+    elif hostname == app.active_node:
         app.lock()
         # first replicate live to lower downtime
         for volume in app.volumes:
