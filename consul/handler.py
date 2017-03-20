@@ -176,7 +176,7 @@ class Application(object):
         try:
             return self.compose['services'][service]['environment']['DOMAIN']
         except:
-            log.error('Could not find a DOMAIN environment variable for '
+            log.warn('Could not find a DOMAIN environment variable for '
                       'service %s in the compose file of %s',
                       service, self.name)
 
