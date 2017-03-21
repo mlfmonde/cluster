@@ -83,6 +83,7 @@ class Application(object):
                 return
             time.sleep(1)
             loops += 1
+        self.unlock()
         log.info('Waited too much :(')
         raise RuntimeError('deployment of {} failed'.format(self.name))
 
