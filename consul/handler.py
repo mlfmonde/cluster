@@ -326,8 +326,6 @@ def handle_one(event, hostname, test=False):
         return
     if event_name == 'deploymaster':
         deploymaster(b64decode(payload), hostname, test)
-    elif event_name == 'deployslave':
-        deployslave(b64decode(payload), hostname, test)
     else:
         log.error('Unknown event name: {}'.format(event_name))
 
@@ -361,21 +359,27 @@ def deploymaster(payload, hostname, test):
         raise(e)
     app = Application(repo_url, test=test)
     app.fetch()
+    oldslave = app.slave_node
+    master_node = app.master_node
     if hostname == target:
         time.sleep(2)
         for volume in app.volumes:
+            if oldslave is not None:
+                volume.schedule_replicate(0, app.members()[oldslave]['ip'])
             volume.schedule_snapshots(0)
-        master_node = app.master_node
         if master_node is not None and master_node != hostname:
             app.wait_lock()
             for volume in app.volumes:
                 volume.restore()
         app.start()
         for volume in app.volumes:
-            volume.schedule_snapshots(60)
+            if slave is not None:
+                volume.schedule_replicate(60, app.members()[slave]['ip'])
+            else:
+                volume.schedule_snapshots(60)
         app.register_kv(target, slave, hostname)  # for consul-template
         app.register_consul()  # for consul check
-    elif hostname == app.master_node:
+    elif hostname == master_node:
         app.lock()
         # first replicate live to lower downtime
         for volume in app.volumes:
@@ -391,31 +395,6 @@ def deploymaster(payload, hostname, test):
         app.unlock()
         for volume in app.volumes:
             volume.delete()
-    if slave is not None:
-        deployslave("{} {}".format(slave, repo_url).encode(), hostname, test)
-
-
-def deployslave(payload, hostname, test):
-    """ initiate the replication from target to slave.
-    The payload is the same as for the deploymaster, but with 2 args:
-    "<slavenode> <repo_url>"
-    """
-    # check
-    try:
-        slave = payload.split()[0].decode()
-        repo_url = payload.split()[1].decode()
-    except Exception as e:
-        log.error('deployslave error: '
-                  'you should specify <slavenode> <repo>')
-        raise(e)
-    app = Application(repo_url, test=test)
-    master_node = app.master_node
-    if hostname == master_node:
-        for volume in app.volumes:
-            volume.schedule_replicate(60, app.members()[slave]['ip'])
-    else:
-        for volume in app.volumes:
-            volume.schedule_replicate(0, app.members()[slave]['ip'])
 
 
 if __name__ == '__main__':
