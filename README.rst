@@ -32,29 +32,13 @@ To access it from outside, create a ssh tunnel::
     $ ssh -L 8500:localhost:8500 mlf@nepri.mlfmonde.org
     $ firefox localhost:8500
 
-Deploy a new app
-----------------
+Deploy or move a new app
+------------------------
 
 connect on any node, then run this from the cluster/ directory::
 
-    docker-compose exec consul consul event -name=deploymaster "<targetnode> <repository_url>"
+    docker-compose exec consul consul event -name=deploymaster "<masternode> <slavenode> <repository_url>"
 
-Example:
+Example: deploy lycee-test-mlf on nepri and replicate on edjo::
 
-Deploy lycee-test-mlf on nepri::
-
-    docker-compose exec consul consul event -name=deploymaster "nepri ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
-
-Switch an app on another node
------------------------------
-
-connect on any node, then run this from the cluster/ directory::
-
-    docker-compose exec consul consul event -name=deploymaster "<targetnode> <repository_url>"
-
-Example:
-
-Deploy lycee-test-mlf on nepri::
-
-    docker-compose exec consul consul event -name=deploymaster "nepri ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
-
+    docker-compose exec consul consul event -name=deploymaster "nepri edjo ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
