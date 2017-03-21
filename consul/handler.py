@@ -235,25 +235,20 @@ class Application(object):
             domain = self.domain(service)
             if not domain:
                 continue
-            state = self.ps(service)
-            if state.startswith('Up '):
-                # store the domain and name in the kv
-                ct = self.container_name(service)
-                port = self.port(service)
-                proto = self.proto(service)
-                value = {
-                    'domain': domain,
-                    'node': target,
-                    'slave': slave,
-                    'ip': self.members()[target]['ip'],
-                    'ct': '{proto}{ct}:{port}'.format(**locals())}
-                cmd = ("consul kv put site/{} '{}'"
-                       .format(domain, json.dumps(value)))
-                self.do(cmd, runintest=False)
-                log.info("Registered %s", cmd)
-            else:
-                raise RuntimeError('deployment of {} failed: state={}'
-                                   .format(self.name, state))
+            # store the domain and name in the kv
+            ct = self.container_name(service)
+            port = self.port(service)
+            proto = self.proto(service)
+            value = {
+                'domain': domain,
+                'node': target,
+                'slave': slave,
+                'ip': self.members()[target]['ip'],
+                'ct': '{proto}{ct}:{port}'.format(**locals())}
+            cmd = ("consul kv put site/{} '{}'"
+                   .format(domain, json.dumps(value)))
+            self.do(cmd, runintest=False)
+            log.info("Registered %s", cmd)
 
     def register_consul(self):
         """register a service in consul
