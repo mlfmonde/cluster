@@ -116,8 +116,23 @@ class Application(object):
         return self.project + '_' + service + '_1'
 
     @property
-    def active_node(self):
-        """active node for the current app
+    def slave_node(self):
+        """slave node for the current app
+        """
+        domain = ''
+        try:
+            domains = [self.domain(s) for s in self.services]
+            domains = [d for d in domains if d is not None]
+            domain = domains[0] if domains else ''
+            cmd = 'consul kv get site/{}'.format(domain)
+            return json.loads(self.do(cmd))['slave']
+        except:
+            log.warn('Could not determine the slave node for %s', domain)
+            return None
+
+    @property
+    def master_node(self):
+        """master node for the current app
         """
         domain = ''
         try:
@@ -127,7 +142,7 @@ class Application(object):
             cmd = 'consul kv get site/{}'.format(domain)
             return json.loads(self.do(cmd))['node']
         except:
-            log.warn('Could not determine the active node for %s', domain)
+            log.warn('Could not determine the master node for %s', domain)
             return None
 
     def clean(self):
@@ -209,7 +224,7 @@ class Application(object):
                      % self.container_name(service))
         return ps.split('\n')[-1].strip()
 
-    def register_kv(self, target, hostname):
+    def register_kv(self, target, slave, hostname):
         """register a service in the kv store
         so that consul-template can regenerate the
         caddy and haproxy conf files
@@ -228,6 +243,7 @@ class Application(object):
                 value = {
                     'domain': domain,
                     'node': target,
+                    'slave': slave,
                     'ip': self.members()[target]['ip'],
                     'ct': '{proto}{ct}:{port}'.format(**locals())}
                 cmd = ("consul kv put site/{} '{}'"
@@ -340,8 +356,8 @@ def deploymaster(payload, hostname, test):
             raise Exception
     except Exception as e:
         log.error('deploymaster error: '
-                  'you should specify <target> <repo> '
-                  'or <target> <slave> <repo>')
+                  'you should specify "<target> <repo>" '
+                  'or "<target> <slave> <repo>"')
         raise(e)
     app = Application(repo_url, test=test)
     app.fetch()
@@ -349,20 +365,23 @@ def deploymaster(payload, hostname, test):
         time.sleep(2)
         for volume in app.volumes:
             volume.schedule_snapshots(0)
-        if app.active_node is not None:
+        if app.master_node is not None:
             app.wait_lock()
             for volume in app.volumes:
                 volume.restore()
         app.start()
         for volume in app.volumes:
             volume.schedule_snapshots(60)
-        app.register_kv(target, hostname)  # for consul-template
+        app.register_kv(target, slave, hostname)  # for consul-template
         app.register_consul()  # for consul check
-    elif hostname == app.active_node:
+    elif hostname == app.master_node:
         app.lock()
         # first replicate live to lower downtime
         for volume in app.volumes:
             volume.schedule_snapshots(0)
+            oldslave = app.slave_node
+            if oldslave is not None:
+                volume.schedule_replicate(0, app.members()[oldslave]['ip'])
             volume.send(volume.snapshot(), app.members()[target]['ip'])
         # then stop and replicate again (should be faster)
         app.stop()
@@ -389,8 +408,8 @@ def deployslave(payload, hostname, test):
                   'you should specify <slavenode> <repo>')
         raise(e)
     app = Application(repo_url, test=test)
-    active_node = app.active_node
-    if hostname == active_node:
+    master_node = app.master_node
+    if hostname == master_node:
         for volume in app.volumes:
             volume.schedule_replicate(60, app.members()[slave]['ip'])
     else:
