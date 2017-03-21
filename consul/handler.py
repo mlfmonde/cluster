@@ -273,15 +273,21 @@ class Volume(object):
         return _run(cmd, cwd=cwd, test=self.test)
 
     def snapshot(self):
-        """snapshot all volumes of a running compose
+        """snapshot the volume
         """
         return self.do("buttervolume snapshot {}".format(self.volume))
 
     def schedule_snapshots(self, timer):
-        """schedule snapshots of all volumes of a running compose
+        """schedule snapshots of the volume
         """
         self.do("buttervolume schedule snapshot {} {}"
                 .format(timer, self.volume))
+
+    def schedule_replicate(self, timer, slavehost):
+        """schedule a replication of the volume
+        """
+        self.do("buttervolume schedule replicate:{} {} {}"
+                .format(slavehost, timer, self.volume))
 
     def delete(self):
         """destroy a volume
@@ -304,6 +310,8 @@ def handle_one(event, hostname, test=False):
         return
     if event_name == 'deploymaster':
         deploymaster(b64decode(payload), hostname, test)
+    elif event_name == 'deployslave':
+        deployslave(b64decode(payload), hostname, test)
     else:
         log.error('Unknown event name: {}'.format(event_name))
 
@@ -320,11 +328,20 @@ def deploymaster(payload, hostname, test):
     """
     # check
     try:
-        target = payload.split()[0].decode()
-        repo_url = payload.split()[1].decode()
+        if len(payload.split()) == 2:  # just target
+            target = payload.split()[0].decode()
+            slave = None
+            repo_url = payload.split()[1].decode()
+        elif len(payload.split()) == 3:  # target + slave
+            target = payload.split()[0].decode()
+            slave = payload.split()[1].decode()
+            repo_url = payload.split()[2].decode()
+        else:
+            raise Exception
     except Exception as e:
         log.error('deploymaster error: '
-                  'you should specify a hostname and repository URL')
+                  'you should specify <target> <repo> '
+                  'or <target> <slave> <repo>')
         raise(e)
     app = Application(repo_url, test=test)
     app.fetch()
@@ -354,6 +371,31 @@ def deploymaster(payload, hostname, test):
         app.unlock()
         for volume in app.volumes:
             volume.delete()
+    if slave is not None:
+        deployslave("{} {}".format(slave, repo_url), hostname, test)
+
+
+def deployslave(payload, hostname, test):
+    """ initiate the replication from target to slave.
+    The payload is the same as for the deploymaster, but with 2 args:
+    "<slavenode> <repo_url>"
+    """
+    # check
+    try:
+        slave = payload.split()[0].decode()
+        repo_url = payload.split()[1].decode()
+    except Exception as e:
+        log.error('deployslave error: '
+                  'you should specify <slavenode> <repo>')
+        raise(e)
+    app = Application(repo_url, test=test)
+    active_node = app.active_node
+    if hostname == active_node:
+        for volume in app.volumes:
+            volume.schedule_replicate(60, app.members()[slave]['ip'])
+    else:
+        for volume in app.volumes:
+            volume.schedule_replicate(0, app.members()[slave]['ip'])
 
 
 if __name__ == '__main__':

@@ -29,7 +29,7 @@ Consul web UI
 The consul web UI runs on http://127.0.0.1:8500 on the host, through the consul docker running in host network_driver mode.
 To access it from outside, create a ssh tunnel::
 
-    $ ssh -L 8500:localhost:8500 nepri
+    $ ssh -L 8500:localhost:8500 mlf@nepri.mlfmonde.org
     $ firefox localhost:8500
 
 Deploy a new app
