@@ -372,7 +372,6 @@ def deploymaster(payload, hostname, test):
             app.wait_lock()
             for volume in app.volumes:
                 volume.restore()
-        app.start()
         for volume in app.volumes:
             if slave is not None:
                 volume.schedule_replicate(60, app.members()[slave]['ip'])
@@ -380,6 +379,7 @@ def deploymaster(payload, hostname, test):
                 volume.schedule_snapshots(60)
         app.register_kv(target, slave, hostname)  # for consul-template
         app.register_consul()  # for consul check
+        app.start()
     elif hostname == master_node:
         app.lock()
         # first replicate live to lower downtime
