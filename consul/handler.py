@@ -391,7 +391,7 @@ def deploymaster(payload, hostname, test):
         for volume in app.volumes:
             volume.delete()
     if slave is not None:
-        deployslave("{} {}".format(slave, repo_url), hostname, test)
+        deployslave("{} {}".format(slave, repo_url).encode(), hostname, test)
 
 
 def deployslave(payload, hostname, test):
