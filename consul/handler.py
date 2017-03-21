@@ -365,7 +365,8 @@ def deploymaster(payload, hostname, test):
         time.sleep(2)
         for volume in app.volumes:
             volume.schedule_snapshots(0)
-        if app.master_node is not None:
+        master_node = app.master_node
+        if master_node is not None and master_node != hostname:
             app.wait_lock()
             for volume in app.volumes:
                 volume.restore()
