@@ -56,14 +56,14 @@ frontend http-in
     # Recette redirections
     http-request redirect code 301 prefix http://aberdeen-total.gepi.mlf.anybox.eu if old_aberd_uri ee_recette_dns
     http-request redirect code 301 location / if old_aberd_uri new_aberd_recette_dns
-    http-request redirect code 301 prefix http:/okpo-technip.gepi.mlf.anybox.eu if old_okpo_uri ee_recette_dns
+    http-request redirect code 301 prefix http://okpo-technip.gepi.mlf.anybox.eu if old_okpo_uri ee_recette_dns
     http-request redirect code 301 location / if old_okpo_uri new_okpo_recette_dns
     # Prod redirections
     # PV: ticket 8499 use 302 redirection code (no browser cache) while waiting
     # MLF validation for the use of dns on the form of *.gepi.ee.mlfmonde.org
     http-request redirect code 302 prefix http://aberdeen-total.gepi.ee.mlfmonde.org if old_aberd_uri ee_prod_dns
     http-request redirect code 302 location / if old_aberd_uri new_aberd_prod_dns
-    http-request redirect code 302 prefix http:/okpo-technip.gepi.ee.mlfmonde.org if old_okpo_uri ee_prod_dns
+    http-request redirect code 302 prefix http://okpo-technip.gepi.ee.mlfmonde.org if old_okpo_uri ee_prod_dns
     http-request redirect code 302 location / if old_okpo_uri new_okpo_prod_dns
 
     use_backend http-consul-mlf.anybox.eu if { hdr(host) -i consul-mlf.anybox.eu  }
