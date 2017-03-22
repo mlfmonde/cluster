@@ -35,6 +35,37 @@ frontend http-in
     option socket-stats
     tcp-request inspect-delay 5s
 
+    # PV: ticket 8499, redirect GEPI urls
+    # http://ee.mlfmonde.org/GEPI/aberdeen-total/ to http://aberdeen-total.gepi.ee.mlfmonde.org
+    # unfurtunetely I haven't found how to redirect prefix and location at once
+    # so we create two redirections:
+    # ee.mlfmonde.org/GEPI/aberdeen-total/
+    # 1 => aberdeen-total.gepi.ee.mlfmonde.org/GEPI/aberdeen-total/
+    # 2    => aberdeen-total.gepi.ee.mlfmonde.org
+    # common ACL
+    acl old_aberd_uri         path_beg  /GEPI/aberdeen-total
+    acl old_okpo_uri          path_beg  /GEPI/okpo-technip
+    # recette ACL
+    acl ee_recette_dns        hdr(host) -i ee.mlf.anybox.eu
+    acl new_aberd_recette_dns hdr(host) -i aberdeen-total.gepi.mlf.anybox.eu
+    acl new_okpo_recette_dns  hdr(host) -i okpo-technip.gepi.mlf.anybox.eu
+    # prod ACL
+    acl ee_prod_dns           hdr(host) -i ee.mlfmonde.org
+    acl new_aberd_prod_dns    hdr(host) -i aberdeen-total.gepi.ee.mlfmonde.org
+    acl new_okpo_prod_dns     hdr(host) -i okpo-technip.gepi.ee.mlfmonde.org
+    # Recette redirections
+    http-request redirect code 301 prefix http://aberdeen-total.gepi.mlf.anybox.eu if old_aberd_uri ee_recette_dns
+    http-request redirect code 301 location / if old_aberd_uri new_aberd_recette_dns
+    http-request redirect code 301 prefix http:/okpo-technip.gepi.mlf.anybox.eu if old_okpo_uri ee_recette_dns
+    http-request redirect code 301 location / if old_okpo_uri new_okpo_recette_dns
+    # Prod redirections
+    # PV: ticket 8499 use 302 redirection code (no browser cache) while waiting
+    # MLF validation for the use of dns on the form of *.gepi.ee.mlfmonde.org
+    http-request redirect code 302 prefix http://aberdeen-total.gepi.ee.mlfmonde.org if old_aberd_uri ee_prod_dns
+    http-request redirect code 302 location / if old_aberd_uri new_aberd_prod_dns
+    http-request redirect code 302 prefix http:/okpo-technip.gepi.ee.mlfmonde.org if old_okpo_uri ee_prod_dns
+    http-request redirect code 302 location / if old_okpo_uri new_okpo_prod_dns
+
     use_backend http-consul-mlf.anybox.eu if { hdr(host) -i consul-mlf.anybox.eu  }
     {{ range tree "site"  }}use_backend http-{{ .Key  }} if { hdr(host) -i {{ .Key  }}  }
     {{ end  }}
