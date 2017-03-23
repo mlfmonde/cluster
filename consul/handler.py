@@ -164,7 +164,7 @@ class Application(object):
 
     def start(self):
         log.info("Starting the project %s", self.name)
-        self.do('docker-compose up -d', cwd=self.path)
+        self.do('docker-compose up -d --build', cwd=self.path)
 
     def stop(self):
         log.info("Stopping the project %s", self.name)
