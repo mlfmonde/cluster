@@ -1,6 +1,7 @@
 #!/bin/sh
 
 chown consul: /deploy
+chown -R consul: /consul/template
 
 /bin/consul-template \
     -template="/consul/template/caddy/Caddyfile.ctmpl:/consul/template/caddy/Caddyfile:docker restart cluster_caddy_1" \
