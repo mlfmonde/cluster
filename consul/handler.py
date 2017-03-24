@@ -12,6 +12,7 @@ from base64 import b64decode
 from os.path import basename, join, exists
 from subprocess import run as srun, CalledProcessError, PIPE
 from sys import stdin, argv
+from urllib.parse import urlparse
 DEPLOY = '/deploy'
 log = logging.getLogger(__name__)
 
@@ -186,8 +187,19 @@ class Application(object):
             members[name] = {'ip': ip.split(':')[0], 'status': status}
         return members
 
+    def url(self, service):
+        """URL configured in the compose for the service
+        """
+        try:
+            return self.compose['services'][service]['environment']['URL']
+        except:
+            log.warn('Could not find a URL environment variable for '
+                     'service %s in the compose file of %s',
+                     service, self.name)
+
     def domain(self, service):
         """DOMAIN configured in the compose for the service
+        WARNING deprecated, don't use
         """
         try:
             return self.compose['services'][service]['environment']['DOMAIN']
@@ -233,14 +245,19 @@ class Application(object):
         log.info("Registering URLs of %s in the kv store", self.name)
         for service in self.services:
             domain = self.domain(service)
-            if not domain:
+            url = self.url(service)
+            if not domain and not url:
                 continue
+            if not url:
+                url = 'https://{}:443'.format(domain)
+            domain = urlparse(url).netloc.split(':')[0]
             # store the domain and name in the kv
             ct = self.container_name(service)
             port = self.port(service)
             proto = self.proto(service)
             value = {
-                'domain': domain,
+                'domain': domain,  # deprecated, don't use (domain is the key)
+                'url': url,
                 'node': target,
                 'slave': slave,
                 'ip': self.members()[target]['ip'],
