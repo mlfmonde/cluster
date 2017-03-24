@@ -187,6 +187,16 @@ class Application(object):
             members[name] = {'ip': ip.split(':')[0], 'status': status}
         return members
 
+    def tls(self, service):
+        """TLS configured in the compose for the service
+        """
+        try:
+            return self.compose['services'][service]['environment']['TLS']
+        except:
+            log.info('Could not find a TLS environment variable for '
+                     'service %s in the compose file of %s',
+                     service, self.name)
+
     def url(self, service):
         """URL configured in the compose for the service
         """
@@ -204,7 +214,7 @@ class Application(object):
         try:
             return self.compose['services'][service]['environment']['DOMAIN']
         except:
-            log.warn('Could not find a DOMAIN environment variable for '
+            log.info('Could not find a DOMAIN environment variable for '
                      'service %s in the compose file of %s',
                      service, self.name)
 
@@ -246,6 +256,7 @@ class Application(object):
         for service in self.services:
             domain = self.domain(service)
             url = self.url(service)
+            tls = self.tls(service)
             if not domain and not url:
                 continue
             if not url:
@@ -258,6 +269,7 @@ class Application(object):
             value = {
                 'domain': domain,  # deprecated, don't use (domain is the key)
                 'url': url,
+                'tls': tls,
                 'node': target,
                 'slave': slave,
                 'ip': self.members()[target]['ip'],

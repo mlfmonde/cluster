@@ -16,7 +16,7 @@ https://consul-mlf.anybox.eu:443 {
 
 {{ range tree "site" }}{{ $k := .Key }}{{ $v := .Value | parseJSON  }}{{ if eq $v.node (env "HOSTNAME")  }}
 {{ $v.url  }} {
-  tls self_signed
+  {{ if $v.tls }}  tls self_signed{{ end }}
   timeouts 300s
   proxy / {{ $v.ct  }}/ {
     transparent
