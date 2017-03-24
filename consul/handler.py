@@ -41,10 +41,10 @@ def _run(cmd, cwd=None, test=False):
 class Application(object):
     """commands
     """
-    def __init__(self, url, cwd=None, test=False):
+    def __init__(self, repo_url, cwd=None, test=False):
         self.test = test  # for unit tests
-        self.url = url  # of the git repository
-        name = basename(url.strip('/'))
+        self.repo_url = repo_url  # of the git repository
+        name = basename(repo_url.strip('/'))
         self.name = name[:-4] if name.endswith('.git') else name  # repository
         self.path = join(DEPLOY, self.name)  # path of the checkout
         self._services = None
@@ -153,7 +153,7 @@ class Application(object):
     def fetch(self, retrying=False):
         try:
             if not exists(self.path):
-                self.do('git clone "{}"'.format(self.url), cwd=DEPLOY)
+                self.do('git clone "{}"'.format(self.repo_url), cwd=DEPLOY)
             else:
                 self.do('git pull', cwd=self.path)
         except CalledProcessError:
