@@ -1,6 +1,9 @@
 Cluster management
 ==================
 
+Basic actions
+*************
+
 Start
 -----
 
@@ -42,3 +45,31 @@ connect on any node, then run this from the cluster/ directory::
 Example: deploy lycee-test-mlf on nepri and replicate on edjo::
 
     docker-compose exec consul consul event -name=deploymaster "nepri edjo ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
+
+Troubleshooting
+***************
+
+Caddyfile are not regenerated
+-----------------------------
+
+Probably an error in the consul-template ``caddy/conf/Caddyfile.ctmpl`` or ``haproxy/conf/haproxy.cmtpl``,
+or an invalid value in the KV store of Consul.
+
+Try to regenerate the Caddyfile or haproxy.cfg manually to detect the error::
+
+    $ ssh nepri  # or edjo or tayt
+    $ cd cluster
+    $ docker-compose exec --user consul consul sh
+    $ cat /docker-entrypoint.sh
+    $ /bin/consul-template -once -template="/consul/template/caddy/Caddyfile.ctmpl:/consul/template/caddy/Caddyfile:docker restart cluster_caddy_1"
+    Consul Template returned errors:
+    /consul/template/caddy/Caddyfile.ctmpl: execute: template: :17:57: executing "" at <parseJSON>: error calling parseJSON: unexpected end of JSON input
+
+Also try to open the web ui to quickly check the deployed parameters::
+
+    $ ssh -L 8500:localhost:8500 mlf@nepri
+    $ firefox localhost:8500
+    - click on Key/Value → Site
+    - You can change values, it should trigger the recompute of the Caddyfile and haproxy.cfg if something changed in the resulting file.
+
+
