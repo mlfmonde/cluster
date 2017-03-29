@@ -126,6 +126,11 @@ class Application(object):
             domains = [self.domain(s) for s in self.services]
             domains = [d for d in domains if d is not None]
             domain = domains[0] if domains else ''
+            if not domain:
+                urls = [self.url(s) for s in self.services]
+                urls = [d for d in urls if d is not None]
+                url = urls[0] if urls else ''
+                domain = urlparse(url).netloc.split(':')[0]
             cmd = 'consul kv get site/{}'.format(domain)
             return json.loads(self.do(cmd))['slave']
         except:
@@ -141,6 +146,11 @@ class Application(object):
             domains = [self.domain(s) for s in self.services]
             domains = [d for d in domains if d is not None]
             domain = domains[0] if domains else ''
+            if not domain:
+                urls = [self.url(s) for s in self.services]
+                urls = [d for d in urls if d is not None]
+                url = urls[0] if urls else ''
+                domain = urlparse(url).netloc.split(':')[0]
             cmd = 'consul kv get site/{}'.format(domain)
             return json.loads(self.do(cmd))['node']
         except:
