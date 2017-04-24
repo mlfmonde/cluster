@@ -7,6 +7,7 @@ services:
     volumes:
       - caddy_ssl:/root/.caddy
       - caddy_log:/var/log
+      - caddy_sync_test:/var/sync_test
       - ./caddy/conf/:/etc/caddy
 
   haproxy:
@@ -44,4 +45,6 @@ volumes:
   caddy_log:
     driver: btrfs
   caddy_ssl:
+    driver: btrfs
+  caddy_sync_test:
     driver: btrfs
