@@ -393,10 +393,10 @@ def deploymaster(payload, hostname, test):
                   'or "<target> <slave> <repo>"')
         raise(e)
     app = Application(repo_url, test=test)
-    app.fetch()
     oldslave = app.slave_node
     master_node = app.master_node
     if hostname == target:
+        app.fetch()
         time.sleep(2)
         for volume in app.volumes:
             if oldslave is not None:
