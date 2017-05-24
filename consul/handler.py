@@ -166,6 +166,9 @@ class Application(object):
                 self.do('git clone "{}"'.format(self.repo_url), cwd=DEPLOY)
             else:
                 self.do('git pull', cwd=self.path)
+            self._services = None
+            self._volumes = None
+            self._compose = None
         except CalledProcessError:
             if not retrying:
                 log.warn("Failed to fetch %s, retrying", self.name)
@@ -393,10 +396,11 @@ def deploymaster(payload, hostname, test):
                   'or "<target> <slave> <repo>"')
         raise(e)
     app = Application(repo_url, test=test)
-    oldslave = app.slave_node
     master_node = app.master_node
     if hostname == target:
         app.fetch()
+        oldslave = app.slave_node
+        master_node = app.master_node
         time.sleep(2)
         for volume in app.volumes:
             if oldslave is not None:
