@@ -32,11 +32,11 @@ services:
                 "type": "event",
                 "handler": "/handler.py"}]
             }'
-        CONSUL_BIND_INTERFACE: enp1s0f1
+        CONSUL_BIND_INTERFACE: enp3s0f1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /run/docker/plugins:/run/docker/plugins
-      - ~/deploy:/deploy
+      - /home/sandre/anybox/git.mlfmonde.org/deploy:/deploy
       - ./caddy/conf/:/consul/template/caddy/
       - ./haproxy/conf/:/consul/template/haproxy/
 
