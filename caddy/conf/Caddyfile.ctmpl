@@ -33,3 +33,12 @@ https://consul-mlf.anybox.eu:443 {
   }
 }
 {{ end  }}{{ end  }}
+
+# url redirects parts
+{{ range tree "site" }}{{ $k := .Key }}{{ $v := .Value | parseJSON  }}{{ if and (eq $v.node (env "HOSTNAME")) ($v.url_redirects)  }}
+{{ $v.url_redirects }} {
+  tls off
+  redir {{ $splited_url := $v.url | split ":" }}{{ index $splited_url 0}}:{{ index $splited_url 1}}{uri}
+}
+{{ end }}{{ end }}
+
