@@ -56,14 +56,16 @@ Use cluster with local/dev env
 
 All docker container can be use partially (not with ssl website) on developer host
 
-You need to edit docker-compose.dev.yml to use environment variable CONSUL_BIND_INTERFACE.
-Put your local interface connected to your router/internet.
+.. warning:: You need to edit docker-compose.dev.yml 
+             to use environment variable CONSUL_BIND_INTERFACE.
+             Put your local interface connected to your router/internet.
 
 After::
 
     $ pushd buttervolume
     $ docker-compose up -d
     $ popd
+    $ mkdir deploy
     $ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 
 And you may have buttervolumeplugin/consul/caddy/haproxy on your personal host !
