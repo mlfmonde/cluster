@@ -1,0 +1,12 @@
+version: '2.1'
+services:
+  consul:
+    environment:
+      CONSUL_BIND_INTERFACE: wlp2s0
+    command: ["agent", "-dev", "-ui"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /run/docker/plugins:/run/docker/plugins
+      - /home/sandre/anybox/git.mlfmonde.org/deploy:/deploy
+      - ./caddy/conf/:/consul/template/caddy/
+      - ./haproxy/conf/:/consul/template/haproxy/

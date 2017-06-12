@@ -33,4 +33,4 @@ RUN chown -R consul: /home/consul \
 COPY handler.py /
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["agent", "-dev", "-ui"]
+CMD ["agent", "-server", "-retry-join=10.91.210.57", "-retry-join=10.91.210.58", "-retry-join=10.91.210.59", "-bootstrap-expect=3", "-ui"]
