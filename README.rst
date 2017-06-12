@@ -17,6 +17,11 @@ Then start caddy, haproxy and consul::
     $ popd
     $ docker-compose up -d
 
+Restart
+-------
+::
+    $ docker-compose up -d --build
+
 Stop
 ----
 
@@ -45,6 +50,23 @@ connect on any node, then run this from the cluster/ directory::
 Example: deploy lycee-test-mlf on nepri and replicate on edjo::
 
     docker-compose exec consul consul event -name=deploymaster "nepri edjo ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
+
+Use cluster with local/dev env
+------------------------------
+
+All docker container can be use partially (not with ssl website) on developer host
+
+You need to edit docker-compose.dev.yml to use environment variable CONSUL_BIND_INTERFACE.
+Put your local interface connected to your router/internet.
+
+After::
+
+    $ pushd buttervolume
+    $ docker-compose up -d
+    $ popd
+    $ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+
+And you may have buttervolumeplugin/consul/caddy/haproxy on your personal host !
 
 Troubleshooting
 ***************
