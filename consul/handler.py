@@ -220,16 +220,6 @@ class Application(object):
                      'service %s in the compose file of %s',
                      service, self.name)
 
-    def url_redirects(self, service):
-        """URL redirects configured in the compose for the service
-        """
-        try:
-            return self.compose['services'][service]['environment']['URL_REDIRECTS']
-        except:
-            log.info('Could not find a URL environment variable for '
-                     'service %s in the compose file of %s',
-                     service, self.name)
-
     def domain(self, service):
         """DOMAIN configured in the compose for the service
         WARNING deprecated, don't use
@@ -279,7 +269,6 @@ class Application(object):
         for service in self.services:
             domain = self.domain(service)
             url = self.url(service)
-            url_redirects = self.url_redirects(service)
             tls = self.tls(service)
             if not domain and not url:
                 continue
@@ -293,7 +282,6 @@ class Application(object):
             value = {
                 'domain': domain,  # deprecated, don't use (domain is the key)
                 'url': url,
-                'url_redirects': url_redirects,
                 'tls': tls,
                 'node': target,
                 'slave': slave,

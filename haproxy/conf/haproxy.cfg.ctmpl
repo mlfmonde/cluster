@@ -18,10 +18,6 @@ frontend https-in
     use_backend https-consul-mlf.anybox.eu if { req_ssl_sni -i consul-mlf.anybox.eu  }
     {{ range tree "site"  }}use_backend https-{{ .Key  }} if { req_ssl_sni -i {{ .Key  }}  }
     {{ end  }}
-    # Special backend to redirect
-    {{ range tree "site" }}{{ with $d := .Value | parseJSON }}{{ if $d.url_redirects }}
-    {{ range $url_redirect := $d.url_redirects | split " " }}use_backend https-{{ $url_redirect  }} if { req_ssl_sni -i {{ $url_redirect }}  }
-    {{ end  }}{{ end  }}{{ end  }}{{ end }}
 
 backend https-consul-mlf.anybox.eu
   mode tcp
@@ -29,17 +25,9 @@ backend https-consul-mlf.anybox.eu
 
 {{ range tree "site"  }}backend https-{{ .Key  }}
   mode tcp
-  server {{ with $d := .Value | parseJSON  }}{{ $d.node }} {{ if eq $d.node (env "HOSTNAME")  }}caddy{{ else  }}{{ $d.ip  }}{{ end  }}:443{{ end }}
+  server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy{{ else  }}{{ $d.ip  }}{{ end  }}:443{{ end  }}
+
 {{ end  }}
-
-# Special backend to redirect
-# Note, maybe we can use same backend !!!!
-{{ range tree "site"  }}{{ with $d := .Value | parseJSON  }}{{ if $d.url_redirects }}{{ range $url_redirect := $d.url_redirects | split " " }}
-backend https-{{ $url_redirect }}
-  mode tcp
-  server {{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy{{ else  }}{{ $d.ip }}{{ end  }}:443
-{{ end }}{{ end }}{{ end  }}{{ end  }}
-
 
 frontend http-in
     mode http
@@ -86,10 +74,6 @@ frontend http-in
     use_backend http-consul-mlf.anybox.eu if { hdr(host) -i consul-mlf.anybox.eu  }
     {{ range tree "site"  }}use_backend http-{{ .Key  }} if { hdr(host) -i {{ .Key  }}  }
     {{ end  }}
-    # Special backend to redirect
-    {{ range tree "site"  }}{{ with $d := .Value | parseJSON  }}{{ if $d.url_redirects }}
-    {{ range $url_redirect := $d.url_redirects | split " " }}use_backend http-{{ $url_redirect  }} if { hdr(host) -i {{ $url_redirect }}  }
-    {{ end  }}{{ end  }}{{ end  }}{{ end  }}
 
 backend http-consul-mlf.anybox.eu
   mode http
@@ -98,12 +82,5 @@ backend http-consul-mlf.anybox.eu
 {{ range tree "site"  }}backend http-{{ .Key  }}
   mode http
   server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy{{ else  }}{{ $d.ip  }}{{ end  }}:80{{ end  }}
-{{ end  }}
 
-# Special backend to redirect
-# Note, maybe we can use same backend !!!!
-{{ range tree "site"  }}{{ with $d := .Value | parseJSON  }}{{ if $d.url_redirects }}{{ range $url_redirect := $d.url_redirects | split " " }}
-backend http-{{ $url_redirect }}
-  mode http
-  server {{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy{{ else  }}{{ $d.ip }}{{ end  }}:2015
-{{ end }}{{ end }}{{ end  }}{{ end  }}
+{{ end  }}
