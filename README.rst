@@ -68,6 +68,10 @@ After::
 
 And you may have buttervolumeplugin/consul/caddy/haproxy on your personal host !
 
+To deploy a website::
+
+    $ docker-compose exec consul consul event -name=deploymaster "localhost.localdomain ssh://git@git.mlfmonde.org:2222/hebergement/primaire.lyceemolieresaragosse.org.git"
+
 Troubleshooting
 ***************
 
