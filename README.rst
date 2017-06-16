@@ -54,11 +54,26 @@ Example: deploy lycee-test-mlf on nepri and replicate on edjo::
 Use cluster with local/dev env
 ------------------------------
 
-All docker container can be use partially (not with ssl website) on developer host
+All docker container can be use partially (not with ssl website) on developer
+host.
 
-.. warning:: You need to edit docker-compose.dev.yml 
-             to use environment variable CONSUL_BIND_INTERFACE.
-             Put your local interface connected to your router/internet.
+.. note::
+
+    You can use self signed certificate adding ``TLS: self_signed`` in the
+    docker-compose service as environment variable.
+
+You need to edit docker-compose.dev.yml:
+
+* Set environment variable CONSUL_BIND_INTERFACE define your local interface
+  connected to your router/internet.
+* Make sure the DOCKER_GID match to the docker group ID availaible on your host
+  machine (look at ``/etc/hosts``)
+
+Make sure docker group has access to:
+
+* ``/run/docker/plugins/`` directory with read/execution (``r-x``)
+* ``/run/docker/plugins/btrfs.sock`` file with read/write (``rw-``)
+
 
 After::
 

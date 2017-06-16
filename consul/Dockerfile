@@ -21,12 +21,13 @@ RUN apk add --no-cache \
 USER consul
 COPY ssh /home/consul/.ssh
 USER root
+ARG DOCKER_GID=233
 RUN chown -R consul: /home/consul \
     && chmod go-rwx /home/consul/.ssh/id_rsa \
     && delgroup docker \
-    && addgroup -g 233 docker \
+    && addgroup -g $DOCKER_GID docker \
     && mkdir -p /run/docker/plugins/ \
-    && adduser -S -u 233 -G docker docker \
+    && adduser -S -u $DOCKER_GID -G docker docker \
     && adduser consul root \
     && adduser consul docker
 
