@@ -89,6 +89,7 @@ To deploy a website::
 
     $ docker-compose exec consul consul event -name=deploymaster "localhost.localdomain ssh://git@git.mlfmonde.org:2222/hebergement/primaire.lyceemolieresaragosse.org.git"
 
+
 Troubleshooting
 ***************
 
@@ -116,3 +117,17 @@ Also try to open the web ui to quickly check the deployed parameters::
     - You can change values, it should trigger the recompute of the Caddyfile and haproxy.cfg if something changed in the resulting file.
 
 
+
+proxy protocol
+--------------
+
+[Proxy protocol](https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt)
+let send real client IP from the first packet header even it's an encrypted
+connection (like https).
+
+.. warning::
+
+    When setting ``send-proxy`` on haproxy configuration, the backend (the
+    Caddy server) **have to** understand and accept the proxy protocole.
+    (note: but in Caddy conf file once configured to listen proxy protole
+    that works even it recived proper http / https)

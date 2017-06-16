@@ -16,6 +16,9 @@ https://consul-mlf.anybox.eu:443 {
 {{ $v.url  }} {
   {{ if $v.tls }}  tls self_signed{{ end }}
   timeouts 300s
+
+  proxyprotocol 0.0.0.0/0
+
   proxy / {{ $v.ct  }}/ {
     transparent
     websocket
