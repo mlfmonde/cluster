@@ -25,7 +25,7 @@ backend https-consul-mlf.anybox.eu
 
 {{ range tree "site"  }}backend https-{{ .Key  }}
   mode tcp
-  server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy{{ else  }}{{ $d.ip  }}{{ end  }}:443{{ end  }}
+  server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy{{ else  }}{{ $d.ip  }}{{ end  }}:443 send-proxy{{ end  }}
 
 {{ end  }}
 
@@ -81,6 +81,6 @@ backend http-consul-mlf.anybox.eu
 
 {{ range tree "site"  }}backend http-{{ .Key  }}
   mode http
-  server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy{{ else  }}{{ $d.ip  }}{{ end  }}:80{{ end  }}
+  server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy{{ else  }}{{ $d.ip  }}{{ end  }}:80 send-proxy{{ end  }}
 
 {{ end  }}
