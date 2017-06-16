@@ -6,11 +6,9 @@ https://consul-mlf.anybox.eu:443 {
   }
   gzip
   log /var/log/consul-mlf.anybox.eu.access.log {
-      rotate {
-          size 100 # Rotate after 100 MB
-          age  14  # Keep log files for 14 days
-          keep 10  # Keep at most 10 log files
-      }
+      rotate_size 100 # Rotate after 100 MB
+      rotate_age  14  # Keep log files for 14 days
+      rotate_keep 10  # Keep at most 10 log files
   }
 }
 
@@ -25,11 +23,9 @@ https://consul-mlf.anybox.eu:443 {
   }
   gzip
   log /var/log/{{ $k  }}.access.log {
-      rotate {
-          size 100 # Rotate after 100 MB
-          age  14  # Keep log files for 14 days
-          keep 10  # Keep at most 10 log files
-      }
+      rotate_size 100 # Rotate after 100 MB
+      rotate_age  14  # Keep log files for 14 days
+      rotate_keep 10  # Keep at most 10 log files
   }
 }
 {{ end  }}{{ end  }}
