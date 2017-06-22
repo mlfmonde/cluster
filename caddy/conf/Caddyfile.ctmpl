@@ -37,3 +37,6 @@ https://consul-mlf.anybox.eu:443 {
 http://www.lyceemlfpalma.org {
   redir http://lyceemlfpalma.org{uri}
 }
+http://lycee-verdun.edu.lb {
+  redir http://www.lycee-verdun.edu.lb{uri}
+}
