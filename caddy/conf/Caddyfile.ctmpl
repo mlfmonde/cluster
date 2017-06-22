@@ -32,3 +32,8 @@ https://consul-mlf.anybox.eu:443 {
   }
 }
 {{ end  }}{{ end  }}
+
+# special host for redirection
+http://www.lyceemlfpalma.org {
+  redir http://lyceemlfpalma.org{uri}
+}

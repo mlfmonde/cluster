@@ -74,6 +74,8 @@ frontend http-in
     use_backend http-consul-mlf.anybox.eu if { hdr(host) -i consul-mlf.anybox.eu  }
     {{ range tree "site"  }}use_backend http-{{ .Key  }} if { hdr(host) -i {{ .Key  }}  }
     {{ end  }}
+    # Special backend for redirect website
+    use_backend http-lyceemlfpalma.org if { hdr(host) -i www.lyceemlfpalma.org}
 
 backend http-consul-mlf.anybox.eu
   mode http
@@ -84,3 +86,4 @@ backend http-consul-mlf.anybox.eu
   server {{ with $d := .Value | parseJSON  }}{{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy{{ else  }}{{ $d.ip  }}{{ end  }}:80{{ end  }}
 
 {{ end  }}
+
