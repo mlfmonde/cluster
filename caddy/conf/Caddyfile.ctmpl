@@ -40,3 +40,9 @@ http://www.lyceemlfpalma.org {
 http://lycee-verdun.edu.lb {
   redir http://www.lycee-verdun.edu.lb{uri}
 }
+http://lyceemolieresaragosse.fr {
+  redir http://www.lyceemolieresaragosse.fr{uri}
+}
+http://lyceemolieresaragosse.org {
+  redir http://www.lyceemolieresaragosse.org{uri}
+}

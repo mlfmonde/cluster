@@ -77,6 +77,8 @@ frontend http-in
     # Special backend for redirect website
     use_backend http-lyceemlfpalma.org if { hdr(host) -i www.lyceemlfpalma.org }
     use_backend http-www.lycee-verdun.edu.lb if { hdr(host) -i lycee-verdun.edu.lb }
+    use_backend http-www.lyceemolieresaragosse.fr if { hdr(host) -i lyceemolieresaragosse.fr }
+    use_backend http-www.lyceemolieresaragosse.org if { hdr(host) -i lyceemolieresaragosse.org }
 
 backend http-consul-mlf.anybox.eu
   mode http
