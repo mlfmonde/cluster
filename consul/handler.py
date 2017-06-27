@@ -163,8 +163,9 @@ class Application(object):
     def fetch(self, retrying=False):
         try:
             if exists(self.path):
-                self.do('rm -rf "{}"'.format(self.repo_url), cwd=DEPLOY)
-            self.do('git clone --depth 1 "{}"'.format(self.repo_url), cwd=DEPLOY)
+                self.clean()
+            self.do('git clone --depth 1 "{}"'
+                    .format(self.repo_url), cwd=DEPLOY)
             self._services = None
             self._volumes = None
             self._compose = None
