@@ -14,7 +14,7 @@ from subprocess import run as srun, CalledProcessError, PIPE
 from sys import stdin, argv
 from urllib.parse import urlparse
 DEPLOY = '/deploy'
-log = logging.getLogger(__name__)
+log = logging.getLogger()
 
 
 def concat(xs):
@@ -437,7 +437,9 @@ def deploymaster(payload, hostname, test):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG,
-                        filename=join(DEPLOY, 'handler.log'))
+                        format='{asctime}\t{levelname}\t{message}',
+                        filename=join(DEPLOY, 'handler.log'),
+                        style='{')
     try:  # test mode?
         test = argv[0] == 'test'
     except:
