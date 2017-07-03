@@ -39,13 +39,16 @@ def _run(cmd, cwd=None, test=False):
 
 
 class Application(object):
-    """commands
-    """
     def __init__(self, repo_url, cwd=None, test=False):
         self.test = test  # for unit tests
-        self.repo_url = repo_url  # of the git repository
-        name = basename(repo_url.strip('/'))
-        self.repo_name = name[:-4] if name.endswith('.git') else name
+        self.repo_url, self.branch = repo_url, 'master'  # backcompat default
+        if '@' in repo_url:
+            self.repo_url, self.branch = repo_url.split('@')
+        self.repo_name = basename(self.repo_url.strip('/'))
+        if self.repo_name.endswith('.git'):
+            self.repo_name = self.repo_name[:-4]
+        suffix = '_' + self.branch if self.branch else ''
+        self.name = self.repo_name + suffix
         self.path = join(DEPLOY, self.repo_name)  # path of the checkout
         self._services = None
         self._volumes = None
@@ -98,7 +101,7 @@ class Application(object):
 
     @property
     def project(self):
-        return re.sub(r'[^a-z0-9]', '', self.repo_name.lower())
+        return re.sub(r'[^a-z0-9]', '', self.name.lower())
 
     @property
     def volumes(self):
@@ -117,44 +120,34 @@ class Application(object):
         """
         return self.project + '_' + service + '_1'
 
+    def valueof(self, name, key):
+        """ return the current value of the key in the kv"""
+        cmd = 'consul kv get site/{}'.format(name)
+        return json.loads(self.do(cmd))[key]
+
     def compose_domain(self):
         """domain name of the first exposed service in the compose"""
         # FIXME prevents from exposing two domains in a compose
         domains = [self.domain(s) for s in self.services]
         domains = [d for d in domains if d is not None]
-        domain = domains[0] if domains else ''
-        if not domain:
-            urls = [self.url(s) for s in self.services]
-            urls = [d for d in urls if d is not None]
-            url = urls[0] if urls else ''
-            domain = urlparse(url).netloc.split(':')[0]
-        return domain
-
-    def valueof(self, domain, key):
-        """ return the current value of the key in the kv"""
-        cmd = 'consul kv get site/{}'.format(domain)
-        return json.loads(self.do(cmd))[key]
+        return domains[0] if domains else ''
 
     @property
     def slave_node(self):
         """slave node for the current app """
-        domain = ''
         try:
-            domain = self.compose_domain()
-            return self.valueof(domain, 'slave')
+            return self.valueof(self.name, 'slave')
         except:
-            log.warn('Could not determine the slave node for %s', domain)
+            log.warn('Could not determine the slave node for %s', self.name)
             return None
 
     @property
     def master_node(self):
         """master node for the current app """
-        domain = ''
         try:
-            domain = self.compose_domain()
-            return self.valueof(domain, 'node')
+            return self.valueof(self.name, 'node')
         except:
-            log.warn('Could not determine the master node for %s', domain)
+            log.warn('Could not determine the master node for %s', self.name)
             return None
 
     def clean(self):
@@ -164,8 +157,8 @@ class Application(object):
         try:
             if exists(self.path):
                 self.clean()
-            self.do('git clone --depth 1 "{}"'
-                    .format(self.repo_url), cwd=DEPLOY)
+            self.do('git clone --depth 1 -b "{}" "{}" "{}"'
+                    .format(self.branch, self.repo_url, self.name), cwd=DEPLOY)
             self._services = None
             self._volumes = None
             self._compose = None
@@ -229,8 +222,9 @@ class Application(object):
         return [l.strip() for l in lines if len(l.split()) == 1]
 
     def domain(self, service):
-        """deprecated option, don't use """
-        self.compose_env(service, 'DOMAIN')
+        """ domain computed from the URL
+        """
+        return urlparse(self.url).netloc.split(':')[0]
 
     def proto(self, service):
         """frontend protocol configured in the compose for the service.
@@ -255,38 +249,36 @@ class Application(object):
         log.info("Registering URLs of %s in the key/value store",
                  self.repo_name)
         for service in self.services:
-            domain = self.domain(service)
             url = self.url(service)
             redirect_from = self.redirect_from(service)
             tls = self.tls(service)
-            if not domain and not url:
+            if not url:
                 # service not exposed to the web
                 continue
-            if not url:
-                # for backward compatibility
-                url = 'https://{}:443'.format(domain)
             domain = urlparse(url).netloc.split(':')[0]
             # store the domain and name in the kv
             ct = self.container_name(service)
             port = self.port(service)
             proto = self.proto(service)
             value = {
-                'domain': domain,  # deprecated, don't use (domain is the key)
-                'url': url,
-                'redirect_from': redirect_from,
-                'tls': tls,
-                'node': target,
-                'slave': slave,
-                'ip': self.members()[target]['ip'],
-                'ct': '{proto}{ct}:{port}'.format(**locals())}
+                'name': self.name,  # name of the service, and key in the kv
+                'domain': domain,  # used by haproxy
+                'ip': self.members()[target]['ip'],  # used by haproxy
+                'node': target,  # used by haproxy and caddy
+                'url': url,  # used by caddy
+                'redirect_from': redirect_from,  # used by caddy
+                'tls': tls,  # used by caddy
+                'slave': slave,  # used by the handler
+                'ct': '{proto}{ct}:{port}'.format(**locals())}  # used by caddy
             cmd = ("consul kv put site/{} '{}'"
-                   .format(domain, json.dumps(value)))
+                   .format(self.name, json.dumps(value)))
             self.do(cmd, runintest=False)
             log.info("Registered: %s", cmd)
 
     def register_consul(self):
         """register a service in consul
         """
+        # FIXME generate automatically
         try:
             path = '{}/service.json'.format(self.path)
             log.info("Registering %s in consul", self.path)
@@ -349,20 +341,16 @@ class Volume(object):
         self.do("buttervolume send {} {}".format(target, snapshot))
 
 
-def handle_one(event, hostname, test=False):
-    event_name = event.get('Name')
-    payload = event.get('Payload')
-    if not payload:
-        return
-    if event_name == 'deploymaster':
-        deploymaster(b64decode(payload), hostname, test)
-    else:
-        log.error('Unknown event name: {}'.format(event_name))
-
-
 def handle(events, hostname, test=False):
     for event in json.loads(events):
-        handle_one(event, hostname, test)
+        event_name = event.get('Name')
+        payload = event.get('Payload')
+        if not payload:
+            return
+        if event_name == 'deploymaster':
+            deploymaster(b64decode(payload), hostname, test)
+        else:
+            log.error('Unknown event name: {}'.format(event_name))
 
 
 def deploymaster(payload, hostname, test):
@@ -370,7 +358,6 @@ def deploymaster(payload, hostname, test):
     Deployments are done in the DEPLOY folder.
     Any remaining stuff in this folder are a sign of a failed deploy
     """
-    # check
     try:
         if len(payload.split()) == 2:  # just target
             target = payload.split()[0].decode()
@@ -387,9 +374,10 @@ def deploymaster(payload, hostname, test):
                   'you should specify "<target> <repo>" '
                   'or "<target> <slave> <repo>"')
         raise(e)
+
     app = Application(repo_url, test=test)
     master_node = app.master_node
-    if hostname == target:
+    if hostname == target:  # 1st deployment or slave that will turn to master
         app.fetch()
         oldslave = app.slave_node
         master_node = app.master_node
@@ -410,7 +398,7 @@ def deploymaster(payload, hostname, test):
         app.register_kv(target, slave, hostname)  # for consul-template
         app.register_consul()  # for consul check
         app.start()
-    elif hostname == master_node:
+    elif hostname == master_node:  # master that will turn to a slave
         app.lock()
         # first replicate live to lower downtime
         for volume in app.volumes:
