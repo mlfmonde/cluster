@@ -29,15 +29,24 @@ Using from the shell
 
 From Consul (the expected way), just configure a watcher (see the docker-compose.yml of the consul MLF docker).
 
-For instance inside a consul container with python3 installed::
+For instance, from inside a consul container with python3 installed::
 
     $ echo [{"ID":"0","Name":"plop","Payload":"cGxvcDI=","Version":1,"LTime":1}] | python3 handler.py
 
-The same **test mode** ::
+The same in **test mode** ::
 
     $ echo [{"ID":"0","Name":"plop","Payload":"cGxvcDI=","Version":1,"LTime":1}] | python3 handler.py test
 
 The test mode just prints the commands that should be executed.
+
+Passing data as argument
+************************
+
+Another useful mode is available to manually test a deployment, just pass the data as first argument to the handler::
+
+    $ python3 handler.py '[{"ID":"0","Name":"plop","Payload":"cGxvcDI=","Version":1,"LTime":1}]'
+
+This way, it is easier to put a **pdb** debugger in the handler.
 
 Using as a Python library
 *************************

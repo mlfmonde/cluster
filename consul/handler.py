@@ -14,7 +14,7 @@ from subprocess import run as srun, CalledProcessError, PIPE
 from sys import stdin, argv
 from urllib.parse import urlparse
 DEPLOY = '/deploy'
-log = logging.getLogger(__name__)
+log = logging.getLogger()
 
 
 def concat(xs):
@@ -45,8 +45,8 @@ class Application(object):
         self.test = test  # for unit tests
         self.repo_url = repo_url  # of the git repository
         name = basename(repo_url.strip('/'))
-        self.name = name[:-4] if name.endswith('.git') else name  # repository
-        self.path = join(DEPLOY, self.name)  # path of the checkout
+        self.repo_name = name[:-4] if name.endswith('.git') else name
+        self.path = join(DEPLOY, self.repo_name)  # path of the checkout
         self._services = None
         self._volumes = None
         self._lock = False
@@ -68,17 +68,17 @@ class Application(object):
         return self._compose
 
     def lock(self):
-        self.do('consul kv put deploying/{}'.format(self.name))
+        self.do('consul kv put deploying/{}'.format(self.repo_name))
 
     def unlock(self):
-        self.do('consul kv delete deploying/{}'.format(self.name))
+        self.do('consul kv delete deploying/{}'.format(self.repo_name))
 
     def wait_lock(self):
         loops = 0
         while loops < 60:
-            log.info('Waiting lock release for %s', self.name)
+            log.info('Waiting lock release for %s', self.repo_name)
             try:
-                self.do('consul kv get deploying/{}'.format(self.name))
+                self.do('consul kv get deploying/{}'.format(self.repo_name))
             except Exception:
                 log.info('Lock released')
                 return
@@ -86,7 +86,7 @@ class Application(object):
             loops += 1
         self.unlock()
         log.info('Waited too much :(')
-        raise RuntimeError('deployment of {} failed'.format(self.name))
+        raise RuntimeError('deployment of {} failed'.format(self.repo_name))
 
     @property
     def services(self):
@@ -98,7 +98,7 @@ class Application(object):
 
     @property
     def project(self):
-        return re.sub(r'[^a-z0-9]', '', self.name.lower())
+        return re.sub(r'[^a-z0-9]', '', self.repo_name.lower())
 
     @property
     def volumes(self):
@@ -117,42 +117,42 @@ class Application(object):
         """
         return self.project + '_' + service + '_1'
 
+    def compose_domain(self):
+        """domain name of the first exposed service in the compose"""
+        # FIXME prevents from exposing two domains in a compose
+        domains = [self.domain(s) for s in self.services]
+        domains = [d for d in domains if d is not None]
+        domain = domains[0] if domains else ''
+        if not domain:
+            urls = [self.url(s) for s in self.services]
+            urls = [d for d in urls if d is not None]
+            url = urls[0] if urls else ''
+            domain = urlparse(url).netloc.split(':')[0]
+        return domain
+
+    def valueof(self, domain, key):
+        """ return the current value of the key in the kv"""
+        cmd = 'consul kv get site/{}'.format(domain)
+        return json.loads(self.do(cmd))[key]
+
     @property
     def slave_node(self):
-        """slave node for the current app
-        """
+        """slave node for the current app """
         domain = ''
         try:
-            domains = [self.domain(s) for s in self.services]
-            domains = [d for d in domains if d is not None]
-            domain = domains[0] if domains else ''
-            if not domain:
-                urls = [self.url(s) for s in self.services]
-                urls = [d for d in urls if d is not None]
-                url = urls[0] if urls else ''
-                domain = urlparse(url).netloc.split(':')[0]
-            cmd = 'consul kv get site/{}'.format(domain)
-            return json.loads(self.do(cmd))['slave']
+            domain = self.compose_domain()
+            return self.valueof(domain, 'slave')
         except:
             log.warn('Could not determine the slave node for %s', domain)
             return None
 
     @property
     def master_node(self):
-        """master node for the current app
-        """
+        """master node for the current app """
         domain = ''
         try:
-            domains = [self.domain(s) for s in self.services]
-            domains = [d for d in domains if d is not None]
-            domain = domains[0] if domains else ''
-            if not domain:
-                urls = [self.url(s) for s in self.services]
-                urls = [d for d in urls if d is not None]
-                url = urls[0] if urls else ''
-                domain = urlparse(url).netloc.split(':')[0]
-            cmd = 'consul kv get site/{}'.format(domain)
-            return json.loads(self.do(cmd))['node']
+            domain = self.compose_domain()
+            return self.valueof(domain, 'node')
         except:
             log.warn('Could not determine the master node for %s', domain)
             return None
@@ -162,26 +162,26 @@ class Application(object):
 
     def fetch(self, retrying=False):
         try:
-            if not exists(self.path):
-                self.do('git clone "{}"'.format(self.repo_url), cwd=DEPLOY)
-            else:
-                self.do('git pull', cwd=self.path)
+            if exists(self.path):
+                self.clean()
+            self.do('git clone --depth 1 "{}"'
+                    .format(self.repo_url), cwd=DEPLOY)
             self._services = None
             self._volumes = None
             self._compose = None
         except CalledProcessError:
             if not retrying:
-                log.warn("Failed to fetch %s, retrying", self.name)
+                log.warn("Failed to fetch %s, retrying", self.repo_name)
                 self.fetch(retrying=True)
             else:
                 raise
 
     def start(self):
-        log.info("Starting the project %s", self.name)
+        log.info("Starting the project %s", self.repo_name)
         self.do('docker-compose up -d --build', cwd=self.path)
 
     def stop(self):
-        log.info("Stopping the project %s", self.name)
+        log.info("Stopping the project %s", self.repo_name)
         self.do('docker-compose down', cwd=self.path)
 
     def _members(self):
@@ -200,70 +200,47 @@ class Application(object):
             members[name] = {'ip': ip.split(':')[0], 'status': status}
         return members
 
-    def tls(self, service):
-        """TLS configured in the compose for the service
+    def compose_env(self, service, name, default=None):
+        """retrieve an environment variable from the service in the compose
         """
         try:
-            return self.compose['services'][service]['environment']['TLS']
-        except:
-            log.info('Could not find a TLS environment variable for '
+            val = self.compose['services'][service]['environment'][name]
+            log.info('Found a %s environment variable for '
                      'service %s in the compose file of %s',
-                     service, self.name)
+                     name, service, self.repo_name)
+            return val
+        except:
+            log.info('No %s environment variable for '
+                     'service %s in the compose file of %s',
+                     name, service, self.repo_name)
+            return default
+
+    def tls(self, service):
+        """used to disable tls with TLS: self_signed """
+        return self.compose_env(service, 'TLS')
 
     def url(self, service):
-        """URL configured in the compose for the service
-        """
-        try:
-            return self.compose['services'][service]['environment']['URL']
-        except:
-            log.warn('Could not find a URL environment variable for '
-                     'service %s in the compose file of %s',
-                     service, self.name)
+        """end url to expose the service """
+        return self.compose_env(service, 'URL')
 
-    def url_redirects(self, service):
-        """URL redirects configured in the compose for the service
-        """
-        try:
-            return self.compose['services'][service]['environment']['URL_REDIRECTS']
-        except:
-            log.info('Could not find a URL environment variable for '
-                     'service %s in the compose file of %s',
-                     service, self.name)
+    def redirect_from(self, service):
+        """ list of redirects transmitted to caddy """
+        lines = self.compose_env(service, 'REDIRECT_FROM', '').split('\n')
+        return [l.strip() for l in lines if len(l.split()) == 1]
 
     def domain(self, service):
-        """DOMAIN configured in the compose for the service
-        WARNING deprecated, don't use
-        """
-        try:
-            return self.compose['services'][service]['environment']['DOMAIN']
-        except:
-            log.info('Could not find a DOMAIN environment variable for '
-                     'service %s in the compose file of %s',
-                     service, self.name)
+        """deprecated option, don't use """
+        self.compose_env(service, 'DOMAIN')
 
     def proto(self, service):
-        """frontend PROTO configured in the compose for the service.
-        Defaults to http:// if unspecified
+        """frontend protocol configured in the compose for the service.
         """
-        try:
-            return self.compose['services'][service]['environment']['PROTO']
-        except:
-            log.warn('Could not find a PROTO environment variable for '
-                     'service %s in the compose file of %s',
-                     service, self.name)
-            return 'http://'
+        self.compose_env(service, 'PROTO', 'http://')
 
     def port(self, service):
-        """frontend PORT configured in the compose for the service.
-        Defaults to 80 if unspecified
+        """frontend port configured in the compose for the service.
         """
-        try:
-            return self.compose['services'][service]['environment']['PORT']
-        except:
-            log.warn('Could not find a PORT environment variable for '
-                     'service %s in the compose file of %s',
-                     service, self.name)
-            return '80'
+        self.compose_env(service, 'PORT', '80')
 
     def ps(self, service):
         ps = self.do('docker ps -f name=%s --format "table {{.Status}}"'
@@ -271,19 +248,22 @@ class Application(object):
         return ps.split('\n')[-1].strip()
 
     def register_kv(self, target, slave, hostname):
-        """register a service in the kv store
+        """register a service in the key/value store
         so that consul-template can regenerate the
         caddy and haproxy conf files
         """
-        log.info("Registering URLs of %s in the kv store", self.name)
+        log.info("Registering URLs of %s in the key/value store",
+                 self.repo_name)
         for service in self.services:
             domain = self.domain(service)
             url = self.url(service)
-            url_redirects = self.url_redirects(service)
+            redirect_from = self.redirect_from(service)
             tls = self.tls(service)
             if not domain and not url:
+                # service not exposed to the web
                 continue
             if not url:
+                # for backward compatibility
                 url = 'https://{}:443'.format(domain)
             domain = urlparse(url).netloc.split(':')[0]
             # store the domain and name in the kv
@@ -293,7 +273,7 @@ class Application(object):
             value = {
                 'domain': domain,  # deprecated, don't use (domain is the key)
                 'url': url,
-                'url_redirects': url_redirects,
+                'redirect_from': redirect_from,
                 'tls': tls,
                 'node': target,
                 'slave': slave,
@@ -302,7 +282,7 @@ class Application(object):
             cmd = ("consul kv put site/{} '{}'"
                    .format(domain, json.dumps(value)))
             self.do(cmd, runintest=False)
-            log.info("Registered %s", cmd)
+            log.info("Registered: %s", cmd)
 
     def register_consul(self):
         """register a service in consul
@@ -450,7 +430,9 @@ def deploymaster(payload, hostname, test):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG,
-                        filename=join(DEPLOY, 'handler.log'))
+                        format='{asctime}\t{levelname}\t{message}',
+                        filename=join(DEPLOY, 'handler.log'),
+                        style='{')
     try:  # test mode?
         test = argv[0] == 'test'
     except:
@@ -458,4 +440,4 @@ if __name__ == '__main__':
     test = os.environ.get('TEST', test) and True or False
     hostname = socket.gethostname()
     # read json from stdin
-    handle(stdin.read(), hostname, test)
+    handle(len(argv) == 2 and argv[1] or stdin.read(), hostname, test)

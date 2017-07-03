@@ -51,16 +51,31 @@ Example: deploy lycee-test-mlf on nepri and replicate on edjo::
 
     docker-compose exec consul consul event -name=deploymaster "nepri edjo ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
 
-Use cluster with local/dev env
-------------------------------
+Local development environment
+-----------------------------
 
-All docker container can be use partially (not with ssl website) on developer host
+All docker containers can be use partially (not with ssl website) on developer
+host.
 
-.. warning:: You need to edit docker-compose.dev.yml 
-             to use environment variable CONSUL_BIND_INTERFACE.
-             Put your local interface connected to your router/internet.
+.. note::
 
-After::
+    You can use self signed certificate adding ``TLS: self_signed`` in the
+    docker-compose service as environment variable.
+
+You need to edit two files:
+
+* In ``docker-compose.dev.yml`` set environment variable CONSUL_BIND_INTERFACE to define
+  your local interface connected to your router/internet.
+* Make sure the DOCKER_GID in ``consul/Dockerfile`` and ``docker-compose.dev.yml``
+  match to the docker group ID available on your host machine (look at ``/etc/hosts``)
+
+Make sure the docker group has access to:
+
+* ``/run/docker/plugins/`` directory with read/execution (``r-x``)
+* ``/run/docker/plugins/btrfs.sock`` file with read/write (``rw-``)
+
+
+Then::
 
     $ pushd buttervolume
     $ docker-compose up -d
@@ -74,11 +89,13 @@ To deploy a website::
 
     $ docker-compose exec consul consul event -name=deploymaster "localhost.localdomain ssh://git@git.mlfmonde.org:2222/hebergement/primaire.lyceemolieresaragosse.org.git"
 
+Possibly replace localhost.localdomain with the hostname of your development machine.
+
 Troubleshooting
 ***************
 
-Caddyfile are not regenerated
------------------------------
+Caddyfile is not regenerated
+----------------------------
 
 Probably an error in the consul-template ``caddy/conf/Caddyfile.ctmpl`` or ``haproxy/conf/haproxy.cmtpl``,
 or an invalid value in the KV store of Consul.
@@ -101,3 +118,17 @@ Also try to open the web ui to quickly check the deployed parameters::
     - You can change values, it should trigger the recompute of the Caddyfile and haproxy.cfg if something changed in the resulting file.
 
 
+
+proxy protocol
+--------------
+
+[Proxy protocol](https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt)
+let send real client IP from the first packet header even it's an encrypted
+connection (like https).
+
+.. warning::
+
+    When setting ``send-proxy`` on haproxy configuration, the backend (the
+    Caddy server) **have to** understand and accept the proxy protocole.
+    (note: but in Caddy conf file once configured to listen proxy protole
+    that works even it recived proper http / https)
