@@ -51,10 +51,10 @@ Example: deploy lycee-test-mlf on nepri and replicate on edjo::
 
     docker-compose exec consul consul event -name=deploymaster "nepri edjo ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
 
-Use cluster with local/dev env
-------------------------------
+Local development environment
+-----------------------------
 
-All docker container can be use partially (not with ssl website) on developer
+All docker containers can be use partially (not with ssl website) on developer
 host.
 
 .. note::
@@ -62,20 +62,20 @@ host.
     You can use self signed certificate adding ``TLS: self_signed`` in the
     docker-compose service as environment variable.
 
-You need to edit docker-compose.dev.yml:
+You need to edit two files:
 
-* Set environment variable CONSUL_BIND_INTERFACE define your local interface
-  connected to your router/internet.
-* Make sure the DOCKER_GID match to the docker group ID availaible on your host
-  machine (look at ``/etc/hosts``)
+* In ``docker-compose.dev.yml`` set environment variable CONSUL_BIND_INTERFACE to define
+  your local interface connected to your router/internet.
+* Make sure the DOCKER_GID in ``consul/Dockerfile`` and ``docker-compose.dev.yml``
+  match to the docker group ID available on your host machine (look at ``/etc/hosts``)
 
-Make sure docker group has access to:
+Make sure the docker group has access to:
 
 * ``/run/docker/plugins/`` directory with read/execution (``r-x``)
 * ``/run/docker/plugins/btrfs.sock`` file with read/write (``rw-``)
 
 
-After::
+Then::
 
     $ pushd buttervolume
     $ docker-compose up -d
@@ -89,12 +89,13 @@ To deploy a website::
 
     $ docker-compose exec consul consul event -name=deploymaster "localhost.localdomain ssh://git@git.mlfmonde.org:2222/hebergement/primaire.lyceemolieresaragosse.org.git"
 
+Possibly replace localhost.localdomain with the hostname of your development machine.
 
 Troubleshooting
 ***************
 
-Caddyfile are not regenerated
------------------------------
+Caddyfile is not regenerated
+----------------------------
 
 Probably an error in the consul-template ``caddy/conf/Caddyfile.ctmpl`` or ``haproxy/conf/haproxy.cmtpl``,
 or an invalid value in the KV store of Consul.
