@@ -15,13 +15,8 @@ frontend https-in
     tcp-request inspect-delay 5s
     tcp-request content accept if { req_ssl_hello_type 1  }
 
-    use_backend https-consul-mlf.anybox.eu if { req_ssl_sni -i consul-mlf.anybox.eu  }
     {{ range tree "site"  }}use_backend https-{{ .Key  }} if { req_ssl_sni -i {{ .Key  }}  }
     {{ end  }}
-
-backend https-consul-mlf.anybox.eu
-  mode tcp
-  server nepri caddy:443
 
 {{ range tree "site"  }}backend https-{{ .Key  }}
   mode tcp
@@ -71,7 +66,6 @@ frontend http-in
     http-request redirect code 301 prefix http://forum-ee.mlfmonde.org if old_forum_uri ee_prod_dns
     http-request redirect code 301 location / if old_forum_uri new_forum_prod_dns
 
-    use_backend http-consul-mlf.anybox.eu if { hdr(host) -i consul-mlf.anybox.eu  }
     {{ range tree "site"  }}use_backend http-{{ .Key  }} if { hdr(host) -i {{ .Key  }}  }
     {{ end  }}
     # Special backend for redirect website
@@ -79,10 +73,6 @@ frontend http-in
     use_backend http-www.lycee-verdun.edu.lb if { hdr(host) -i lycee-verdun.edu.lb }
     use_backend http-www.lyceemolieresaragosse.fr if { hdr(host) -i lyceemolieresaragosse.fr }
     use_backend http-www.lyceemolieresaragosse.org if { hdr(host) -i lyceemolieresaragosse.org }
-
-backend http-consul-mlf.anybox.eu
-  mode http
-  server nepri caddy:80
 
 {{ range tree "site"  }}backend http-{{ .Key  }}
   mode http
