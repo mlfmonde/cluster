@@ -98,7 +98,7 @@ class Application(object):
 
     @property
     def project(self):
-        return re.sub(r'[^a-z0-9]', '', self.repo_name.lower())
+        return re.sub(r'[^a-z0-9]', '', self.name.lower())
 
     @property
     def volumes(self):
