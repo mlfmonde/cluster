@@ -9,6 +9,7 @@ import socket
 import time
 import yaml
 from base64 import b64decode
+from contextlib import contextmanager
 from os.path import basename, join, exists
 from subprocess import run as srun, CalledProcessError, PIPE
 from sys import stdin, argv
@@ -67,10 +68,10 @@ class Application(object):
                 raise EnvironmentError('Could not read docker-compose.yml')
         return self._compose
 
+    @contextmanager
     def lock(self):
         self.do('consul kv put deploying/{}'.format(self.name))
-
-    def unlock(self):
+        yield
         self.do('consul kv delete deploying/{}'.format(self.name))
 
     def wait_lock(self):
@@ -389,19 +390,18 @@ def deploymaster(payload, hostname, test):
         app.register_consul()  # for consul check
         app.start()
     elif hostname == master_node:  # master that will turn to a slave
-        app.lock()
-        # first replicate live to lower downtime
-        for volume in app.volumes:
-            volume.schedule_snapshots(0)
-            oldslave = app.slave_node
-            if oldslave is not None:
-                volume.schedule_replicate(0, app.members()[oldslave]['ip'])
-            volume.send(volume.snapshot(), app.members()[target]['ip'])
-        # then stop and replicate again (should be faster)
-        app.stop()
-        for volume in app.volumes:
-            volume.send(volume.snapshot(), app.members()[target]['ip'])
-        app.unlock()
+        with app.lock():
+            # first replicate live to lower downtime
+            for volume in app.volumes:
+                volume.schedule_snapshots(0)
+                oldslave = app.slave_node
+                if oldslave is not None:
+                    volume.schedule_replicate(0, app.members()[oldslave]['ip'])
+                volume.send(volume.snapshot(), app.members()[target]['ip'])
+            # then stop and replicate again (should be faster)
+            app.stop()
+            for volume in app.volumes:
+                volume.send(volume.snapshot(), app.members()[target]['ip'])
         for volume in app.volumes:
             volume.delete()
 
