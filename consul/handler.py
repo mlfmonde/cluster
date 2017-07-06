@@ -78,6 +78,7 @@ class Application(object):
             self.unlock()
             self.start()
             raise
+        log.error('Volume transfer SUCCEEDED!')
         self.unlock()
 
     def unlock(self):
@@ -89,7 +90,7 @@ class Application(object):
             log.info('Waiting lock release for %s', self.name)
             try:
                 self.do('consul kv get transferring/{}'.format(self.name))
-            except Exception:
+            except CalledProcessError:
                 log.info('Lock released')
                 return
             time.sleep(1)
@@ -352,7 +353,7 @@ class Volume(object):
 
 
 def handle(events, myself, test=False):
-    for event in json.loads(events):
+    for event in json.loads(events)[-1]:
         event_name = event.get('Name')
         payload = b64decode(event.get('Payload', '')).decode('utf-8')
         if not payload:
