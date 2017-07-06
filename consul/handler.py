@@ -42,10 +42,10 @@ class Application(object):
     def __init__(self, repo_url, branch, cwd=None, test=False):
         self.test = test  # for unit tests
         self.repo_url, self.branch = repo_url, branch
-        self.repo_name = basename(self.repo_url.strip('/'))
-        if self.repo_name.endswith('.git'):
-            self.repo_name = self.repo_name[:-4]
-        self.name = self.repo_name + ('_' + self.branch if self.branch else '')
+        repo_name = basename(self.repo_url.strip('/'))
+        if repo_name.endswith('.git'):
+            repo_name = repo_name[:-4]
+        self.name = repo_name + ('_' + self.branch if self.branch else '')
         self.path = join(DEPLOY, self.name)  # path of the checkout
         self._services = None
         self._volumes = None
@@ -68,17 +68,17 @@ class Application(object):
         return self._compose
 
     def lock(self):
-        self.do('consul kv put deploying/{}'.format(self.repo_name))
+        self.do('consul kv put deploying/{}'.format(self.name))
 
     def unlock(self):
-        self.do('consul kv delete deploying/{}'.format(self.repo_name))
+        self.do('consul kv delete deploying/{}'.format(self.name))
 
     def wait_lock(self):
         loops = 0
         while loops < 60:
-            log.info('Waiting lock release for %s', self.repo_name)
+            log.info('Waiting lock release for %s', self.name)
             try:
-                self.do('consul kv get deploying/{}'.format(self.repo_name))
+                self.do('consul kv get deploying/{}'.format(self.name))
             except Exception:
                 log.info('Lock released')
                 return
@@ -86,7 +86,7 @@ class Application(object):
             loops += 1
         self.unlock()
         log.info('Waited too much :(')
-        raise RuntimeError('deployment of {} failed'.format(self.repo_name))
+        raise RuntimeError('deployment of {} failed'.format(self.name))
 
     @property
     def services(self):
@@ -197,12 +197,12 @@ class Application(object):
             val = self.compose['services'][service]['environment'][name]
             log.info('Found a %s environment variable for '
                      'service %s in the compose file of %s',
-                     name, service, self.repo_name)
+                     name, service, self.name)
             return val
         except:
             log.info('No %s environment variable for '
                      'service %s in the compose file of %s',
-                     name, service, self.repo_name)
+                     name, service, self.name)
             return default
 
     def tls(self, service):
