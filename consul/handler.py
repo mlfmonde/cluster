@@ -39,7 +39,7 @@ def _run(cmd, cwd=None, test=False):
 
 
 class Application(object):
-    def __init__(self, repo_url, branch='master', cwd=None, test=False):
+    def __init__(self, repo_url, branch, cwd=None, test=False):
         self.test = test  # for unit tests
         self.repo_url, self.branch = repo_url, branch
         self.repo_name = basename(self.repo_url.strip('/'))
@@ -363,7 +363,7 @@ def deploymaster(payload, hostname, test):
     repo_url = payload['repo']
     target = payload['target']
     slave = payload.get('slave')
-    branch = payload.get('branch')
+    branch = payload.get('branch', 'master')
 
     app = Application(repo_url, branch=branch, test=test)
     master_node = app.master_node
