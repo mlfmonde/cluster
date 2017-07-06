@@ -39,17 +39,14 @@ def _run(cmd, cwd=None, test=False):
 
 
 class Application(object):
-    def __init__(self, repo_url, cwd=None, test=False):
+    def __init__(self, repo_url, branch='master', cwd=None, test=False):
         self.test = test  # for unit tests
-        self.repo_url, self.branch = repo_url, 'master'  # backcompat default
-        if '@' in repo_url:
-            self.repo_url, self.branch = repo_url.split('@')
+        self.repo_url, self.branch = repo_url, branch
         self.repo_name = basename(self.repo_url.strip('/'))
         if self.repo_name.endswith('.git'):
             self.repo_name = self.repo_name[:-4]
-        suffix = '_' + self.branch if self.branch else ''
-        self.name = self.repo_name + suffix
-        self.path = join(DEPLOY, self.repo_name)  # path of the checkout
+        self.name = self.repo_name + ('_' + self.branch if self.branch else '')
+        self.path = join(DEPLOY, self.name)  # path of the checkout
         self._services = None
         self._volumes = None
         self._lock = False
@@ -181,9 +178,9 @@ class Application(object):
         if self.test:
             return (
                 'Node   Address            Status  Type       DC\n'
-                'edjo   10.91.210.58:8301  alive   server     dc1\n'
-                'nepri  10.91.210.57:8301  alive   server     dc1\n'
-                'tayt   10.91.210.59:8301  alive   server     dc1')
+                'node1   10.10.10.11:8301  alive   server     dc1\n'
+                'node2   10.10.10.12:8301  alive   server     dc1\n'
+                'node3   10.10.10.13:8301  alive   server     dc1')
         return self.do('consul members')
 
     def members(self):
@@ -343,12 +340,17 @@ class Volume(object):
 
 def handle(events, hostname, test=False):
     for event in json.loads(events):
-        event_name = event.get('Name')
-        payload = event.get('Payload')
+        payload = b64decode(event.get('Payload', '')).decode('utf-8')
         if not payload:
             return
+        try:
+            payload = json.loads(payload)
+        except:
+            raise Exception('Wrong event payload format. Please provide json')
+
+        event_name = event.get('Name')
         if event_name == 'deploymaster':
-            deploymaster(b64decode(payload), hostname, test)
+            deploymaster(payload, hostname, test)
         else:
             log.error('Unknown event name: {}'.format(event_name))
 
@@ -358,24 +360,12 @@ def deploymaster(payload, hostname, test):
     Deployments are done in the DEPLOY folder.
     Any remaining stuff in this folder are a sign of a failed deploy
     """
-    try:
-        if len(payload.split()) == 2:  # just target
-            target = payload.split()[0].decode()
-            slave = None
-            repo_url = payload.split()[1].decode()
-        elif len(payload.split()) == 3:  # target + slave
-            target = payload.split()[0].decode()
-            slave = payload.split()[1].decode()
-            repo_url = payload.split()[2].decode()
-        else:
-            raise Exception
-    except Exception as e:
-        log.error('deploymaster error: '
-                  'you should specify "<target> <repo>" '
-                  'or "<target> <slave> <repo>"')
-        raise(e)
+    repo_url = payload['repo']
+    target = payload['target']
+    slave = payload.get('slave')
+    branch = payload.get('branch')
 
-    app = Application(repo_url, test=test)
+    app = Application(repo_url, branch=branch, test=test)
     master_node = app.master_node
     if hostname == target:  # 1st deployment or slave that will turn to master
         app.fetch()
@@ -391,7 +381,7 @@ def deploymaster(payload, hostname, test):
             for volume in app.volumes:
                 volume.restore()
         for volume in app.volumes:
-            if slave is not None:
+            if slave:
                 volume.schedule_replicate(60, app.members()[slave]['ip'])
             else:
                 volume.schedule_snapshots(60)
