@@ -62,12 +62,10 @@ host.
     You can use self signed certificate adding ``TLS: self_signed`` in the
     docker-compose service as environment variable.
 
-You need to edit two files:
+You need to edit ``docker-compose.dev.yml``:
 
-* In ``docker-compose.dev.yml`` set environment variable CONSUL_BIND_INTERFACE to define
+* Set environment variable CONSUL_BIND_INTERFACE to define
   your local interface connected to your router/internet.
-* Make sure the DOCKER_GID in ``consul/Dockerfile`` and ``docker-compose.dev.yml``
-  match to the docker group ID available on your host machine (look at ``/etc/hosts``)
 
 Make sure the docker group has access to:
 
