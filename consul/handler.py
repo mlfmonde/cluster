@@ -70,16 +70,25 @@ class Application(object):
 
     @contextmanager
     def lock(self):
-        self.do('consul kv put deploying/{}'.format(self.name))
-        yield
-        self.do('consul kv delete deploying/{}'.format(self.name))
+        self.do('consul kv put transferring/{}'.format(self.name))
+        try:
+            yield
+        except:
+            log.error('Volume transfer FAILED!')
+            self.unlock()
+            self.start()
+            raise
+        self.unlock()
+
+    def unlock(self):
+        self.do('consul kv delete transferring/{}'.format(self.name))
 
     def wait_lock(self):
         loops = 0
         while loops < 60:
             log.info('Waiting lock release for %s', self.name)
             try:
-                self.do('consul kv get deploying/{}'.format(self.name))
+                self.do('consul kv get transferring/{}'.format(self.name))
             except Exception:
                 log.info('Lock released')
                 return
@@ -239,7 +248,7 @@ class Application(object):
                      % self.container_name(service))
         return ps.split('\n')[-1].strip()
 
-    def register_kv(self, target, slave, hostname):
+    def register_kv(self, target, slave, myself):
         """register a service in the key/value store
         so that consul-template can regenerate the
         caddy and haproxy conf files
@@ -311,8 +320,8 @@ class Volume(object):
     def snapshot(self):
         """snapshot the volume
         """
-        if self.volume and exists('/var/lib/docker/volumes/' + self.volume):
-            return self.do("buttervolume snapshot {}".format(self.volume))
+        log.info(u'Snapshotting volume: {}'.format(self.volume))
+        return self.do("buttervolume snapshot {}".format(self.volume))
 
     def schedule_snapshots(self, timer):
         """schedule snapshots of the volume
@@ -329,21 +338,20 @@ class Volume(object):
     def delete(self):
         """destroy a volume
         """
-        if self.volume and exists('/var/lib/docker/volumes/' + self.volume):
-            return self.do("docker volume rm {}".format(self.volume))
+        log.info(u'Destroying volume: {}'.format(self.volume))
+        return self.do("docker volume rm {}".format(self.volume))
 
     def restore(self, snapshot=None):
+        log.info(u'Restoring snapshot: {}'.format(snapshot))
         if snapshot is None:  # use the latest snapshot
             snapshot = self.volume
-        if snapshot and exists('/var/lib/docker/snapshots/' + snapshot):
-            self.do("buttervolume restore {}".format(snapshot))
 
     def send(self, snapshot, target):
-        if snapshot and exists('/var/lib/docker/snapshots/' + snapshot):
-            self.do("buttervolume send {} {}".format(target, snapshot))
+        log.info(u'Sending snapshot: {}'.format(snapshot))
+        self.do("buttervolume send {} {}".format(target, snapshot))
 
 
-def handle(events, hostname, test=False):
+def handle(events, myself, test=False):
     for event in json.loads(events):
         event_name = event.get('Name')
         payload = b64decode(event.get('Payload', '')).decode('utf-8')
@@ -357,15 +365,14 @@ def handle(events, hostname, test=False):
             raise Exception('Wrong event payload format. Please provide json')
 
         if event_name == 'deploymaster':
-            deploymaster(payload, hostname, test)
+            deploymaster(payload, myself, test)
         else:
             log.error('Unknown event name: {}'.format(event_name))
 
 
-def deploymaster(payload, hostname, test):
+def deploymaster(payload, myself, test):
     """Keep in mind this is executed in the consul container
     Deployments are done in the DEPLOY folder.
-    Any remaining stuff in this folder are a sign of a failed deploy
     """
     repo_url = payload['repo']
     target = payload['target']
@@ -374,40 +381,35 @@ def deploymaster(payload, hostname, test):
 
     app = Application(repo_url, branch=branch, test=test)
     master_node = app.master_node
-    if hostname == target:  # 1st deployment or slave that will turn to master
+    oldslave = app.slave_node
+    members = app.members()
+    if myself == target:  # 1st deployment or slave that will turn to master
         app.fetch()
-        oldslave = app.slave_node
-        master_node = app.master_node
-        time.sleep(2)
-        for volume in app.volumes:
-            if oldslave is not None:
-                volume.schedule_replicate(0, app.members()[oldslave]['ip'])
-            volume.schedule_snapshots(0)
-        if master_node is not None and master_node != hostname:
+        time.sleep(2)  # let the master put the lock
+        if myself != master_node and master_node is not None:
             app.wait_lock()
             for volume in app.volumes:
                 volume.restore()
         for volume in app.volumes:
             if slave:
-                volume.schedule_replicate(60, app.members()[slave]['ip'])
+                volume.schedule_replicate(60, members[slave]['ip'])
             else:
                 volume.schedule_snapshots(60)
-        app.register_kv(target, slave, hostname)  # for consul-template
+        app.register_kv(target, slave, myself)  # for consul-template
         app.register_consul()  # for consul check
         app.start()
-    elif hostname == master_node:  # master that will turn to a slave
+    elif myself == master_node:  # master that will turn to a slave
         with app.lock():
             # first replicate live to lower downtime
             for volume in app.volumes:
+                volume.send(volume.snapshot(), members[target]['ip'])
                 volume.schedule_snapshots(0)
-                oldslave = app.slave_node
                 if oldslave is not None:
-                    volume.schedule_replicate(0, app.members()[oldslave]['ip'])
-                volume.send(volume.snapshot(), app.members()[target]['ip'])
+                    volume.schedule_replicate(0, members[oldslave]['ip'])
             # then stop and replicate again (should be faster)
             app.stop()
             for volume in app.volumes:
-                volume.send(volume.snapshot(), app.members()[target]['ip'])
+                volume.send(volume.snapshot(), members[target]['ip'])
         for volume in app.volumes:
             volume.delete()
 
@@ -422,6 +424,6 @@ if __name__ == '__main__':
     except:
         test = False
     test = os.environ.get('TEST', test) and True or False
-    hostname = socket.gethostname()
+    myself = socket.gethostname()
     # read json from stdin
-    handle(len(argv) == 2 and argv[1] or stdin.read(), hostname, test)
+    handle(len(argv) == 2 and argv[1] or stdin.read(), myself, test)
