@@ -161,17 +161,17 @@ class Application(object):
             self._compose = None
         except CalledProcessError:
             if not retrying:
-                log.warn("Failed to fetch %s, retrying", self.repo_name)
+                log.warn("Failed to fetch %s, retrying", self.repo_url)
                 self.fetch(retrying=True)
             else:
                 raise
 
     def start(self):
-        log.info("Starting the project %s", self.repo_name)
+        log.info("Starting %s", self.name)
         self.do('docker-compose up -d --build', cwd=self.path)
 
     def stop(self):
-        log.info("Stopping the project %s", self.repo_name)
+        log.info("Stopping %s", self.name)
         self.do('docker-compose down', cwd=self.path)
 
     def _members(self):
@@ -226,12 +226,12 @@ class Application(object):
     def proto(self, service):
         """frontend protocol configured in the compose for the service.
         """
-        self.compose_env(service, 'PROTO', 'http://')
+        return self.compose_env(service, 'PROTO', 'http://')
 
     def port(self, service):
         """frontend port configured in the compose for the service.
         """
-        self.compose_env(service, 'PORT', '80')
+        return self.compose_env(service, 'PORT', '80')
 
     def ps(self, service):
         ps = self.do('docker ps -f name=%s --format "table {{.Status}}"'
@@ -244,7 +244,7 @@ class Application(object):
         caddy and haproxy conf files
         """
         log.info("Registering URLs of %s in the key/value store",
-                 self.repo_name)
+                 self.name)
         for service in self.services:
             url = self.url(service)
             redirect_from = self.redirect_from(service)
