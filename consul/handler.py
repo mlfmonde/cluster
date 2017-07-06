@@ -393,6 +393,8 @@ def deploymaster(payload, myself, test):
             for volume in app.volumes:
                 volume.restore()
         for volume in app.volumes:
+            if oldslave is not None:
+                volume.schedule_replicate(0, members[oldslave]['ip'])
             if slave:
                 volume.schedule_replicate(60, members[slave]['ip'])
             else:
