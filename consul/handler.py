@@ -343,9 +343,10 @@ class Volume(object):
         return self.do("docker volume rm {}".format(self.volume))
 
     def restore(self, snapshot=None):
-        log.info(u'Restoring snapshot: {}'.format(snapshot))
         if snapshot is None:  # use the latest snapshot
             snapshot = self.volume
+        log.info(u'Restoring snapshot: {}'.format(snapshot))
+        self.do("buttervolume restore {}".format(snapshot))
 
     def send(self, snapshot, target):
         log.info(u'Sending snapshot: {}'.format(snapshot))
