@@ -311,7 +311,8 @@ class Volume(object):
     def snapshot(self):
         """snapshot the volume
         """
-        return self.do("buttervolume snapshot {}".format(self.volume))
+        if self.volume and exists('/var/lib/docker/volumes/' + self.volume):
+            return self.do("buttervolume snapshot {}".format(self.volume))
 
     def schedule_snapshots(self, timer):
         """schedule snapshots of the volume
@@ -328,15 +329,18 @@ class Volume(object):
     def delete(self):
         """destroy a volume
         """
-        return self.do("docker volume rm {}".format(self.volume))
+        if self.volume and exists('/var/lib/docker/volumes/' + self.volume):
+            return self.do("docker volume rm {}".format(self.volume))
 
     def restore(self, snapshot=None):
         if snapshot is None:  # use the latest snapshot
             snapshot = self.volume
-        self.do("buttervolume restore {}".format(snapshot))
+        if snapshot and exists('/var/lib/docker/snapshots/' + snapshot):
+            self.do("buttervolume restore {}".format(snapshot))
 
     def send(self, snapshot, target):
-        self.do("buttervolume send {} {}".format(target, snapshot))
+        if snapshot and exists('/var/lib/docker/snapshots/' + snapshot):
+            self.do("buttervolume send {} {}".format(target, snapshot))
 
 
 def handle(events, hostname, test=False):
