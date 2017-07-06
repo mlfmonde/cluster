@@ -345,15 +345,17 @@ class Volume(object):
 
 def handle(events, hostname, test=False):
     for event in json.loads(events):
+        event_name = event.get('Name')
         payload = b64decode(event.get('Payload', '')).decode('utf-8')
         if not payload:
             return
+        log.info(u'Received event: {} with payload: {}'
+                 .format(event_name, payload))
         try:
             payload = json.loads(payload)
         except:
             raise Exception('Wrong event payload format. Please provide json')
 
-        event_name = event.get('Name')
         if event_name == 'deploymaster':
             deploymaster(payload, hostname, test)
         else:
