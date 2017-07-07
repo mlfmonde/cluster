@@ -65,7 +65,7 @@ class Application(object):
                 for url in urls:
                     if (url in site.get('redirect_from', [])
                             or url == site.get('url')):
-                        msg = ('Site {} is already deployed by {}'
+                        msg = ('Aborting! Site {} is already deployed by {}'
                                .format(url, site['name']))
                         log.error(msg)
                         raise ValueError(msg)
