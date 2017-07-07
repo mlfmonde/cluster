@@ -61,8 +61,10 @@ class Application(object):
             url = self.url(service)
             for site in sites.values():
                 if site.get('name') != self.name and site.get('url') == url:
-                    raise ValueError('Site {} is already deployed by {}'
-                                     .format(url, site['name']))
+                    msg = ('Site {} is already deployed by {}'
+                           .format(url, site['name']))
+                    log.error(msg)
+                    raise ValueError(msg)
 
     def do(self, cmd, cwd=None, runintest=True):
         return _run(cmd, cwd=cwd, test=self.test and not runintest)
@@ -76,6 +78,7 @@ class Application(object):
                 with open(join(self.path, 'docker-compose.yml')) as c:
                     self._compose = yaml.load(c.read())
             except:
+                log.error('Could not read docker-compose.yml')
                 raise EnvironmentError('Could not read docker-compose.yml')
         return self._compose
 
@@ -107,7 +110,7 @@ class Application(object):
             time.sleep(1)
             loops += 1
         self.unlock()
-        log.info('Waited too much :(')
+        log.info('Waited too much :( Deployment failed.')
         raise RuntimeError('deployment of {} failed'.format(self.name))
 
     @property
@@ -322,8 +325,9 @@ class Application(object):
         else:
             res = requests.post(url, svc)
             if res.status_code != 200:
-                raise RuntimeError('Consul service register failed: {}'
-                                   .format(res.reason))
+                msg = 'Consul service register failed: {}'.format(res.reason)
+                log.error(msg)
+                raise RuntimeError(msg)
             log.info("Registered %s in consul", self.path)
 
 
@@ -383,7 +387,9 @@ def handle(events, myself, test=False):
         try:
             payload = json.loads(payload)
         except:
-            raise Exception('Wrong event payload format. Please provide json')
+            msg = 'Wrong event payload format. Please provide json'
+            log.error(msg)
+            raise Exception(msg)
 
         if event_name == 'deploymaster':
             deploymaster(payload, myself, test)
