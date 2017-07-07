@@ -56,15 +56,19 @@ class Application(object):
     def check(self):
         sites = {s['key']: json.loads(b64decode(s['value']).decode('utf-8'))
                  for s in json.loads(self.do('consul kv export site/'))}
-        # check url unicity
+        # check urls are not already used
         for service in self.services:
-            url = self.url(service)
+            urls = [self.url(service)] + self.redirect_from(service)
             for site in sites.values():
-                if site.get('name') != self.name and site.get('url') == url:
-                    msg = ('Site {} is already deployed by {}'
-                           .format(url, site['name']))
-                    log.error(msg)
-                    raise ValueError(msg)
+                if site.get('name') == self.name:
+                    continue
+                for url in urls:
+                    if (url in site.get('redirect_from', [])
+                            or url == site.get('url')):
+                        msg = ('Site {} is already deployed by {}'
+                               .format(url, site['name']))
+                        log.error(msg)
+                        raise ValueError(msg)
 
     def do(self, cmd, cwd=None, runintest=True):
         return _run(cmd, cwd=cwd, test=self.test and not runintest)
@@ -409,7 +413,7 @@ def deploymaster(payload, myself, test):
     app = Application(repo_url, branch=branch, test=test)
     if myself == target:
         app.fetch()
-        app.check()
+        app.check()  # fail fast if something's wrong
     master_node = app.master_node
     oldslave = app.slave_node
     members = app.members()
