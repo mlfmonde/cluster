@@ -312,21 +312,16 @@ class Application(object):
     def register_consul(self):
         """register a service in consul
         """
-        # FIXME generate automatically
-        try:
-            path = '{}/service.json'.format(self.path)
-            log.info("Registering %s in consul", self.path)
-            content = '{}'
-            with open(path) as f:
-                content = f.read()
-        except Exception:
-            log.error('Could not read %s', path)
-            raise
-        url = 'http://localhost:8500/v1/agent/service/register'
-        svc = json.dumps(json.loads(content))
-        if self.test:
-            print('POST', url, content)
-        else:
+        for service in self.services:
+            url = self.url(service)
+            if not url:
+                continue
+            svc = json.dumps({
+                'Name': self.name,
+                'Check': {
+                    'HTTP': url,
+                    'Interval': '60s'}})
+            url = 'http://localhost:8500/v1/agent/service/register'
             res = requests.post(url, svc)
             if res.status_code != 200:
                 msg = 'Consul service register failed: {}'.format(res.reason)
