@@ -387,6 +387,7 @@ def deploymaster(payload, myself, test):
     members = app.members()
     if myself == target:  # 1st deployment or slave that will turn to master
         app.fetch()
+        app.stop()
         time.sleep(2)  # let the master put the lock
         if myself != master_node and master_node is not None:
             app.wait_lock()
