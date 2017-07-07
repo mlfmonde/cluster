@@ -229,6 +229,11 @@ class Application(object):
         lines = self.compose_env(service, 'REDIRECT_FROM', '').split('\n')
         return [l.strip() for l in lines if len(l.split()) == 1]
 
+    def redirect_to(self, service):
+        """ list of redirects transmitted to caddy """
+        lines = self.compose_env(service, 'REDIRECT_TO', '').split('\n')
+        return [l.strip() for l in lines if len(l.split()) == 1]
+
     def domain(self, service):
         """ domain computed from the URL
         """
@@ -259,6 +264,7 @@ class Application(object):
         for service in self.services:
             url = self.url(service)
             redirect_from = self.redirect_from(service)
+            redirect_to = self.redirect_to(service)
             tls = self.tls(service)
             if not url:
                 # service not exposed to the web
@@ -275,6 +281,7 @@ class Application(object):
                 'node': target,  # used by haproxy and caddy
                 'url': url,  # used by caddy
                 'redirect_from': redirect_from,  # used by caddy
+                'redirect_to': redirect_to,  # used by caddy
                 'tls': tls,  # used by caddy
                 'slave': slave,  # used by the handler
                 'ct': '{proto}{ct}:{port}'.format(**locals())}  # used by caddy

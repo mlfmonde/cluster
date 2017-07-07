@@ -27,12 +27,10 @@ frontend https-in
 
 {{ end  }}
 
-### ccomb: FIXME try to switch http to tcp mode as well
 frontend http-in
     mode http
     bind *:80
     option socket-stats
-    tcp-request inspect-delay 5s
 
     # PV: ticket 8499, redirect GEPI urls
     # http://ee.mlfmonde.org/GEPI/aberdeen-total/ to http://aberdeen-total-gepi.mlfmonde.org
