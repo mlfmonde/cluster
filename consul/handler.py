@@ -386,7 +386,7 @@ def deploymaster(payload, myself, test):
     repo_url = payload['repo']
     target = payload['target']
     slave = payload.get('slave')
-    branch = payload.get('branch', 'master')
+    branch = payload.get('branch', '')
 
     app = Application(repo_url, branch=branch, test=test)
     master_node = app.master_node
