@@ -2,7 +2,6 @@
 # coding: utf-8
 import json
 import logging
-import os
 import re
 import requests
 import socket
@@ -22,26 +21,20 @@ def concat(xs):
     return [y for x in xs for y in x]
 
 
-def _run(cmd, cwd=None, test=False):
+def _run(cmd, cwd=None):
     try:
         if cwd:
             cmd = 'cd "{}" && {}'.format(cwd, cmd)
-        if test:
-            print(cmd)
-            return ''
-        else:
-            log.info(cmd)
-            res = srun(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
-            out = res.stdout.decode().strip()
-            return out
+        log.info(cmd)
+        res = srun(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
+        return res.stdout.decode().strip()
     except CalledProcessError as e:
         log.error("Failed to run %s: %s", e.cmd, e.stderr.decode())
         raise
 
 
 class Application(object):
-    def __init__(self, repo_url, branch, cwd=None, test=False):
-        self.test = test  # for unit tests
+    def __init__(self, repo_url, branch, cwd=None):
         self.repo_url, self.branch = repo_url, branch
         repo_name = basename(self.repo_url.strip('/'))
         if repo_name.endswith('.git'):
@@ -70,8 +63,8 @@ class Application(object):
                         log.error(msg)
                         raise ValueError(msg)
 
-    def do(self, cmd, cwd=None, runintest=True):
-        return _run(cmd, cwd=cwd, test=self.test and not runintest)
+    def do(self, cmd, cwd=None):
+        return _run(cmd, cwd=cwd)
 
     @property
     def compose(self):
@@ -135,7 +128,7 @@ class Application(object):
         """
         if self._volumes is None:
             self._volumes = [
-                Volume(self.project + '_' + v[0], test=self.test)
+                Volume(self.project + '_' + v[0])
                 for v in self.compose.get('volumes', {}).items()
                 if v[1] and v[1].get('driver') == 'btrfs']
         return self._volumes
@@ -205,12 +198,6 @@ class Application(object):
         self.do('docker-compose down', cwd=self.path)
 
     def _members(self):
-        if self.test:
-            return (
-                'Node   Address            Status  Type       DC\n'
-                'node1   10.10.10.11:8301  alive   server     dc1\n'
-                'node2   10.10.10.12:8301  alive   server     dc1\n'
-                'node3   10.10.10.13:8301  alive   server     dc1')
         return self.do('consul members')
 
     def members(self):
@@ -304,10 +291,9 @@ class Application(object):
                 'tls': tls,  # used by caddy
                 'slave': slave,  # used by the handler
                 'ct': '{proto}{ct}:{port}'.format(**locals())}  # used by caddy
-            cmd = ("consul kv put site/{} '{}'"
-                   .format(self.name, json.dumps(value)))
-            self.do(cmd, runintest=False)
-            log.info("Registered: %s", cmd)
+            self.do("consul kv put site/{} '{}'"
+                    .format(self.name, json.dumps(value)))
+            log.info("Registered %s", self.name)
 
     def register_consul(self):
         """register a service in consul
@@ -333,12 +319,11 @@ class Application(object):
 class Volume(object):
     """wrapper for buttervolume cli
     """
-    def __init__(self, volume, test=False):
-        self.test = test
+    def __init__(self, volume):
         self.volume = volume
 
     def do(self, cmd, cwd=None):
-        return _run(cmd, cwd=cwd, test=self.test)
+        return _run(cmd, cwd=cwd)
 
     def snapshot(self):
         """snapshot the volume
@@ -375,7 +360,7 @@ class Volume(object):
         self.do("buttervolume send {} {}".format(target, snapshot))
 
 
-def handle(events, myself, test=False):
+def handle(events, myself):
     for event in json.loads(events)[-1:]:
         event_name = event.get('Name')
         payload = b64decode(event.get('Payload', '')).decode('utf-8')
@@ -391,12 +376,12 @@ def handle(events, myself, test=False):
             raise Exception(msg)
 
         if event_name == 'deploymaster':
-            deploymaster(payload, myself, test)
+            deploymaster(payload, myself)
         else:
             log.error('Unknown event name: {}'.format(event_name))
 
 
-def deploymaster(payload, myself, test):
+def deploymaster(payload, myself):
     """Keep in mind this is executed in the consul container
     Deployments are done in the DEPLOY folder.
     """
@@ -405,7 +390,7 @@ def deploymaster(payload, myself, test):
     slave = payload.get('slave')
     branch = payload.get('branch', '')
 
-    app = Application(repo_url, branch=branch, test=test)
+    app = Application(repo_url, branch=branch)
     if myself == target:
         app.fetch()
         app.check()  # fail fast if something's wrong
@@ -450,11 +435,6 @@ if __name__ == '__main__':
                         format='{asctime}\t{levelname}\t{message}',
                         filename=join(DEPLOY, 'handler.log'),
                         style='{')
-    try:  # test mode?
-        test = argv[0] == 'test'
-    except:
-        test = False
-    test = os.environ.get('TEST', test) and True or False
     myself = socket.gethostname()
     # read json from stdin
-    handle(len(argv) == 2 and argv[1] or stdin.read(), myself, test)
+    handle(len(argv) == 2 and argv[1] or stdin.read(), myself)
