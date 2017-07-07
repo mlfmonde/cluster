@@ -247,7 +247,7 @@ class Application(object):
     def redirect_to(self, service):
         """ list of redirects transmitted to caddy """
         lines = self.compose_env(service, 'REDIRECT_TO', '').split('\n')
-        return [l.strip() for l in lines if len(l.split()) == 1]
+        return [l.strip() for l in lines if 1 <= len(l.split()) <= 3]
 
     def domain(self, service):
         """ domain computed from the URL
