@@ -53,6 +53,17 @@ class Application(object):
         self._lock = False
         self._compose = None
 
+    def check(self):
+        sites = {s['key']: json.loads(b64decode(s['value']).decode('utf-8'))
+                 for s in json.loads(self.do('consul kv export site/'))}
+        # check url unicity
+        for service in self.services:
+            url = self.url(service)
+            for site in sites.values():
+                if site.get('name') != self.name and site.get('url') == url:
+                    raise ValueError('Site {} is already deployed by {}'
+                                     .format(url, site['name']))
+
     def do(self, cmd, cwd=None, runintest=True):
         return _run(cmd, cwd=cwd, test=self.test and not runintest)
 
@@ -166,7 +177,8 @@ class Application(object):
             if exists(self.path):
                 self.clean()
             self.do('git clone --depth 1 -b "{}" "{}" "{}"'
-                    .format(self.branch, self.repo_url, self.name), cwd=DEPLOY)
+                    .format(self.branch or 'master', self.repo_url, self.name),
+                    cwd=DEPLOY)
             self._services = None
             self._volumes = None
             self._compose = None
@@ -389,11 +401,13 @@ def deploymaster(payload, myself, test):
     branch = payload.get('branch', '')
 
     app = Application(repo_url, branch=branch, test=test)
+    if myself == target:
+        app.fetch()
+        app.check()
     master_node = app.master_node
     oldslave = app.slave_node
     members = app.members()
     if myself == target:  # 1st deployment or slave that will turn to master
-        app.fetch()
         app.stop()
         time.sleep(2)  # let the master put the lock
         if myself != master_node and master_node is not None:
