@@ -516,7 +516,6 @@ def deploy(payload, myself):
             newapp.enable_purge(True)
         else:  # slave -> nothing
             log.info("I'm nothing now for %s", newapp.name)
-            newapp.enable_purge(False)
 
     else:  # nothing ->
         log.info("I was nothing for %s", oldapp.name)
