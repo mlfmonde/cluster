@@ -134,7 +134,8 @@ class Application(object):
                 log.info("No compose available,"
                          "reading volumes from the kv store")
                 try:
-                    self._volumes = self.valueof('volumes')
+                    self._volumes = [Volume(self.project + '_' + v)
+                                     for v in self.valueof('volumes')]
                 except:
                     log.info("No volumes found in the kv store")
                     self._volumes = []
@@ -306,7 +307,7 @@ class Application(object):
                 'redirect_to': redirect_to,  # used by caddy
                 'tls': tls,  # used by caddy
                 'slave': slave,  # used by the handler
-                'volumes': self.volumes,
+                'volumes': [v.name for v in self.volumes],
                 'ct': '{proto}{ct}:{port}'.format(**locals())}  # used by caddy
             self.do("consul kv put site/{} '{}'"
                     .format(self.name, json.dumps(value)))
@@ -368,8 +369,8 @@ class Application(object):
 class Volume(object):
     """wrapper for buttervolume cli
     """
-    def __init__(self, volume):
-        self.volume = volume
+    def __init__(self, name):
+        self.name = name
 
     def do(self, cmd, cwd=None):
         return _run(cmd, cwd=cwd)
@@ -377,36 +378,36 @@ class Volume(object):
     def snapshot(self):
         """snapshot the volume
         """
-        log.info(u'Snapshotting volume: {}'.format(self.volume))
-        return self.do("buttervolume snapshot {}".format(self.volume))
+        log.info(u'Snapshotting volume: {}'.format(self.name))
+        return self.do("buttervolume snapshot {}".format(self.name))
 
     def schedule_snapshots(self, timer):
         """schedule snapshots of the volume
         """
         self.do("buttervolume schedule snapshot {} {}"
-                .format(timer, self.volume))
+                .format(timer, self.name))
 
     def schedule_replicate(self, timer, slavehost):
         """schedule a replication of the volume
         """
         self.do("buttervolume schedule replicate:{} {} {}"
-                .format(slavehost, timer, self.volume))
+                .format(slavehost, timer, self.name))
 
     def schedule_purge(self, timer, pattern):
         """schedule a purge of the snapshots
         """
         self.do("buttervolume schedule purge:{} {} {}"
-                .format(pattern, timer, self.volume))
+                .format(pattern, timer, self.name))
 
     def delete(self):
         """destroy a volume
         """
-        log.info(u'Destroying volume: {}'.format(self.volume))
-        return self.do("docker volume rm {}".format(self.volume))
+        log.info(u'Destroying volume: {}'.format(self.name))
+        return self.do("docker volume rm {}".format(self.name))
 
     def restore(self, snapshot=None):
         if snapshot is None:  # use the latest snapshot
-            snapshot = self.volume
+            snapshot = self.name
         log.info(u'Restoring snapshot: {}'.format(snapshot))
         self.do("buttervolume restore {}".format(snapshot))
 
