@@ -121,13 +121,23 @@ class Application(object):
 
     @property
     def volumes(self):
-        """btrfs volumes defined in the compose
+        """btrfs volumes defined in the compose,
+        or in the kv if no compose available
         """
         if self._volumes is None:
-            self._volumes = [
-                Volume(self.project + '_' + v[0])
-                for v in self.compose.get('volumes', {}).items()
-                if v[1] and v[1].get('driver') == 'btrfs']
+            try:
+                self._volumes = [
+                    Volume(self.project + '_' + v[0])
+                    for v in self.compose.get('volumes', {}).items()
+                    if v[1] and v[1].get('driver') == 'btrfs']
+            except:
+                log.info("No compose available,"
+                         "reading volumes from the kv store")
+            try:
+                self._volumes = self.valueof('volumes')
+            except:
+                log.info("No volumes found in the kv store")
+                self._volumes = []
         return self._volumes
 
     def container_name(self, service):
@@ -295,6 +305,7 @@ class Application(object):
                 'redirect_to': redirect_to,  # used by caddy
                 'tls': tls,  # used by caddy
                 'slave': slave,  # used by the handler
+                'volumes': self.volumes,
                 'ct': '{proto}{ct}:{port}'.format(**locals())}  # used by caddy
             self.do("consul kv put site/{} '{}'"
                     .format(self.name, json.dumps(value)))
