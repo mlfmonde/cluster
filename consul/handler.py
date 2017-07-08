@@ -352,14 +352,12 @@ class Application(object):
         """
         for volume in self.volumes:
             volume.schedule_snapshots(60 if enable else 0)
-            volume.schedule_purge(1440 if enable else 0, '1h:1d:1w:4w:1y')
 
     def enable_replicate(self, enable, ip):
         """enable or disable scheduled replication
         """
         for volume in self.volumes:
             volume.schedule_replicate(60 if enable else 0, ip)
-            volume.schedule_purge(1440 if enable else 0, '1h:1d:1w:4w:1y')
 
     def enable_purge(self, enable):
         for volume in self.volumes:
