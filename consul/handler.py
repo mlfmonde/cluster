@@ -134,8 +134,8 @@ class Application(object):
                 log.info("No compose available,"
                          "reading volumes from the kv store")
                 try:
-                    self._volumes = [Volume(self.project + '_' + v)
-                                     for v in self.valueof('volumes')]
+                    self._volumes = [
+                        Volume(v) for v in self.valueof(self.name, 'volumes')]
                 except:
                     log.info("No volumes found in the kv store")
                     self._volumes = []
