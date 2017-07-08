@@ -45,11 +45,11 @@ Deploy or move a new app
 
 connect on any node, then run this from the cluster/ directory::
 
-    docker-compose exec consul consul event -name=deploymaster "<masternode> <slavenode> <repository_url>"
+    docker-compose exec consul consul event -name=deploy "<masternode> <slavenode> <repository_url>"
 
 Example: deploy lycee-test-mlf on nepri and replicate on edjo::
 
-    docker-compose exec consul consul event -name=deploymaster "nepri edjo ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
+    docker-compose exec consul consul event -name=deploy "nepri edjo ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
 
 Local development environment
 -----------------------------
@@ -87,7 +87,7 @@ And you may have buttervolumeplugin/consul/caddy/haproxy on your personal host !
 
 To deploy a website::
 
-    $ docker-compose exec consul consul event -name=deploymaster "localhost.localdomain ssh://git@git.mlfmonde.org:2222/hebergement/primaire.lyceemolieresaragosse.org.git"
+    $ docker-compose exec consul consul event -name=deploy "localhost.localdomain ssh://git@git.mlfmonde.org:2222/hebergement/primaire.lyceemolieresaragosse.org.git"
 
 Possibly replace localhost.localdomain with the hostname of your development machine.
 

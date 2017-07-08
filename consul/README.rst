@@ -66,7 +66,7 @@ First try to deploy a master, pretending we are 'nepri'::
     >>> from base64 import b64encode
     >>> payload = "nepri ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
     >>> payload = b64encode(payload.encode()).decode()
-    >>> events = '[{"ID":"0","Name": "deploymaster","Payload": "%s","Version":1,"LTime":1}]' % payload
+    >>> events = '[{"ID":"0","Name": "deploy","Payload": "%s","Version":1,"LTime":1}]' % payload
     >>> handler.handle(events, 'nepri', test=True)
     buttervolume snapshot lyceetestmlf_dbdata
     buttervolume schedule snapshot 60 lyceetestmlf_dbdata
