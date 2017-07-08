@@ -133,11 +133,12 @@ class Application(object):
             except:
                 log.info("No compose available,"
                          "reading volumes from the kv store")
-            try:
-                self._volumes = self.valueof('volumes')
-            except:
-                log.info("No volumes found in the kv store")
-                self._volumes = []
+                try:
+                    self._volumes = self.valueof('volumes')
+                except:
+                    log.info("No volumes found in the kv store")
+                    self._volumes = []
+            self._volumes = self._volumes or None
         return self._volumes
 
     def container_name(self, service):
@@ -329,7 +330,7 @@ class Application(object):
             msg = 'Consul service register failed: {}'.format(res.reason)
             log.error(msg)
             raise RuntimeError(msg)
-        log.info("Registered %s in consul", self.path)
+        log.info("Registered %s in consul", self.name)
 
     def unregister_consul(self):
         for service in self.services:
@@ -343,7 +344,7 @@ class Application(object):
                 msg = 'Consul service deregister failed: {}'.format(res.reason)
                 log.error(msg)
                 raise RuntimeError(msg)
-            log.info("Deregistered %s in consul", self.path)
+            log.info("Deregistered %s in consul", self.name)
 
     def enable_snapshot(self, enable):
         """enable or disable scheduled snapshots
