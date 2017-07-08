@@ -9,16 +9,13 @@ import time
 import yaml
 from base64 import b64decode
 from contextlib import contextmanager
+from datetime import datetime
 from os.path import basename, join, exists
 from subprocess import run as srun, CalledProcessError, PIPE
 from sys import stdin, argv
 from urllib.parse import urlparse
 DEPLOY = '/deploy'
 log = logging.getLogger()
-
-
-def concat(xs):
-    return [y for x in xs for y in x]
 
 
 def _run(cmd, cwd=None):
@@ -87,7 +84,7 @@ class Application(object):
         except:
             log.error('Volume transfer FAILED!')
             self.unlock()
-            self.start()
+            self.up()
             raise
         log.error('Volume transfer SUCCEEDED!')
         self.unlock()
@@ -169,6 +166,14 @@ class Application(object):
             log.warn('Could not determine the master node for %s', self.name)
             return None
 
+    def shelve(self):
+        """move the checkout to a temporary location"""
+        oldpath = self.path
+        DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
+        newpath = oldpath + '.old@' + datetime.now().strftime(DTFORMAT)
+        self.do("mv {} {}".format(oldpath, newpath))
+        self.path = newpath
+
     def clean(self):
         self.do('rm -rf "{}"'.format(self.path))
 
@@ -189,11 +194,11 @@ class Application(object):
             else:
                 raise
 
-    def start(self):
+    def up(self):
         log.info("Starting %s", self.name)
         self.do('docker-compose up -d --build', cwd=self.path)
 
-    def stop(self):
+    def down(self):
         log.info("Stopping %s", self.name)
         self.do('docker-compose down', cwd=self.path)
 
@@ -295,25 +300,57 @@ class Application(object):
                     .format(self.name, json.dumps(value)))
             log.info("Registered %s", self.name)
 
+    def unregister_kv(self):
+        self.do("consul kv delete site/{}".format(self.name))
+
     def register_consul(self):
-        """register a service in consul
+        """register a service and check in consul
         """
+        urls = [self.url(s) for s in self.services]
+        svc = json.dumps({
+            'Name': self.name,
+            'Checks': [{
+                'HTTP': url,
+                'Interval': '60s'} for url in urls if url]})
+        url = 'http://localhost:8500/v1/agent/service/register'
+        res = requests.post(url, svc)
+        if res.status_code != 200:
+            msg = 'Consul service register failed: {}'.format(res.reason)
+            log.error(msg)
+            raise RuntimeError(msg)
+        log.info("Registered %s in consul", self.path)
+
+    def unregister_consul(self):
         for service in self.services:
             url = self.url(service)
             if not url:
                 continue
-            svc = json.dumps({
-                'Name': self.name,
-                'Check': {
-                    'HTTP': url,
-                    'Interval': '60s'}})
-            url = 'http://localhost:8500/v1/agent/service/register'
-            res = requests.post(url, svc)
+            url = ('http://localhost:8500/v1/agent/service/deregister/:{}'
+                   .format(self.name))
+            res = requests.put(url)
             if res.status_code != 200:
-                msg = 'Consul service register failed: {}'.format(res.reason)
+                msg = 'Consul service deregister failed: {}'.format(res.reason)
                 log.error(msg)
                 raise RuntimeError(msg)
-            log.info("Registered %s in consul", self.path)
+            log.info("Deregistered %s in consul", self.path)
+
+    def enable_snapshot(self, enable):
+        """enable or disable scheduled snapshots
+        """
+        for volume in self.volumes:
+            volume.schedule_snapshots(60 if enable else 0)
+            volume.schedule_purge(1440 if enable else 0, '1h:1d:1w:4w:1y')
+
+    def enable_replicate(self, enable, ip):
+        """enable or disable scheduled replication
+        """
+        for volume in self.volumes:
+            volume.schedule_replicate(60 if enable else 0, ip)
+            volume.schedule_purge(1440 if enable else 0, '1h:1d:1w:4w:1y')
+
+    def enable_purge(self, enable):
+        for volume in self.volumes:
+            volume.schedule_purge(1440 if enable else 0, '1h:1d:1w:4w:1y')
 
 
 class Volume(object):
@@ -342,6 +379,12 @@ class Volume(object):
         """
         self.do("buttervolume schedule replicate:{} {} {}"
                 .format(slavehost, timer, self.volume))
+
+    def schedule_purge(self, timer, pattern):
+        """schedule a purge of the snapshots
+        """
+        self.do("buttervolume schedule purge:{} {} {}"
+                .format(pattern, timer, self.volume))
 
     def delete(self):
         """destroy a volume
@@ -375,59 +418,147 @@ def handle(events, myself):
             log.error(msg)
             raise Exception(msg)
 
-        if event_name == 'deploymaster':
-            deploymaster(payload, myself)
+        if event_name == 'deploy':
+            deploy(payload, myself)
+        elif event_name == 'destroy':
+            destroy(payload, myself)
         else:
             log.error('Unknown event name: {}'.format(event_name))
 
 
-def deploymaster(payload, myself):
+def deploy(payload, myself):
     """Keep in mind this is executed in the consul container
     Deployments are done in the DEPLOY folder.
     """
     repo_url = payload['repo']
-    target = payload['target']
-    slave = payload.get('slave')
+    newmaster = payload['target']
+    newslave = payload.get('slave')
     branch = payload.get('branch', '')
 
-    app = Application(repo_url, branch=branch)
-    if myself == target:
-        app.fetch()
-        app.check()  # fail fast if something's wrong
-    master_node = app.master_node
-    oldslave = app.slave_node
-    members = app.members()
-    if myself == target:  # 1st deployment or slave that will turn to master
-        app.stop()
-        time.sleep(2)  # let the master put the lock
-        if myself != master_node and master_node is not None:
-            app.wait_lock()
-            for volume in app.volumes:
-                volume.restore()
-        for volume in app.volumes:
-            if oldslave is not None:
-                volume.schedule_replicate(0, members[oldslave]['ip'])
-            if slave:
-                volume.schedule_replicate(60, members[slave]['ip'])
+    oldapp = Application(repo_url, branch=branch)
+    oldmaster = oldapp.master_node
+    oldslave = oldapp.slave_node
+    newapp = Application(repo_url, branch=branch)
+    members = newapp.members()
+
+    if oldmaster == myself:  # master ->
+        log.info('I was the master of %s', oldapp.name)
+        oldapp.down()
+        oldapp.unregister_consul()
+        oldapp.unregister_kv()
+        if oldslave:
+            oldapp.enable_replicate(False, members[oldslave]['ip'])
+        else:
+            oldapp.enable_snapshot(False)
+        oldapp.enable_purge(False)
+        oldapp.shelve()
+        if newmaster == myself:  # master -> master
+            log.info("I'm still the master of %s", newapp.name)
+            newapp.fetch()
+            newapp.check()
+            if newslave:
+                newapp.enable_replicate(True, members[newslave]['ip'])
             else:
-                volume.schedule_snapshots(60)
-        app.register_kv(target, slave, myself)  # for consul-template
-        app.register_consul()  # for consul check
-        app.start()
-    elif myself == master_node:  # master that will turn to a slave
-        with app.lock():
-            # first replicate live to lower downtime
-            for volume in app.volumes:
-                volume.send(volume.snapshot(), members[target]['ip'])
-                volume.schedule_snapshots(0)
-                if oldslave is not None:
-                    volume.schedule_replicate(0, members[oldslave]['ip'])
-            # then stop and replicate again (should be faster)
-            app.stop()
-            for volume in app.volumes:
-                volume.send(volume.snapshot(), members[target]['ip'])
-        for volume in app.volumes:
-            volume.delete()
+                newapp.enable_snapshot(True)
+            newapp.enable_purge(True)
+            newapp.register_kv(newmaster, newslave, myself)  # for consul-templ
+            newapp.register_consul()  # for consul check
+            newapp.up()
+        elif newslave == myself:  # master -> slave
+            log.info("I'm now the slave of %s", newapp.name)
+            with newapp.lock():
+                for volume in newapp.volumes:
+                    volume.send(volume.snapshot(), members[newmaster]['ip'])
+            for volume in newapp.volumes:
+                volume.delete()
+            newapp.enable_purge(True)
+        else:  # master -> nothing
+            log.info("I'm nothing now for %s", newapp.name)
+            with newapp.lock():
+                for volume in newapp.volumes:
+                    volume.send(volume.snapshot(), members[newmaster]['ip'])
+            for volume in newapp.volumes:
+                volume.delete()
+        oldapp.clean()
+
+    elif oldslave == myself:  # slave ->
+        log.info("I was the slave of %s", oldapp.name)
+        oldapp.enable_purge(False)
+        if newmaster == myself:  # slave -> master
+            log.info("I'm now the master of %s", newapp.name)
+            newapp.fetch()
+            newapp.check()
+            time.sleep(2)  # give time to the master to put the lock FIXME
+            newapp.wait_lock()  # wait for data to be sent by the master
+            for volume in newapp.volumes:
+                volume.restore()
+            if newslave:
+                newapp.enable_replicate(True, members[newslave]['ip'])
+            else:
+                newapp.enable_snapshot(True)
+            newapp.enable_purge(True)
+            newapp.register_kv(newmaster, newslave, myself)  # for consul-templ
+            newapp.register_consul()  # for consul check
+            newapp.up()
+        elif newslave == myself:  # slave -> slave
+            log.info("I'm still the slave of %s", newapp.name)
+            newapp.enable_purge(True)
+        else:  # slave -> nothing
+            log.info("I'm nothing now for %s", newapp.name)
+            newapp.enable_purge(False)
+
+    else:  # nothing ->
+        log.info("I was nothing for %s", oldapp.name)
+        if newmaster == myself:  # nothing -> master
+            log.info("I'm now the master of %s", newapp.name)
+            newapp.fetch()
+            newapp.check()
+            time.sleep(2)  # give time to the master to put the lock FIXME
+            newapp.wait_lock()  # wait for data to be sent by the master
+            for volume in newapp.volumes:
+                volume.restore()
+            if newslave:
+                newapp.enable_replicate(True, members[newslave]['ip'])
+            else:
+                newapp.enable_snapshot(True)
+            newapp.enable_purge(True)
+            newapp.register_kv(newmaster, newslave, myself)  # for consul-templ
+            newapp.register_consul()  # for consul check
+            newapp.up()
+        elif newslave == myself:  # nothing -> slave
+            log.info("I'm now the slave of %s", newapp.name)
+            newapp.enable_purge(True)
+        else:  # nothing -> nothing
+            log.info("I'm still nothing for %s", newapp.name)
+
+
+def destroy(payload, myself):
+    """ destroy containers, unregister, remove schedules but keep volumes
+    """
+    repo_url = payload['repo']
+    branch = payload.get('branch', '')
+
+    oldapp = Application(repo_url, branch=branch)
+    oldmaster = oldapp.master_node
+    oldslave = oldapp.slave_node
+    members = oldapp.members()
+
+    if oldmaster == myself:  # master ->
+        log.info('I was the master of %s', oldapp.name)
+        oldapp.down()
+        oldapp.unregister_consul()
+        if oldslave:
+            oldapp.enable_replicate(False, members[oldslave]['ip'])
+        else:
+            oldapp.enable_snapshot(False)
+        oldapp.enable_purge(False)
+        oldapp.unregister_kv()
+        oldapp.clean()
+    elif oldslave == myself:  # slave ->
+        log.info("I was the slave of %s", oldapp.name)
+        oldapp.enable_purge(False)
+    else:  # nothing ->
+        log.info("I was nothing for %s", oldapp.name)
 
 
 if __name__ == '__main__':
