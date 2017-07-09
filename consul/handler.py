@@ -85,7 +85,7 @@ class Application(object):
             self.do('consul kv put transfer/{}/failure'.format(self.name))
             self.up()  # TODO move in the deploy
             raise
-        log.error('Volume transfer SUCCEEDED!')
+        log.info('Volume transfer SUCCEEDED!')
 
     def wait_notification(self):
         loops = 0
