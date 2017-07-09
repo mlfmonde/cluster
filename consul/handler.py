@@ -420,7 +420,8 @@ class Volume(object):
         if snapshot is None:  # use the latest snapshot
             snapshot = self.name
         log.info(u'Restoring snapshot: {}'.format(snapshot))
-        self.do("buttervolume restore {}".format(snapshot))
+        restored = self.do("buttervolume restore {}".format(snapshot))
+        log.info('Restored %s', restored)
 
     def send(self, snapshot, target):
         log.info(u'Sending snapshot: {}'.format(snapshot))
