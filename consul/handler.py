@@ -76,34 +76,32 @@ class Application(object):
         return self._compose
 
     @contextmanager
-    def lock(self):
-        self.do('consul kv put transferring/{}'.format(self.name))
+    def notify_transfer(self):
         try:
             yield
+            self.do('consul kv put transfer/{}/success'.format(self.name))
         except:
             log.error('Volume transfer FAILED!')
+            self.do('consul kv put transfer/{}/failure'.format(self.name))
             self.up()  # TODO move in the deploy
             raise
         log.error('Volume transfer SUCCEEDED!')
-        self.unlock()
 
-    def unlock(self):
-        self.do('consul kv delete transferring/{}'.format(self.name))
-
-    def wait_lock(self):
+    def wait_notification(self):
         loops = 0
         while loops < 60:
-            log.info('Waiting lock release for %s', self.name)
-            try:
-                self.do('consul kv get transferring/{}'.format(self.name))
-            except CalledProcessError:
-                log.info('Lock released')
-                return
+            log.info('Waiting transfer notification for %s', self.name)
+            res = self.do('consul kv get -keys transfer/{}'.format(self.name))
+            if res:
+                status = res.split('/')[-1]
+                self.do('consul kv delete transfer/{}/{}'
+                        .format(self.name, status))
+                return status
             time.sleep(1)
             loops += 1
-        self.unlock()
-        log.info('Waited too much :( Deployment failed.')
-        raise RuntimeError('deployment of {} failed'.format(self.name))
+        msg = ('Waited too much :( Master did not send a notification for %s')
+        log.info(msg, self.name)
+        raise RuntimeError(msg % self.name)
 
     @property
     def services(self):
@@ -489,7 +487,7 @@ def deploy(payload, myself):
             newapp.up()
         elif newslave == myself:  # master -> slave
             log.info("I'm now the slave of %s", newapp.name)
-            with newapp.lock():
+            with newapp.notify_transfer():
                 for volume in newapp.volumes:
                     volume.send(volume.snapshot(), members[newmaster]['ip'])
             oldapp.unregister_consul()
@@ -498,7 +496,7 @@ def deploy(payload, myself):
             newapp.enable_purge(True)
         else:  # master -> nothing
             log.info("I'm nothing now for %s", newapp.name)
-            with newapp.lock():
+            with newapp.notify_transfer():
                 for volume in newapp.volumes:
                     volume.send(volume.snapshot(), members[newmaster]['ip'])
             oldapp.unregister_consul()
@@ -513,8 +511,7 @@ def deploy(payload, myself):
             log.info("I'm now the master of %s", newapp.name)
             newapp.fetch()
             newapp.check()
-            time.sleep(2)  # give time to the master to put the lock FIXME
-            newapp.wait_lock()  # wait for data to be sent by the master
+            newapp.wait_notification()  # wait for data to be sent by the master
             for volume in newapp.volumes:
                 volume.restore()
             if newslave:
@@ -537,8 +534,7 @@ def deploy(payload, myself):
             log.info("I'm now the master of %s", newapp.name)
             newapp.fetch()
             newapp.check()
-            time.sleep(2)  # give time to the master to put the lock FIXME
-            newapp.wait_lock()  # wait for data to be sent by the master
+            newapp.wait_notification()  # wait for data to be sent by the master
             for volume in newapp.volumes:
                 volume.restore()
             if newslave:
