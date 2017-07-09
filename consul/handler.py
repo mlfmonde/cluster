@@ -40,7 +40,6 @@ class Application(object):
         self.path = join(DEPLOY, self.name)  # path of the checkout
         self._services = None
         self._volumes = None
-        self._lock = False
         self._compose = None
 
     def check(self):
@@ -83,8 +82,7 @@ class Application(object):
             yield
         except:
             log.error('Volume transfer FAILED!')
-            self.unlock()
-            self.up()
+            self.up()  # TODO move in the deploy
             raise
         log.error('Volume transfer SUCCEEDED!')
         self.unlock()
@@ -182,9 +180,24 @@ class Application(object):
         """move the checkout to a temporary location"""
         oldpath = self.path
         DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
-        newpath = oldpath + '.old@' + datetime.now().strftime(DTFORMAT)
+        newpath = oldpath + '@' + datetime.now().strftime(DTFORMAT)
         self.do("mv {} {}".format(oldpath, newpath))
         self.path = newpath
+        log.info('Successfully shelved %s', newpath)
+
+    def unshelve(self):
+        """restore the shelved checkout"""
+        oldpath = self.path
+        DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
+        try:
+            newpath = oldpath.rsplit('@', 1)[0]
+            time.strptime(oldpath.split('@')[-1], DTFORMAT)  # check
+        except:
+            log.error('Could not unshelve %s', oldpath)
+            return
+        self.do("mv {} {}".format(oldpath, newpath))
+        self.path = newpath
+        log.info('Successfully unshelved %s', oldpath)
 
     def clean(self):
         self.do('rm -rf "{}"'.format(self.path))
@@ -455,8 +468,6 @@ def deploy(payload, myself):
     if oldmaster == myself:  # master ->
         log.info('I was the master of %s', oldapp.name)
         oldapp.down()
-        oldapp.unregister_consul()
-        oldapp.unregister_kv()
         if oldslave:
             oldapp.enable_replicate(False, members[oldslave]['ip'])
         else:
@@ -480,6 +491,7 @@ def deploy(payload, myself):
             with newapp.lock():
                 for volume in newapp.volumes:
                     volume.send(volume.snapshot(), members[newmaster]['ip'])
+            oldapp.unregister_consul()
             for volume in newapp.volumes:
                 volume.delete()
             newapp.enable_purge(True)
@@ -488,6 +500,7 @@ def deploy(payload, myself):
             with newapp.lock():
                 for volume in newapp.volumes:
                     volume.send(volume.snapshot(), members[newmaster]['ip'])
+            oldapp.unregister_consul()
             for volume in newapp.volumes:
                 volume.delete()
         oldapp.clean()
