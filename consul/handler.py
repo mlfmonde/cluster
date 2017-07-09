@@ -94,8 +94,9 @@ class Application(object):
             res = self.do('consul kv get -keys transfer/{}'.format(self.name))
             if res:
                 status = res.split('/')[-1]
-                self.do('consul kv delete transfer/{}/{}'
-                        .format(self.name, status))
+                self.do('consul kv delete -recurse transfer/{}/'
+                        .format(self.name))
+                log.info('Transfer notification status: %s', status)
                 return status
             time.sleep(1)
             loops += 1
