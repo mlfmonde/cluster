@@ -185,9 +185,10 @@ class Application(object):
         oldpath = self.path
         DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
         newpath = oldpath + '@' + datetime.now().strftime(DTFORMAT)
-        self.do("mv {} {}".format(oldpath, newpath))
-        self.path = newpath
-        log.info('Successfully shelved %s', newpath)
+        if exists(oldpath):
+            self.do("mv {} {}".format(oldpath, newpath))
+            self.path = newpath
+            log.info('Successfully shelved %s', newpath)
 
     def unshelve(self):
         """restore the shelved checkout"""
@@ -199,9 +200,10 @@ class Application(object):
         except:
             log.error('Could not unshelve %s', oldpath)
             return
-        self.do("mv {} {}".format(oldpath, newpath))
-        self.path = newpath
-        log.info('Successfully unshelved %s', oldpath)
+        if exists(oldpath):
+            self.do("mv {} {}".format(oldpath, newpath))
+            self.path = newpath
+            log.info('Successfully unshelved %s', oldpath)
 
     def clean(self):
         self.do('rm -rf "{}"'.format(self.path))
@@ -230,7 +232,8 @@ class Application(object):
 
     def down(self):
         log.info("Stopping %s", self.name)
-        self.do('docker-compose down', cwd=self.path)
+        if exists(self.path):
+            self.do('docker-compose down', cwd=self.path)
 
     def _members(self):
         return self.do('consul members')
