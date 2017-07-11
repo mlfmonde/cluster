@@ -434,8 +434,9 @@ class Volume(object):
 
 
 def handle(events, myself):
-    for event in json.loads(events)[-1:]:
+    for event in json.loads(events):
         event_name = event.get('Name')
+        log.info(repr(event))
         payload = b64decode(event.get('Payload', '')).decode('utf-8')
         if not payload:
             return
