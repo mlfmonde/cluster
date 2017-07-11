@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 # coding: utf-8
+import hashlib
 import json
 import logging
 import re
@@ -32,17 +33,20 @@ def _run(cmd, cwd=None):
 
 class Application(object):
     def __init__(self, repo_url, branch, cwd=None):
-        self.repo_url, self.branch = repo_url, branch
+        self.repo_url, self.branch = repo_url.lower().strip(), branch.strip()
+        if self.repo_url.endswith('.git'):
+            self.repo_url = self.repo_url[:-4]
         repo_name = basename(self.repo_url.strip('/'))
-        if repo_name.endswith('.git'):
-            repo_name = repo_name[:-4]
-        self.name = repo_name + ('_' + self.branch if self.branch else '')
+        md5 = hashlib.md5(urlparse(self.repo_url).path)
+        self.name = repo_name + ('_' + self.branch if self.branch else ''
+                                 ) + '.' + md5
         self.path = join(DEPLOY, self.name)  # path of the checkout
         self._services = None
         self._volumes = None
         self._compose = None
 
     def check(self):
+        """consistency check"""
         sites = {s['key']: json.loads(b64decode(s['value']).decode('utf-8'))
                  for s in json.loads(self.do('consul kv export site/'))}
         # check urls are not already used
@@ -114,7 +118,7 @@ class Application(object):
 
     @property
     def project(self):
-        return re.sub(r'[^a-z0-9]', '', self.name.lower())
+        return re.sub(r'[^a-z0-9]', '', self.name.rsplit('.', 1)[0])
 
     @property
     def volumes(self):
@@ -206,7 +210,7 @@ class Application(object):
             if exists(self.path):
                 self.clean()
             self.do('git clone --depth 1 -b "{}" "{}" "{}"'
-                    .format(self.branch or 'master', self.repo_url, self.name),
+                    .format(self.branch, self.repo_url, self.name),
                     cwd=DEPLOY)
             self._services = None
             self._volumes = None
@@ -512,7 +516,7 @@ def deploy(payload, myself):
             log.info("I'm now the master of %s", newapp.name)
             newapp.fetch()
             newapp.check()
-            newapp.wait_notification()  # wait for data to be sent by the master
+            newapp.wait_notification()  # wait for master notification
             for volume in newapp.volumes:
                 volume.restore()
             if newslave:
@@ -535,7 +539,7 @@ def deploy(payload, myself):
             log.info("I'm now the master of %s", newapp.name)
             newapp.fetch()
             newapp.check()
-            newapp.wait_notification()  # wait for data to be sent by the master
+            newapp.wait_notification()  # wait for master notification
             for volume in newapp.volumes:
                 volume.restore()
             if newslave:
