@@ -210,8 +210,9 @@ class Application(object):
         try:
             if exists(self.path):
                 self.clean()
-            self.do('git clone --depth 1 -b "{}" "{}" "{}"'
-                    .format(self.branch, self.repo_url, self.name),
+            self.do('git clone --depth 1 "{}" "{}" "{}"'
+                    .format('-b ' + self.branch if self.branch else '',
+                            self.repo_url, self.name),
                     cwd=DEPLOY)
             self._services = None
             self._volumes = None
