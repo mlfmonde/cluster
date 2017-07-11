@@ -541,9 +541,10 @@ def deploy(payload, myself):
             log.info("I'm now the master of %s", newapp.name)
             newapp.fetch()
             newapp.check()
-            newapp.wait_notification()  # wait for master notification
-            for volume in newapp.volumes:
-                volume.restore()
+            if oldslave:
+                newapp.wait_notification()  # wait for master notification
+                for volume in newapp.volumes:
+                    volume.restore()
             if newslave:
                 newapp.enable_replicate(True, members[newslave]['ip'])
             else:
