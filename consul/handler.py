@@ -33,11 +33,11 @@ def _run(cmd, cwd=None):
 
 class Application(object):
     def __init__(self, repo_url, branch, cwd=None):
-        self.repo_url, self.branch = repo_url.lower().strip(), branch.strip()
+        self.repo_url, self.branch = repo_url.strip(), branch.strip()
         if self.repo_url.endswith('.git'):
             self.repo_url = self.repo_url[:-4]
         repo_name = basename(self.repo_url.strip('/'))
-        md5 = hashlib.md5(urlparse(self.repo_url).path.encode('utf-8')
+        md5 = hashlib.md5(urlparse(self.repo_url.lower()).path.encode('utf-8')
                           ).hexdigest()
         self.name = repo_name + ('_' + self.branch if self.branch else ''
                                  ) + '.' + md5
