@@ -36,9 +36,9 @@ class Application(object):
         self.repo_url, self.branch = repo_url.strip(), branch.strip()
         if self.repo_url.endswith('.git'):
             self.repo_url = self.repo_url[:-4]
-        repo_name = basename(self.repo_url.strip('/'))
         md5 = hashlib.md5(urlparse(self.repo_url.lower()).path.encode('utf-8')
                           ).hexdigest()
+        repo_name = basename(self.repo_url.strip('/'))
         self.name = repo_name + ('_' + self.branch if self.branch else ''
                                  ) + '.' + md5
         self.path = join(DEPLOY, self.name)  # path of the checkout
