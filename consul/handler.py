@@ -17,7 +17,10 @@ from sys import stdin, argv
 from urllib.parse import urlparse
 DEPLOY = '/deploy'
 log = logging.getLogger()
-HANDLED = '/deploy/handled.log'
+HANDLED = '/deploy/events.log'
+if not exists(HANDLED):
+    open(HANDLED, 'x')
+
 
 def _run(cmd, cwd=None):
     try:
@@ -439,9 +442,9 @@ class Volume(object):
 def handle(events, myself):
     for event in json.loads(events):
         event_id = event.get('ID')
-        if event_id in open(HANDLED, 'a+').readlines():
+        if event_id in open(HANDLED, 'r').readlines():
             continue
-        open(HANDLED, 'a+').write(event_id + '\n')
+        open(HANDLED, 'a').write(event_id + '\n')
         event_name = event.get('Name')
         payload = b64decode(event.get('Payload', '')).decode('utf-8')
         if not payload:
