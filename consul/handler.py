@@ -119,7 +119,7 @@ class Application(object):
 
     @property
     def project(self):
-        return re.sub(r'[^a-z0-9]', '', self.name.rsplit('.', 1)[0])
+        return re.sub(r'[^a-z0-9]', '', self.name)
 
     @property
     def volumes(self):
