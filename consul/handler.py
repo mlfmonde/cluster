@@ -438,15 +438,16 @@ class Volume(object):
 
 def handle(events, myself):
     for event in json.loads(events):
-        if event.get('ID') in open(HANDLED, 'a+').readlines():
+        event_id = event.get('ID')
+        if event_id in open(HANDLED, 'a+').readlines():
             continue
-        open(HANDLED, 'a+').write(event.get('ID') + '\n')
+        open(HANDLED, 'a+').write(event_id + '\n')
         event_name = event.get('Name')
         payload = b64decode(event.get('Payload', '')).decode('utf-8')
         if not payload:
             return
-        log.info(u'**** Received event: {} with payload: {}'
-                 .format(event_name, payload))
+        log.info(u'**** Received event: {} with ID: {} and payload: {}'
+                 .format(event_name, event_id, payload))
         try:
             payload = json.loads(payload)
         except:
