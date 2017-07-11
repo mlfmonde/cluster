@@ -439,7 +439,7 @@ def handle(events, myself):
         payload = b64decode(event.get('Payload', '')).decode('utf-8')
         if not payload:
             return
-        log.info(u'Received event: {} with payload: {}'
+        log.info(u'\n\nReceived event: {} with payload: {}'
                  .format(event_name, payload))
         try:
             payload = json.loads(payload)
@@ -472,7 +472,7 @@ def deploy(payload, myself):
     members = newapp.members()
 
     if oldmaster == myself:  # master ->
-        log.info('I was the master of %s', oldapp.name)
+        log.info('** I was the master of %s', oldapp.name)
         oldapp.down()
         if oldslave:
             oldapp.enable_replicate(False, members[oldslave]['ip'])
@@ -481,7 +481,7 @@ def deploy(payload, myself):
         oldapp.enable_purge(False)
         oldapp.shelve()
         if newmaster == myself:  # master -> master
-            log.info("I'm still the master of %s", newapp.name)
+            log.info("\nI'm still the master of %s", newapp.name)
             newapp.fetch()
             newapp.check()
             if newslave:
@@ -493,7 +493,7 @@ def deploy(payload, myself):
             newapp.register_consul()  # for consul check
             newapp.up()
         elif newslave == myself:  # master -> slave
-            log.info("I'm now the slave of %s", newapp.name)
+            log.info("\nI'm now the slave of %s", newapp.name)
             with newapp.notify_transfer():
                 for volume in newapp.volumes:
                     volume.send(volume.snapshot(), members[newmaster]['ip'])
@@ -502,7 +502,7 @@ def deploy(payload, myself):
                 volume.delete()
             newapp.enable_purge(True)
         else:  # master -> nothing
-            log.info("I'm nothing now for %s", newapp.name)
+            log.info("\nI'm nothing now for %s", newapp.name)
             with newapp.notify_transfer():
                 for volume in newapp.volumes:
                     volume.send(volume.snapshot(), members[newmaster]['ip'])
@@ -512,10 +512,10 @@ def deploy(payload, myself):
         oldapp.clean()
 
     elif oldslave == myself:  # slave ->
-        log.info("I was the slave of %s", oldapp.name)
+        log.info("\nI was the slave of %s", oldapp.name)
         oldapp.enable_purge(False)
         if newmaster == myself:  # slave -> master
-            log.info("I'm now the master of %s", newapp.name)
+            log.info("\nI'm now the master of %s", newapp.name)
             newapp.fetch()
             newapp.check()
             newapp.wait_notification()  # wait for master notification
@@ -530,15 +530,15 @@ def deploy(payload, myself):
             newapp.register_consul()  # for consul check
             newapp.up()
         elif newslave == myself:  # slave -> slave
-            log.info("I'm still the slave of %s", newapp.name)
+            log.info("\nI'm still the slave of %s", newapp.name)
             newapp.enable_purge(True)
         else:  # slave -> nothing
-            log.info("I'm nothing now for %s", newapp.name)
+            log.info("\nI'm nothing now for %s", newapp.name)
 
     else:  # nothing ->
-        log.info("I was nothing for %s", oldapp.name)
+        log.info("\nI was nothing for %s", oldapp.name)
         if newmaster == myself:  # nothing -> master
-            log.info("I'm now the master of %s", newapp.name)
+            log.info("\nI'm now the master of %s", newapp.name)
             newapp.fetch()
             newapp.check()
             if oldslave:
@@ -554,10 +554,10 @@ def deploy(payload, myself):
             newapp.register_consul()  # for consul check
             newapp.up()
         elif newslave == myself:  # nothing -> slave
-            log.info("I'm now the slave of %s", newapp.name)
+            log.info("\nI'm now the slave of %s", newapp.name)
             newapp.enable_purge(True)
         else:  # nothing -> nothing
-            log.info("I'm still nothing for %s", newapp.name)
+            log.info("\nI'm still nothing for %s", newapp.name)
 
 
 def destroy(payload, myself):
