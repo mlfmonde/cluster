@@ -514,6 +514,7 @@ def deploy(payload, myself):
     elif oldslave == myself:  # slave ->
         log.info("I was the slave of %s", oldapp.name)
         oldapp.enable_purge(False)
+        oldapp.down()
         if newmaster == myself:  # slave -> master
             log.info("I'm now the master of %s", newapp.name)
             newapp.fetch()
