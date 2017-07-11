@@ -442,7 +442,7 @@ class Volume(object):
 def handle(events, myself):
     for event in json.loads(events):
         event_id = event.get('ID')
-        if event_id in open(HANDLED, 'r').readlines():
+        if event_id + '\n' in open(HANDLED, 'r').readlines():
             continue
         open(HANDLED, 'a').write(event_id + '\n')
         event_name = event.get('Name')
