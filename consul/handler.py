@@ -231,13 +231,15 @@ class Application(object):
 
     def up(self):
         log.info("Starting %s", self.name)
-        self.do('docker-compose up -d --build', cwd=self.path)
+        self.do('docker-compose -p "{}" up -d --build'.format(self.project),
+                cwd=self.path)
 
     def down(self, deletevolumes=False):
         log.info("Stopping %s", self.name)
         if exists(self.path):
             v = '-v' if deletevolumes else ''
-            self.do('docker-compose down {}'.format(v), cwd=self.path)
+            self.do('docker-compose -p "{}" down {}'.format(self.project, v),
+                    cwd=self.path)
 
     def _members(self):
         return self.do('consul members')
