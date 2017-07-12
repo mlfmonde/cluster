@@ -586,7 +586,11 @@ def destroy(payload, myself):
     """ destroy containers, unregister, remove schedules but keep volumes
     """
     repo_url = payload['repo']
-    branch = payload.get('branch', '')
+    branch = payload.get('branch')
+    if not branch:
+        msg = "Branch is mandatory"
+        log.error(msg)
+        raise AssertionError(msg)
 
     oldapp = Application(repo_url, branch=branch)
     oldmaster = oldapp.master_node
