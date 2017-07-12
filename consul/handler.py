@@ -233,10 +233,11 @@ class Application(object):
         log.info("Starting %s", self.name)
         self.do('docker-compose up -d --build', cwd=self.path)
 
-    def down(self):
+    def down(self, deletevolumes=False):
         log.info("Stopping %s", self.name)
         if exists(self.path):
-            self.do('docker-compose down', cwd=self.path)
+            v = '-v' if deletevolumes else ''
+            self.do('docker-compose down {}'.format(v), cwd=self.path)
 
     def _members(self):
         return self.do('consul members')
@@ -493,6 +494,8 @@ def deploy(payload, myself):
         oldapp.shelve()
         if newmaster == myself:  # master -> master
             log.info("** I'm still the master of %s", newapp.name)
+            for volume in oldapp.volumes:
+                volume.snapshot()
             newapp.fetch()
             newapp.check()
             if newslave:
@@ -509,8 +512,7 @@ def deploy(payload, myself):
                 for volume in newapp.volumes:
                     volume.send(volume.snapshot(), members[newmaster]['ip'])
             oldapp.unregister_consul()
-            for volume in newapp.volumes:
-                volume.delete()
+            oldapp.down(deletevolumes=True)
             newapp.enable_purge(True)
         else:  # master -> nothing
             log.info("** I'm nothing now for %s", newapp.name)
@@ -518,8 +520,7 @@ def deploy(payload, myself):
                 for volume in newapp.volumes:
                     volume.send(volume.snapshot(), members[newmaster]['ip'])
             oldapp.unregister_consul()
-            for volume in newapp.volumes:
-                volume.delete()
+            oldapp.down(deletevolumes=True)
         oldapp.clean()
 
     elif oldslave == myself:  # slave ->
@@ -595,7 +596,7 @@ def destroy(payload, myself):
         oldapp.unregister_kv()
         for volume in oldapp.volumes:
             volume.snapshot()
-            volume.delete()
+        oldapp.down(deletevolumes=True)
         oldapp.clean()
     elif oldslave == myself:  # slave ->
         log.info("I was the slave of %s", oldapp.name)
