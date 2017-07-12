@@ -602,6 +602,7 @@ def destroy(payload, myself):
         oldapp.enable_purge(False)
     else:  # nothing ->
         log.info("I was nothing for %s", oldapp.name)
+    log.info("Successfully destroyed")
 
 
 if __name__ == '__main__':
