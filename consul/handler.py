@@ -565,6 +565,7 @@ def deploy(payload, myself):
             newapp.up()
         elif newslave == myself:  # nothing -> slave
             log.info("** I'm now the slave of %s", newapp.name)
+            newapp.fetch()
             newapp.enable_purge(True)
         else:  # nothing -> nothing
             log.info("** I'm still nothing for %s", newapp.name)
