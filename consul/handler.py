@@ -476,8 +476,11 @@ def deploy(payload, myself):
     repo_url = payload['repo']
     newmaster = payload['target']
     newslave = payload.get('slave')
-    assert(newmaster != newslave)
-    branch = payload.get('branch', '')
+    if newmaster == newslave:
+        raise AssertionError("Slave must be different than the target Master")
+    branch = payload.get('branch')
+    if not branch:
+        raise AssertionError("Branch is mandatory")
 
     oldapp = Application(repo_url, branch=branch)
     oldmaster = oldapp.master_node
