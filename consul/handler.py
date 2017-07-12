@@ -473,6 +473,7 @@ def deploy(payload, myself):
     repo_url = payload['repo']
     newmaster = payload['target']
     newslave = payload.get('slave')
+    assert(newmaster != newslave)
     branch = payload.get('branch', '')
 
     oldapp = Application(repo_url, branch=branch)
@@ -592,6 +593,9 @@ def destroy(payload, myself):
             oldapp.enable_snapshot(False)
         oldapp.enable_purge(False)
         oldapp.unregister_kv()
+        for volume in oldapp.volumes:
+            volume.snapshot()
+            volume.delete()
         oldapp.clean()
     elif oldslave == myself:  # slave ->
         log.info("I was the slave of %s", oldapp.name)
