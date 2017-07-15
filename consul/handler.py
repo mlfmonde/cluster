@@ -672,8 +672,10 @@ def migrate(payload, myself):
         if targetapp.master_node == myself:
             targetapp.wait_transfer()
     if targetapp.master_node == myself:
+        targetapp.down()
         for source_vol, target_vol in zip(source_volumes, target_volumes):
             source_vol.restore(target=target_vol.name)
+        targetapp.up()
     log.info('Restored %s to %s', sourceapp.name, targetapp.name)
 
 
