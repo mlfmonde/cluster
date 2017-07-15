@@ -645,7 +645,7 @@ def migrate(payload, myself):
     sourceapp = Application(repo_url, branch=branch)
     targetapp = Application(target.get('repo', repo_url),
                             branch=target.get('branch', branch))
-    if sourceapp.master_node != myself and targetapp.master_node != myself:
+    if sourceapp.master_node != myself and target != myself:
         log.info('Not concerned by this event')
         return
     source_volumes = []
@@ -663,16 +663,16 @@ def migrate(payload, myself):
     log.info('Found %s volumes to restore: %s',
              len(source_volumes), repr([v.name for v in source_volumes]))
     # tranfer and restore volumes
-    if sourceapp.master_node != targetapp.master_node:
+    if sourceapp.master_node != target:
         if sourceapp.master_node == myself:
             for volume in source_volumes:
                 volume.send(
                     volume.snapshot(),
-                    targetapp.members[targetapp.master_node]['ip'])
+                    targetapp.members[target]['ip'])
             sourceapp.notify_transfer()
-        if targetapp.master_node == myself:
+        if target == myself:
             targetapp.wait_transfer()
-    if targetapp.master_node == myself:
+    if target == myself:
         targetapp.down()
         for source_vol, target_vol in zip(source_volumes, target_volumes):
             source_vol.restore(target=target_vol.name)
