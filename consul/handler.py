@@ -439,7 +439,8 @@ class Volume(object):
         restored = self.do("buttervolume restore {} {}"
                            .format(snapshot, target))
         target = 'as {}'.format(target) if target else ''
-        log.info('Restored %s %s', restored, target)
+        log.info('Restored %s %s (after a backup: %s)',
+                 snapshot, target, restored)
 
     def send(self, snapshot, target):
         log.info(u'Sending snapshot: {}'.format(snapshot))
