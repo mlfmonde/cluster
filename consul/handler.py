@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 # coding: utf-8
+# TODO identify pure functions
 import hashlib
 import json
 import logging
@@ -43,7 +44,7 @@ class Application(object):
                           ).hexdigest()
         repo_name = basename(self.repo_url.strip('/'))
         self.name = repo_name + ('_' + self.branch if self.branch else ''
-                                 ) + '.' + md5
+                                 ) + '.' + md5[::7]  # don't need full md5
         self.path = join(DEPLOY, self.name)  # path of the checkout
         self._services = None
         self._volumes = None
@@ -95,7 +96,7 @@ class Application(object):
             raise
         log.info('Volume transfer SUCCEEDED!')
 
-    def wait_notification(self):
+    def wait_transfer(self):
         loops = 0
         while loops < 60:
             log.info('Waiting transfer notification for %s', self.name)
@@ -242,6 +243,7 @@ class Application(object):
                     cwd=self.path)
 
     def _members(self):
+        # TODO move outside this class
         return self.do('consul members')
 
     def members(self):
@@ -430,12 +432,14 @@ class Volume(object):
         log.info(u'Destroying volume: {}'.format(self.name))
         return self.do("docker volume rm {}".format(self.name))
 
-    def restore(self, snapshot=None):
+    def restore(self, snapshot=None, target=''):
         if snapshot is None:  # use the latest snapshot
             snapshot = self.name
         log.info(u'Restoring snapshot: {}'.format(snapshot))
-        restored = self.do("buttervolume restore {}".format(snapshot))
-        log.info('Restored %s', restored)
+        restored = self.do("buttervolume restore {} {}"
+                           .format(snapshot, target))
+        target = 'as {}'.format(target) if target else ''
+        log.info('Restored %s %s', restored, target)
 
     def send(self, snapshot, target):
         log.info(u'Sending snapshot: {}'.format(snapshot))
@@ -465,13 +469,16 @@ def handle(events, myself):
             deploy(payload, myself)
         elif event_name == 'destroy':
             destroy(payload, myself)
+        elif event_name == 'migrate':
+            migrate(payload, myself)
         else:
             log.error('Unknown event name: {}'.format(event_name))
 
 
 def deploy(payload, myself):
     """Keep in mind this is executed in the consul container
-    Deployments are done in the DEPLOY folder.
+    Deployments are done in the DEPLOY folder. Needs:
+    {"repo"': <url>, "branch": <branch>, "target": <host>, "slave": <host>}
     """
     repo_url = payload['repo']
     newmaster = payload['target']
@@ -539,7 +546,7 @@ def deploy(payload, myself):
             log.info("** I'm now the master of %s", newapp.name)
             newapp.fetch()
             newapp.check()
-            newapp.wait_notification()  # wait for master notification
+            newapp.wait_transfer()  # wait for master notification
             for volume in newapp.volumes:
                 volume.restore()
             if newslave:
@@ -563,7 +570,7 @@ def deploy(payload, myself):
             newapp.fetch()
             newapp.check()
             if oldslave:
-                newapp.wait_notification()  # wait for master notification
+                newapp.wait_transfer()  # wait for master notification
                 for volume in newapp.volumes:
                     volume.restore()
             if newslave:
@@ -583,7 +590,9 @@ def deploy(payload, myself):
 
 
 def destroy(payload, myself):
-    """ destroy containers, unregister, remove schedules but keep volumes
+    """Destroy containers, unregister, remove schedules and volumes,
+    but keep snapshots. Needs:
+    {"repo"': <url>, "branch": <branch>}
     """
     repo_url = payload['repo']
     branch = payload.get('branch')
@@ -617,6 +626,54 @@ def destroy(payload, myself):
     else:  # nothing ->
         log.info("I was nothing for %s", oldapp.name)
     log.info("Successfully destroyed")
+
+
+def migrate(payload, myself):
+    """migrate volumes from one app to another. Needs:
+    {"repo"': <url>, "branch": <branch>,
+     "target": {"repo": <url>, "branch": <branch>}}
+    If the "repo" or "branch" of the "target" is not given, it is the same as
+    the source
+    """
+    repo_url = payload['repo']
+    branch = payload['branch']
+    target = payload['target']
+    assert(target.get('repo') or target.get('branch'))
+
+    sourceapp = Application(repo_url, branch=branch)
+    targetapp = Application(target.get('repo', repo_url),
+                            branch=target.get('branch', branch))
+    if sourceapp.master_node != myself and targetapp.master_node != myself:
+        log.info('Not concerned by this event')
+        return
+    source_volumes = []
+    target_volumes = []
+    # find common volumes
+    for source_volume in sourceapp.volumes:
+        source_name = source_volume.name.split('_', 1)[1]
+        for target_volume in targetapp.volumes:
+            target_name = target_volume.name.split('_', 1)[1]
+            if source_name == target_name:
+                source_volumes.append(source_volume)
+                target_volumes.append(target_volume)
+            else:
+                continue
+    log.info('Found %s volumes to restore: %s',
+             len(source_volumes), repr(source_volumes))
+    # tranfer and restore volumes
+    if sourceapp.master_node != targetapp.master_node:
+        if sourceapp.master_node == myself:
+            for volume in source_volumes:
+                volume.send(
+                    volume.snapshot(),
+                    targetapp.members[targetapp.master_node]['ip'])
+            sourceapp.notify_transfer()
+        if targetapp.master_node == myself:
+            targetapp.wait_transfer()
+    if targetapp.master_node == myself:
+        for source_vol, target_vol in zip(source_volumes, target_volumes):
+            target_vol.restore(target=source_vol.name)
+    log.info('Restored %s to %s', sourceapp.name, targetapp.name)
 
 
 if __name__ == '__main__':
