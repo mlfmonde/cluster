@@ -1,4 +1,7 @@
 FROM consul:0.8.5
+
+ARG BUTTERVOLUME=1.1
+
 RUN apk add --no-cache \
       docker \
       git \
@@ -11,6 +14,7 @@ RUN apk add --no-cache \
     && pip3 install pyyaml \
     && git clone http://github.com/anybox/buttervolume \
     && cd buttervolume \
+    && git checkout BUTTERVOLUME \
     && python3 setup.py install \
     && cd /bin \
     && curl -o consul-template.zip https://releases.hashicorp.com/consul-template/0.19.0/consul-template_0.19.0_linux_amd64.zip \

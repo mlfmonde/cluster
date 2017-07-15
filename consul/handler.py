@@ -450,6 +450,7 @@ def handle(events, myself):
     for event in json.loads(events):
         event_id = event.get('ID')
         if event_id + '\n' in open(HANDLED, 'r').readlines():
+            log.info('Event already handled in the past: %s', event_id)
             continue
         open(HANDLED, 'a').write(event_id + '\n')
         event_name = event.get('Name')
@@ -659,7 +660,7 @@ def migrate(payload, myself):
             else:
                 continue
     log.info('Found %s volumes to restore: %s',
-             len(source_volumes), repr(source_volumes))
+             len(source_volumes), repr([v.name for v in source_volumes]))
     # tranfer and restore volumes
     if sourceapp.master_node != targetapp.master_node:
         if sourceapp.master_node == myself:
