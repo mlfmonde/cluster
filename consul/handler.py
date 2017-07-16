@@ -672,7 +672,7 @@ def migrate(payload, myself):
                         volume.snapshot(),
                         targetapp.members[targetapp.master_node]['ip'])
         if targetapp.master_node == myself:
-            targetapp.wait_transfer()
+            sourceapp.wait_transfer()
     if targetapp.master_node == myself:
         targetapp.down()
         for source_vol, target_vol in zip(source_volumes, target_volumes):
