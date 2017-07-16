@@ -246,6 +246,7 @@ class Application(object):
         # TODO move outside this class
         return self.do('consul members')
 
+    @property
     def members(self):
         members = {}
         for m in self._members().split('\n')[1:]:
@@ -329,7 +330,7 @@ class Application(object):
             value = {
                 'name': self.name,  # name of the service, and key in the kv
                 'domain': domain,  # used by haproxy
-                'ip': self.members()[target]['ip'],  # used by haproxy
+                'ip': self.members[target]['ip'],  # used by haproxy
                 'node': target,  # used by haproxy and caddy
                 'url': url,  # used by caddy
                 'redirect_from': redirect_from,  # used by caddy
@@ -499,7 +500,7 @@ def deploy(payload, myself):
     oldmaster = oldapp.master_node
     oldslave = oldapp.slave_node
     newapp = Application(repo_url, branch=branch)
-    members = newapp.members()
+    members = newapp.members
 
     if oldmaster == myself:  # master ->
         log.info('** I was the master of %s', oldapp.name)
@@ -606,7 +607,7 @@ def destroy(payload, myself):
     oldapp = Application(repo_url, branch=branch)
     oldmaster = oldapp.master_node
     oldslave = oldapp.slave_node
-    members = oldapp.members()
+    members = oldapp.members
 
     if oldmaster == myself:  # master ->
         log.info('I was the master of %s', oldapp.name)
@@ -687,4 +688,4 @@ if __name__ == '__main__':
                         style='{')
     myself = socket.gethostname()
     # read json from stdin
-    handle(len(argv) == 2 and argv[1] or stdin.read(), myself)
+    handle(len(argv) > 1 and ' '.join(argv[1:]) or stdin.read(), myself)
