@@ -666,11 +666,11 @@ def migrate(payload, myself):
     # tranfer and restore volumes
     if sourceapp.master_node != targetapp.master_node:
         if sourceapp.master_node == myself:
-            for volume in source_volumes:
-                volume.send(
-                    volume.snapshot(),
-                    targetapp.members[targetapp.master_node]['ip'])
-            sourceapp.notify_transfer()
+            with sourceapp.notify_transfer():
+                for volume in source_volumes:
+                    volume.send(
+                        volume.snapshot(),
+                        targetapp.members[targetapp.master_node]['ip'])
         if targetapp.master_node == myself:
             targetapp.wait_transfer()
     if targetapp.master_node == myself:
