@@ -1,6 +1,6 @@
 FROM consul:0.8.5
 
-ARG BUTTERVOLUME=1.1
+ARG BUTTERVOLUME=1.2
 
 RUN apk add --no-cache \
       docker \
