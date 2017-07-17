@@ -9,13 +9,14 @@ import requests
 import socket
 import time
 import yaml
-from base64 import b64decode
+from base64 import b64decode, b64encode
 from contextlib import contextmanager
 from datetime import datetime
 from os.path import basename, join, exists
 from subprocess import run as srun, CalledProcessError, PIPE
 from sys import stdin, argv
 from urllib.parse import urlparse
+from uuid import uuid1
 DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 DEPLOY = '/deploy'
 log = logging.getLogger()
@@ -693,5 +694,13 @@ if __name__ == '__main__':
                         filename=join(DEPLOY, 'handler.log'),
                         style='{')
     myself = socket.gethostname()
-    # read json from stdin
-    handle(len(argv) > 1 and ' '.join(argv[1:]) or stdin.read(), myself)
+    manual_input = None
+    if len(argv) >= 3:
+        # allow to launch manually inside consul docker
+        event = argv[1]
+        payload = b64encode(' '.join(argv[2:]).encode('utf-8')).decode('utf-8')
+        manual_input = json.dumps({
+            'ID': str(uuid1()), 'Name': event,
+            'Payload': payload, 'Version': 1, 'LTime': 1})
+
+    handle(manual_input or stdin.read(), myself)
