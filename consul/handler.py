@@ -66,7 +66,7 @@ class Application(object):
         """path of the deployment checkout"""
         deploy_date = deploy_date or self.deploy_date
         if deploy_date:
-            return join(DEPLOY, self.name + '@' + self.deploy_date)
+            return join(DEPLOY, self.name + '@' + deploy_date)
         return None
 
     @property
@@ -180,7 +180,9 @@ class Application(object):
     def valueof(self, name, key):
         """ return the current value of the key in the kv"""
         cmd = 'consul kv get site/{}'.format(name)
-        return json.loads(self.do(cmd))[key]
+        value = json.loads(self.do(cmd))[key]
+        log.info('Reading site data for %s: key %s = %s', name, key, value)
+        return value
 
     def compose_domain(self):
         """domain name of the first exposed service in the compose"""
