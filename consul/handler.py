@@ -20,7 +20,7 @@ from uuid import uuid1
 DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 DEPLOY = '/deploy'
 log = logging.getLogger()
-HANDLED = '/deploy/events.log'
+HANDLED = join(DEPLOY, 'events.log')
 if not exists(HANDLED):
     open(HANDLED, 'x')
 
@@ -414,8 +414,13 @@ class Volume(object):
     def snapshot(self):
         """snapshot the volume
         """
-        log.info(u'Snapshotting volume: {}'.format(self.name))
-        return self.do("buttervolume snapshot {}".format(self.name))
+        volumes = [l.split()[1] for l in self.do(
+                   "docker volume ls -f driver=btrfs").splitlines()[1:]]
+        if self.name in volumes:
+            log.info(u'Snapshotting volume: {}'.format(self.name))
+            return self.do("buttervolume snapshot {}".format(self.name))
+        else:
+            log.warn('Could not snapshot unexisting volume %s', self.name)
 
     def schedule_snapshots(self, timer):
         """schedule snapshots of the volume
@@ -699,8 +704,8 @@ if __name__ == '__main__':
         # allow to launch manually inside consul docker
         event = argv[1]
         payload = b64encode(' '.join(argv[2:]).encode('utf-8')).decode('utf-8')
-        manual_input = json.dumps({
+        manual_input = json.dumps([{
             'ID': str(uuid1()), 'Name': event,
-            'Payload': payload, 'Version': 1, 'LTime': 1})
+            'Payload': payload, 'Version': 1, 'LTime': 1}])
 
     handle(manual_input or stdin.read(), myself)
