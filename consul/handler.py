@@ -16,6 +16,7 @@ from os.path import basename, join, exists
 from subprocess import run as srun, CalledProcessError, PIPE
 from sys import stdin, argv
 from urllib.parse import urlparse
+DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 DEPLOY = '/deploy'
 log = logging.getLogger()
 HANDLED = '/deploy/events.log'
@@ -45,10 +46,28 @@ class Application(object):
         repo_name = basename(self.repo_url.strip('/'))
         self.name = repo_name + ('_' + self.branch if self.branch else ''
                                  ) + '.' + md5[::7]  # don't need full md5
-        self.path = join(DEPLOY, self.name)  # path of the checkout
         self._services = None
         self._volumes = None
         self._compose = None
+        self._deploy_date = None
+
+    @property
+    def deploy_date(self):
+        """date of the last deployment"""
+        if self._deploy_date is None:
+            try:
+                self._deploy_date = self.valueof(self.name, 'deploy_date')
+            except:
+                log.info("No current deploy date found in the kv")
+        return self._deploy_date
+
+    @property
+    def path(self, deploy_date=None):
+        """path of the deployment checkout"""
+        deploy_date = deploy_date or self.deploy_date
+        if deploy_date:
+            return join(DEPLOY, self.name + '@' + self.deploy_date)
+        return None
 
     def check(self):
         """consistency check"""
@@ -184,42 +203,20 @@ class Application(object):
             log.warn('Could not determine the master node for %s', self.name)
             return None
 
-    def shelve(self):
-        """move the checkout to a temporary location"""
-        oldpath = self.path
-        DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
-        newpath = oldpath + '@' + datetime.now().strftime(DTFORMAT)
-        if exists(oldpath):
-            self.do("mv {} {}".format(oldpath, newpath))
-            self.path = newpath
-            log.info('Successfully shelved %s', newpath)
-
-    def unshelve(self):
-        """restore the shelved checkout"""
-        oldpath = self.path
-        DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
-        try:
-            newpath = oldpath.rsplit('@', 1)[0]
-            time.strptime(oldpath.split('@')[-1], DTFORMAT)  # check
-        except:
-            log.error('Could not unshelve %s', oldpath)
-            return
-        if exists(oldpath):
-            self.do("mv {} {}".format(oldpath, newpath))
-            self.path = newpath
-            log.info('Successfully unshelved %s', oldpath)
-
     def clean(self):
-        self.do('rm -rf "{}"'.format(self.path))
+        if self.path and exists(self.path):
+            self.do('rm -rf "{}"'.format(self.path))
 
     def fetch(self, retrying=False):
         try:
-            if exists(self.path):
-                self.clean()
+            self.clean()
+            deploy_date = datetime.now().strftime(DTFORMAT)
+            path = self.path(deploy_date)
             self.do('git clone --depth 1 {} "{}" "{}"'
                     .format('-b "%s"' % self.branch if self.branch else '',
-                            self.repo_url, self.name),
+                            self.repo_url, path),
                     cwd=DEPLOY)
+            self._deploy_date = deploy_date
             self._services = None
             self._volumes = None
             self._compose = None
@@ -231,16 +228,22 @@ class Application(object):
                 raise
 
     def up(self):
-        log.info("Starting %s", self.name)
-        self.do('docker-compose -p "{}" up -d --build'.format(self.project),
-                cwd=self.path)
+        if self.path and exists(self.path):
+            log.info("Starting %s", self.name)
+            self.do('docker-compose -p "{}" up -d --build'
+                    .format(self.project),
+                    cwd=self.path)
+        else:
+            log.info("No deployment, cannot start %s", self.name)
 
     def down(self, deletevolumes=False):
-        log.info("Stopping %s", self.name)
-        if exists(self.path):
+        if self.path and exists(self.path):
+            log.info("Stopping %s", self.name)
             v = '-v' if deletevolumes else ''
             self.do('docker-compose -p "{}" down {}'.format(self.project, v),
                     cwd=self.path)
+        else:
+            log.info("No deployment, cannot stop %s", self.name)
 
     def _members(self):
         # TODO move outside this class
@@ -510,13 +513,13 @@ def deploy(payload, myself):
         else:
             oldapp.enable_snapshot(False)
         oldapp.enable_purge(False)
-        oldapp.shelve()
         if newmaster == myself:  # master -> master
             log.info("** I'm still the master of %s", newapp.name)
             for volume in oldapp.volumes:
                 volume.snapshot()
             newapp.fetch()
             newapp.check()
+            newapp.up()
             if newslave:
                 newapp.enable_replicate(True, members[newslave]['ip'])
             else:
@@ -524,7 +527,6 @@ def deploy(payload, myself):
             newapp.enable_purge(True)
             newapp.register_kv(newmaster, newslave, myself)  # for consul-templ
             newapp.register_consul()  # for consul check
-            newapp.up()
         elif newslave == myself:  # master -> slave
             log.info("** I'm now the slave of %s", newapp.name)
             with newapp.notify_transfer():
@@ -552,6 +554,7 @@ def deploy(payload, myself):
             newapp.wait_transfer()  # wait for master notification
             for volume in newapp.volumes:
                 volume.restore()
+            newapp.up()
             if newslave:
                 newapp.enable_replicate(True, members[newslave]['ip'])
             else:
@@ -559,7 +562,6 @@ def deploy(payload, myself):
             newapp.enable_purge(True)
             newapp.register_kv(newmaster, newslave, myself)  # for consul-templ
             newapp.register_consul()  # for consul check
-            newapp.up()
         elif newslave == myself:  # slave -> slave
             log.info("** I'm still the slave of %s", newapp.name)
             newapp.enable_purge(True)
@@ -576,6 +578,7 @@ def deploy(payload, myself):
                 newapp.wait_transfer()  # wait for master notification
                 for volume in newapp.volumes:
                     volume.restore()
+            newapp.up()
             if newslave:
                 newapp.enable_replicate(True, members[newslave]['ip'])
             else:
@@ -583,7 +586,6 @@ def deploy(payload, myself):
             newapp.enable_purge(True)
             newapp.register_kv(newmaster, newslave, myself)  # for consul-templ
             newapp.register_consul()  # for consul check
-            newapp.up()
         elif newslave == myself:  # nothing -> slave
             log.info("** I'm now the slave of %s", newapp.name)
             newapp.fetch()
