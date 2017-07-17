@@ -61,13 +61,16 @@ class Application(object):
                 log.info("No current deploy date found in the kv")
         return self._deploy_date
 
-    @property
-    def path(self, deploy_date=None):
+    def _path(self, deploy_date=None):
         """path of the deployment checkout"""
         deploy_date = deploy_date or self.deploy_date
         if deploy_date:
             return join(DEPLOY, self.name + '@' + self.deploy_date)
         return None
+
+    @property
+    def path(self):
+        return self._path()
 
     def check(self):
         """consistency check"""
@@ -211,7 +214,7 @@ class Application(object):
         try:
             self.clean()
             deploy_date = datetime.now().strftime(DTFORMAT)
-            path = self.path(deploy_date)
+            path = self._path(deploy_date)
             self.do('git clone --depth 1 {} "{}" "{}"'
                     .format('-b "%s"' % self.branch if self.branch else '',
                             self.repo_url, path),
@@ -332,6 +335,7 @@ class Application(object):
             proto = self.proto(service)
             value = {
                 'name': self.name,  # name of the service, and key in the kv
+                'deploy_date': self._deploy_date,
                 'domain': domain,  # used by haproxy
                 'ip': self.members[target]['ip'],  # used by haproxy
                 'node': target,  # used by haproxy and caddy
