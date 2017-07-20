@@ -12,6 +12,7 @@ import yaml
 from base64 import b64decode, b64encode
 from contextlib import contextmanager
 from datetime import datetime
+from functools import reduce
 from os.path import basename, join, exists
 from subprocess import run as srun, CalledProcessError, PIPE
 from sys import stdin, argv
@@ -302,7 +303,9 @@ class Application(object):
     def register_consul(self):
         """register a service and check in consul
         """
-        urls = [self.url(s) for s in self.services]
+        urls = reduce(list.__add__,
+                      [self.proxy_conf(s)['urls'].keys() for s in self.services
+                       if self.proxy_conf(s)['urls']])
         svc = json.dumps({
             'Name': self.name,
             'Checks': [{
@@ -317,18 +320,14 @@ class Application(object):
         log.info("Registered %s in consul", self.name)
 
     def unregister_consul(self):
-        for service in self.services:
-            url = self.url(service)
-            if not url:
-                continue
-            url = ('http://localhost:8500/v1/agent/service/deregister/{}'
-                   .format(self.name))
-            res = requests.put(url)
-            if res.status_code != 200:
-                msg = 'Consul service deregister failed: {}'.format(res.reason)
-                log.error(msg)
-                raise RuntimeError(msg)
-            log.info("Deregistered %s in consul", self.name)
+        res = requests.put(
+            'http://localhost:8500/v1/agent/service/deregister/{}'
+            .format(self.name))
+        if res.status_code != 200:
+            msg = 'Consul service deregister failed: {}'.format(res.reason)
+            log.error(msg)
+            raise RuntimeError(msg)
+        log.info("Deregistered %s in consul", self.name)
 
     def enable_snapshot(self, enable):
         """enable or disable scheduled snapshots
