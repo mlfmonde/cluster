@@ -1,4 +1,5 @@
 #!/bin/sh
+/usr/sbin/sshd -e
 
 chown consul: /deploy
 

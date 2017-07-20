@@ -3,12 +3,19 @@ FROM consul:0.8.5
 ARG BUTTERVOLUME=1.2
 
 RUN apk add --no-cache \
+      bash \
       docker \
       git \
       jq \
+      openrc \
       openssh-client \
+      openssh-server \
       py-pip \
       python3 \
+    && rc-status \
+    && touch /run/openrc/softlevel \
+    && rc-update add sshd \
+    && /etc/init.d/sshd start \
     && pip install --upgrade pip \
     && pip install docker-compose \
     && pip3 install pyyaml \
@@ -20,7 +27,9 @@ RUN apk add --no-cache \
     && curl -o consul-template.zip https://releases.hashicorp.com/consul-template/0.19.0/consul-template_0.19.0_linux_amd64.zip \
     && unzip consul-template.zip \
     && rm consul-template.zip \
-    && mkdir /consul/template
+    && mkdir /consul/template \
+    && sed -i 's/#AuthorizedKeysCommand .*/AuthorizedKeysCommand \/sbin\/authorizedkeys.py/' /etc/ssh/sshd_config \
+    && sed -i 's/#AuthorizedKeysCommandUser .*/AuthorizedKeysCommandUser gw/' /etc/ssh/sshd_config
 
 USER consul
 COPY ssh /home/consul/.ssh
@@ -29,8 +38,11 @@ RUN chown -R consul: /home/consul \
     && chmod go-rwx /home/consul/.ssh/id_rsa \
     && mkdir -p /run/docker/plugins/ \
     && chmod g+rx /run/docker/plugins/ \
-    && adduser consul root
+    && adduser consul root \
+    && adduser -D -s /bin/false gw \
+    && adduser gw docker
 
+COPY authorizedkeys.py /sbin/
 COPY handler.py /
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
