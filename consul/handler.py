@@ -25,11 +25,12 @@ if not exists(HANDLED):
     open(HANDLED, 'x')
 
 
-def _run(cmd, cwd=None):
+def do(cmd, cwd=None):
+    """ Run a command"""
     try:
         if cwd:
             cmd = 'cd "{}" && {}'.format(cwd, cmd)
-        log.info(cmd)
+        log.info('Running: ' + cmd)
         res = srun(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
         return res.stdout.decode().strip()
     except CalledProcessError as e:
@@ -37,7 +38,21 @@ def _run(cmd, cwd=None):
         raise
 
 
+def kv(self, name, key):
+    """ return the current value of the key in the kv"""
+    try:
+        cmd = 'consul kv get app/{}'.format(name)
+        value = json.loads(do(cmd))[key]
+        log.info('Reading %s in kv: %s = %s', name, key, value)
+        return value
+    except:
+        log.warn('Could not determine the %s node for %s', key, self.name)
+        return None
+
+
 class Application(object):
+    """ represents a docker compose, its proxy conf and deployment path
+    """
     def __init__(self, repo_url, branch, cwd=None):
         self.repo_url, self.branch = repo_url.strip(), branch.strip()
         if self.repo_url.endswith('.git'):
@@ -46,7 +61,7 @@ class Application(object):
                           ).hexdigest()
         repo_name = basename(self.repo_url.strip('/'))
         self.name = repo_name + ('_' + self.branch if self.branch else ''
-                                 ) + '.' + md5[::7]  # don't need full md5
+                                 ) + '.' + md5[:5]  # don't need full md5
         self._services = None
         self._volumes = None
         self._compose = None
@@ -56,10 +71,7 @@ class Application(object):
     def deploy_date(self):
         """date of the last deployment"""
         if self._deploy_date is None:
-            try:
-                self._deploy_date = self.valueof(self.name, 'deploy_date')
-            except:
-                log.info("No current deploy date found in the kv")
+            self._deploy_date = kv(self.name, 'deploy_date')
         return self._deploy_date
 
     def _path(self, deploy_date=None):
@@ -75,24 +87,20 @@ class Application(object):
 
     def check(self):
         """consistency check"""
-        sites = {s['key']: json.loads(b64decode(s['value']).decode('utf-8'))
-                 for s in json.loads(self.do('consul kv export site/'))}
+        all_apps = {s['key']: json.loads(b64decode(s['value']).decode('utf-8'))
+                    for s in json.loads(do('consul kv export app/'))}
         # check urls are not already used
         for service in self.services:
-            urls = [self.url(service)] + self.redirect_from(service)
-            for site in sites.values():
-                if site.get('name') == self.name:
+            service_urls = self.proxy_conf(service).get('urls', [])
+            for appname, appconf in all_apps.items():
+                if appname == self.name:
                     continue
-                for url in urls:
-                    if (url in site.get('redirect_from', [])
-                            or url == site.get('url')):
-                        msg = ('Aborting! Site {} is already deployed by {}'
-                               .format(url, site['name']))
+                for url in [u.get('url') for u in service_urls]:
+                    if (url == appconf.get('url')):
+                        msg = ('Aborting! {} is already deployed by {}'
+                               .format(url, appname))
                         log.error(msg)
                         raise ValueError(msg)
-
-    def do(self, cmd, cwd=None):
-        return _run(cmd, cwd=cwd)
 
     @property
     def compose(self):
@@ -111,23 +119,23 @@ class Application(object):
     def notify_transfer(self):
         try:
             yield
-            self.do('consul kv put transfer/{}/success'.format(self.name))
+            do('consul kv put migrate/{}/success'.format(self.name))
         except:
-            log.error('Volume transfer FAILED!')
-            self.do('consul kv put transfer/{}/failure'.format(self.name))
+            log.error('Volume migrate FAILED!')
+            do('consul kv put migrate/{}/failure'.format(self.name))
             self.up()  # TODO move in the deploy
             raise
-        log.info('Volume transfer SUCCEEDED!')
+        log.info('Volume migrate SUCCEEDED!')
 
     def wait_transfer(self):
         loops = 0
         while loops < 60:
-            log.info('Waiting transfer notification for %s', self.name)
-            res = self.do('consul kv get -keys transfer/{}'.format(self.name))
+            log.info('Waiting migrate notification for %s', self.name)
+            res = do('consul kv get -keys migrate/{}'.format(self.name))
             if res:
                 status = res.split('/')[-1]
-                self.do('consul kv delete -recurse transfer/{}/'
-                        .format(self.name))
+                do('consul kv delete -recurse migrate/{}/'
+                   .format(self.name))
                 log.info('Transfer notification status: %s', status)
                 return status
             time.sleep(1)
@@ -149,9 +157,21 @@ class Application(object):
         return re.sub(r'[^a-z0-9]', '', self.name)
 
     @property
+    def volumes_from_kv(self):
+        """volumes defined in the kv
+        """
+        if self._volumes is None:
+            try:
+                self._volumes = [
+                    Volume(v) for v in kv(self.name, 'volumes')]
+            except:
+                log.info("No volumes found in the kv")
+            self._volumes = self._volumes or None
+        return self._volumes
+
+    @property
     def volumes(self):
-        """btrfs volumes defined in the compose,
-        or in the kv if no compose available
+        """btrfs volumes defined in the compose
         """
         if self._volumes is None:
             try:
@@ -160,85 +180,46 @@ class Application(object):
                     for v in self.compose.get('volumes', {}).items()
                     if v[1] and v[1].get('driver') == 'btrfs']
             except:
-                log.info("No compose available,"
-                         "reading volumes from the kv store")
-                try:
-                    self._volumes = [
-                        Volume(v) for v in self.valueof(self.name, 'volumes')]
-                except:
-                    log.info("No volumes found in the kv store")
-                    self._volumes = []
-            self._volumes = self._volumes or None
+                log.info("No volumes found in the compose")
+                self._volumes = []
         return self._volumes
 
     def container_name(self, service):
         """did'nt find a way to query reliably so do it static
         It assumes there is only 1 container for a project/service couple
         """
-        return self.project + '_' + service + '_1'
-
-    def valueof(self, name, key):
-        """ return the current value of the key in the kv"""
-        cmd = 'consul kv get site/{}'.format(name)
-        value = json.loads(self.do(cmd))[key]
-        log.info('Reading site data for %s: key %s = %s', name, key, value)
-        return value
-
-    def compose_domain(self):
-        """domain name of the first exposed service in the compose"""
-        # FIXME prevents from exposing two domains in a compose
-        domains = [self.domain(s) for s in self.services]
-        domains = [d for d in domains if d is not None]
-        return domains[0] if domains else ''
-
-    @property
-    def slave_node(self):
-        """slave node for the current app """
-        try:
-            return self.valueof(self.name, 'slave')
-        except:
-            log.warn('Could not determine the slave node for %s', self.name)
-            return None
-
-    @property
-    def master_node(self):
-        """master node for the current app """
-        try:
-            return self.valueof(self.name, 'node')
-        except:
-            log.warn('Could not determine the master node for %s', self.name)
-            return None
+        return self.project + '_' + service + '_1'  # FIXME _1
 
     def clean(self):
         if self.path and exists(self.path):
-            self.do('rm -rf "{}"'.format(self.path))
+            do('rm -rf "{}"'.format(self.path))
 
-    def fetch(self, retrying=False):
+    def download(self, retrying=False):
         try:
             self.clean()
             deploy_date = datetime.now().strftime(DTFORMAT)
             path = self._path(deploy_date)
-            self.do('git clone --depth 1 {} "{}" "{}"'
-                    .format('-b "%s"' % self.branch if self.branch else '',
-                            self.repo_url, path),
-                    cwd=DEPLOY)
+            do('git clone --depth 1 {} "{}" "{}"'
+               .format('-b "%s"' % self.branch if self.branch else '',
+                       self.repo_url, path),
+               cwd=DEPLOY)
             self._deploy_date = deploy_date
             self._services = None
             self._volumes = None
             self._compose = None
         except CalledProcessError:
             if not retrying:
-                log.warn("Failed to fetch %s, retrying", self.repo_url)
-                self.fetch(retrying=True)
+                log.warn("Failed to download %s, retrying", self.repo_url)
+                self.download(retrying=True)
             else:
                 raise
 
     def up(self):
         if self.path and exists(self.path):
             log.info("Starting %s", self.name)
-            self.do('docker-compose -p "{}" up -d --build'
-                    .format(self.project),
-                    cwd=self.path)
+            do('docker-compose -p "{}" up -d --build'
+               .format(self.project),
+               cwd=self.path)
         else:
             log.info("No deployment, cannot start %s", self.name)
 
@@ -246,115 +227,77 @@ class Application(object):
         if self.path and exists(self.path):
             log.info("Stopping %s", self.name)
             v = '-v' if deletevolumes else ''
-            self.do('docker-compose -p "{}" down {}'.format(self.project, v),
-                    cwd=self.path)
+            do('docker-compose -p "{}" down {}'.format(self.project, v),
+               cwd=self.path)
         else:
             log.info("No deployment, cannot stop %s", self.name)
-
-    def _members(self):
-        # TODO move outside this class
-        return self.do('consul members')
 
     @property
     def members(self):
         members = {}
-        for m in self._members().split('\n')[1:]:
+        for m in do('consul members').split('\n')[1:]:
             name, ip, status = m.split()[:3]
             members[name] = {'ip': ip.split(':')[0], 'status': status}
         return members
 
-    def compose_env(self, service, name, default=None):
-        """retrieve an environment variable from the service in the compose
+    def proxy_conf(self, service):
+        """retrieve the reverse proxy config from the compose
         """
-        try:
-            val = self.compose['services'][service]['environment'][name]
-            log.info('Found a %s environment variable for '
-                     'service %s in the compose file of %s',
-                     name, service, self.name)
-            return val
-        except:
-            log.info('No %s environment variable for '
-                     'service %s in the compose file of %s',
-                     name, service, self.name)
-            return default
-
-    def tls(self, service):
-        """used to disable tls with TLS: self_signed """
-        return self.compose_env(service, 'TLS')
-
-    def url(self, service):
-        """end url to expose the service """
-        return self.compose_env(service, 'URL')
-
-    def redirect_from(self, service):
-        """ list of redirects transmitted to caddy """
-        lines = self.compose_env(service, 'REDIRECT_FROM', '').split('\n')
-        return [l.strip() for l in lines if len(l.split()) == 1]
-
-    def redirect_to(self, service):
-        """ list of redirects transmitted to caddy """
-        lines = self.compose_env(service, 'REDIRECT_TO', '').split('\n')
-        return [l.strip() for l in lines if 1 <= len(l.split()) <= 3]
-
-    def domain(self, service):
-        """ domain computed from the URL
-        """
-        return urlparse(self.url).netloc.split(':')[0]
-
-    def proto(self, service):
-        """frontend protocol configured in the compose for the service.
-        """
-        return self.compose_env(service, 'PROTO', 'http://')
-
-    def port(self, service):
-        """frontend port configured in the compose for the service.
-        """
-        return self.compose_env(service, 'PORT', '80')
+        if self._cluster_conf is None:
+            try:
+                name = 'PROXY_CONF'
+                val = self.compose['services'][service]['environment'][name]
+                log.info('Found a %s environment variable for '
+                         'service %s in the compose file of %s',
+                         name, service, self.name)
+                return json.loads(val)
+            except:
+                log.info('Invalid or missing %s environment variable for '
+                         'service %s in the compose file of %s',
+                         name, service, self.name)
+        return self._cluster_conf or {}
 
     def ps(self, service):
-        ps = self.do('docker ps -f name=%s --format "table {{.Status}}"'
-                     % self.container_name(service))
+        ps = do('docker ps -f name=%s --format "table {{.Status}}"'
+                % self.container_name(service))
         return ps.split('\n')[-1].strip()
 
-    def register_kv(self, target, slave, myself):
-        """register a service in the key/value store
+    def register_kv(self, target, slave):
+        """register services in the key/value store
         so that consul-template can regenerate the
         caddy and haproxy conf files
         """
         log.info("Registering URLs of %s in the key/value store",
                  self.name)
         for service in self.services:
-            url = self.url(service)
-            redirect_from = self.redirect_from(service)
-            redirect_to = self.redirect_to(service)
-            tls = self.tls(service)
-            if not url:
-                # service not exposed to the web
-                continue
-            domain = urlparse(url).netloc.split(':')[0]
-            # store the domain and name in the kv
-            ct = self.container_name(service)
-            port = self.port(service)
-            proto = self.proto(service)
-            value = {
-                'name': self.name,  # name of the service, and key in the kv
+            value = self.proxy_conf(service)
+            value.setdefault('urls', [])
+            value.update({
+                'repo_url': self.repo_url,
+                'branch': self.branch,
                 'deploy_date': self._deploy_date,
-                'domain': domain,  # used by haproxy
-                'ip': self.members[target]['ip'],  # used by haproxy
-                'node': target,  # used by haproxy and caddy
-                'url': url,  # used by caddy
-                'redirect_from': redirect_from,  # used by caddy
-                'redirect_to': redirect_to,  # used by caddy
-                'tls': tls,  # used by caddy
-                'slave': slave,  # used by the handler
-                'volumes': [v.name for v in self.volumes],
-                'ct': '{proto}{ct}:{port}'.format(**locals())}  # used by caddy
-            self.do("consul kv put site/{} '{}'"
-                    .format(self.name, json.dumps(value)))
+                'ip': self.members[target]['ip'],
+                'master': target,  # for haproxy and caddy
+                'slave': slave,  # for the handler
+                'volumes': [v.name for v in self.volumes]})
+            for url in value['urls']:
+                if not url['url']:
+                    log.error('Found a PROXY_CONF without url '
+                              'for service %s of %s',
+                              service, self.name)
+                    continue
+                url['domain'] = urlparse(url['url']).netloc.split(':')[0]
+                url.setdefault('port', '80')
+                url.setdefault('proto', 'http://')
+                url.setdefault('ctname', self.container_name(service))
+                url.setdefault('ct', '{proto}{ctname}:{port}'.format(**url))
+
+            do("consul kv put app/{} '{}'"
+               .format(self.name, json.dumps(value)))
             log.info("Registered %s", self.name)
 
     def unregister_kv(self):
-        self.do("consul kv delete site/{}".format(self.name))
+        do("consul kv delete app/{}".format(self.name))
 
     def register_consul(self):
         """register a service and check in consul
@@ -390,17 +333,17 @@ class Application(object):
     def enable_snapshot(self, enable):
         """enable or disable scheduled snapshots
         """
-        for volume in self.volumes:
+        for volume in self.volumes_from_kv:
             volume.schedule_snapshots(60 if enable else 0)
 
     def enable_replicate(self, enable, ip):
         """enable or disable scheduled replication
         """
-        for volume in self.volumes:
+        for volume in self.volumes_from_kv:
             volume.schedule_replicate(60 if enable else 0, ip)
 
     def enable_purge(self, enable):
-        for volume in self.volumes:
+        for volume in self.volumes_from_kv:
             volume.schedule_purge(1440 if enable else 0, '1h:1d:1w:4w:1y')
 
 
@@ -410,57 +353,54 @@ class Volume(object):
     def __init__(self, name):
         self.name = name
 
-    def do(self, cmd, cwd=None):
-        return _run(cmd, cwd=cwd)
-
     def snapshot(self):
         """snapshot the volume
         """
-        volumes = [l.split()[1] for l in self.do(
+        volumes = [l.split()[1] for l in do(
                    "docker volume ls -f driver=btrfs").splitlines()[1:]]
         if self.name in volumes:
             log.info(u'Snapshotting volume: {}'.format(self.name))
-            return self.do("buttervolume snapshot {}".format(self.name))
+            return do("buttervolume snapshot {}".format(self.name))
         else:
             log.warn('Could not snapshot unexisting volume %s', self.name)
 
     def schedule_snapshots(self, timer):
         """schedule snapshots of the volume
         """
-        self.do("buttervolume schedule snapshot {} {}"
-                .format(timer, self.name))
+        do("buttervolume schedule snapshot {} {}"
+           .format(timer, self.name))
 
     def schedule_replicate(self, timer, slavehost):
         """schedule a replication of the volume
         """
-        self.do("buttervolume schedule replicate:{} {} {}"
-                .format(slavehost, timer, self.name))
+        do("buttervolume schedule replicate:{} {} {}"
+           .format(slavehost, timer, self.name))
 
     def schedule_purge(self, timer, pattern):
         """schedule a purge of the snapshots
         """
-        self.do("buttervolume schedule purge:{} {} {}"
-                .format(pattern, timer, self.name))
+        do("buttervolume schedule purge:{} {} {}"
+           .format(pattern, timer, self.name))
 
     def delete(self):
         """destroy a volume
         """
         log.info(u'Destroying volume: {}'.format(self.name))
-        return self.do("docker volume rm {}".format(self.name))
+        return do("docker volume rm {}".format(self.name))
 
     def restore(self, snapshot=None, target=''):
         if snapshot is None:  # use the latest snapshot
             snapshot = self.name
         log.info(u'Restoring snapshot: {}'.format(snapshot))
-        restored = self.do("buttervolume restore {} {}"
-                           .format(snapshot, target))
+        restored = do("buttervolume restore {} {}"
+                      .format(snapshot, target))
         target = 'as {}'.format(target) if target else ''
         log.info('Restored %s %s (after a backup: %s)',
                  snapshot, target, restored)
 
     def send(self, snapshot, target):
         log.info(u'Sending snapshot: {}'.format(snapshot))
-        self.do("buttervolume send {} {}".format(target, snapshot))
+        do("buttervolume send {} {}".format(target, snapshot))
 
 
 def handle(events, myself):
@@ -512,8 +452,8 @@ def deploy(payload, myself):
         raise AssertionError(msg)
 
     oldapp = Application(repo_url, branch=branch)
-    oldmaster = oldapp.master_node
-    oldslave = oldapp.slave_node
+    oldmaster = kv(oldapp.name, 'master')
+    oldslave = kv(oldapp.name, 'slave')
     newapp = Application(repo_url, branch=branch)
     members = newapp.members
 
@@ -527,9 +467,9 @@ def deploy(payload, myself):
         oldapp.enable_purge(False)
         if newmaster == myself:  # master -> master
             log.info("** I'm still the master of %s", newapp.name)
-            for volume in oldapp.volumes:
+            for volume in oldapp.volumes_from_kv:
                 volume.snapshot()
-            newapp.fetch()
+            newapp.download()
             newapp.check()
             newapp.up()
             if newslave:
@@ -537,12 +477,12 @@ def deploy(payload, myself):
             else:
                 newapp.enable_snapshot(True)
             newapp.enable_purge(True)
-            newapp.register_kv(newmaster, newslave, myself)  # for consul-templ
+            newapp.register_kv(newmaster, newslave)  # for consul-template
             newapp.register_consul()  # for consul check
         elif newslave == myself:  # master -> slave
             log.info("** I'm now the slave of %s", newapp.name)
             with newapp.notify_transfer():
-                for volume in newapp.volumes:
+                for volume in newapp.volumes_from_kv:
                     volume.send(volume.snapshot(), members[newmaster]['ip'])
             oldapp.unregister_consul()
             oldapp.down(deletevolumes=True)
@@ -550,7 +490,7 @@ def deploy(payload, myself):
         else:  # master -> nothing
             log.info("** I'm nothing now for %s", newapp.name)
             with newapp.notify_transfer():
-                for volume in newapp.volumes:
+                for volume in newapp.volumes_from_kv:
                     volume.send(volume.snapshot(), members[newmaster]['ip'])
             oldapp.unregister_consul()
             oldapp.down(deletevolumes=True)
@@ -561,10 +501,10 @@ def deploy(payload, myself):
         oldapp.enable_purge(False)
         if newmaster == myself:  # slave -> master
             log.info("** I'm now the master of %s", newapp.name)
-            newapp.fetch()
+            newapp.download()
             newapp.check()
             newapp.wait_transfer()  # wait for master notification
-            for volume in newapp.volumes:
+            for volume in newapp.volumes_from_kv:
                 volume.restore()
             newapp.up()
             if newslave:
@@ -572,7 +512,7 @@ def deploy(payload, myself):
             else:
                 newapp.enable_snapshot(True)
             newapp.enable_purge(True)
-            newapp.register_kv(newmaster, newslave, myself)  # for consul-templ
+            newapp.register_kv(newmaster, newslave)  # for consul-template
             newapp.register_consul()  # for consul check
         elif newslave == myself:  # slave -> slave
             log.info("** I'm still the slave of %s", newapp.name)
@@ -584,11 +524,11 @@ def deploy(payload, myself):
         log.info("** I was nothing for %s", oldapp.name)
         if newmaster == myself:  # nothing -> master
             log.info("** I'm now the master of %s", newapp.name)
-            newapp.fetch()
+            newapp.download()
             newapp.check()
             if oldslave:
                 newapp.wait_transfer()  # wait for master notification
-                for volume in newapp.volumes:
+                for volume in newapp.volumes_from_kv:
                     volume.restore()
             newapp.up()
             if newslave:
@@ -596,11 +536,11 @@ def deploy(payload, myself):
             else:
                 newapp.enable_snapshot(True)
             newapp.enable_purge(True)
-            newapp.register_kv(newmaster, newslave, myself)  # for consul-templ
+            newapp.register_kv(newmaster, newslave)  # for consul-template
             newapp.register_consul()  # for consul check
         elif newslave == myself:  # nothing -> slave
             log.info("** I'm now the slave of %s", newapp.name)
-            newapp.fetch()
+            newapp.download()
             newapp.enable_purge(True)
         else:  # nothing -> nothing
             log.info("** I'm still nothing for %s", newapp.name)
@@ -619,8 +559,8 @@ def destroy(payload, myself):
         raise AssertionError(msg)
 
     oldapp = Application(repo_url, branch=branch)
-    oldmaster = oldapp.master_node
-    oldslave = oldapp.slave_node
+    oldmaster = kv(oldapp.name, 'master')
+    oldslave = kv(oldapp.name, 'slave')
     members = oldapp.members
 
     if oldmaster == myself:  # master ->
@@ -633,7 +573,7 @@ def destroy(payload, myself):
             oldapp.enable_snapshot(False)
         oldapp.enable_purge(False)
         oldapp.unregister_kv()
-        for volume in oldapp.volumes:
+        for volume in oldapp.volumes_from_kv:
             volume.snapshot()
         oldapp.down(deletevolumes=True)
         oldapp.clean()
@@ -660,7 +600,9 @@ def migrate(payload, myself):
     sourceapp = Application(repo_url, branch=branch)
     targetapp = Application(target.get('repo', repo_url),
                             branch=target.get('branch', branch))
-    if sourceapp.master_node != myself and targetapp.master_node != myself:
+    source_node = kv(sourceapp.name, 'master')
+    target_node = kv(targetapp.name, 'master')
+    if source_node != myself and target_node != myself:
         log.info('Not concerned by this event')
         return
     source_volumes = []
@@ -678,16 +620,16 @@ def migrate(payload, myself):
     log.info('Found %s volumes to restore: %s',
              len(source_volumes), repr([v.name for v in source_volumes]))
     # tranfer and restore volumes
-    if sourceapp.master_node != targetapp.master_node:
-        if sourceapp.master_node == myself:
+    if source_node != target_node:
+        if source_node == myself:
             with sourceapp.notify_transfer():
                 for volume in source_volumes:
                     volume.send(
                         volume.snapshot(),
-                        targetapp.members[targetapp.master_node]['ip'])
-        if targetapp.master_node == myself:
+                        targetapp.members[target_node]['ip'])
+        if target_node == myself:
             sourceapp.wait_transfer()
-    if targetapp.master_node == myself:
+    if target_node == myself:
         targetapp.down()
         for source_vol, target_vol in zip(source_volumes, target_volumes):
             source_vol.restore(target=target_vol.name)
