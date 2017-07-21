@@ -4,10 +4,12 @@
 import hashlib
 import json
 import logging
+import os
 import re
 import requests
 import socket
 import time
+import unittest
 import yaml
 from base64 import b64decode, b64encode
 from contextlib import contextmanager
@@ -21,9 +23,6 @@ from uuid import uuid1
 DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 DEPLOY = '/deploy'
 log = logging.getLogger()
-HANDLED = join(DEPLOY, 'events.log')
-if not exists(HANDLED):
-    open(HANDLED, 'x')
 
 
 def do(cmd, cwd=None):
@@ -243,6 +242,7 @@ class Application(object):
 
     def proxy_conf(self, service):
         """retrieve the reverse proxy config from the compose
+        and add defaults values
         """
         if self._cluster_conf is None:
             try:
@@ -636,13 +636,192 @@ def migrate(payload, myself):
     log.info('Restored %s to %s', sourceapp.name, targetapp.name)
 
 
+class Caddyfile():
+    @classmethod
+    def loads(cls, caddyfile):
+        return cls.parse(caddyfile.splitlines(), [])
+
+    @classmethod
+    def split(cls, line, sep=' '):
+        split = []
+        substring = False
+        for c in line:
+            split = split or ['']
+            if c in ('"', "'"):
+                substring = not substring
+            elif c == sep:
+                if not split[-1]:
+                    continue
+                if substring:
+                    split[-1] += c
+                else:
+                    split.append('')
+            else:
+                split[-1] += c
+        return split
+
+    @classmethod
+    def parse(cls, lines, body, level=0):
+        """level 0 is the root of the caddyfile
+           level 1 is inside the definitions
+           level 2 is forbidden
+        """
+        keys = []
+        while True:
+            if not lines:
+                return body
+            line = cls.split(lines.pop(0))
+            if not line:
+                continue
+            if level == 0:
+                if keys and keys[-1][-1] == ',':
+                    keys += line
+                else:
+                    keys = line
+                if keys[-1][-1] == ',':
+                    continue
+                keys = [k[:-1] if k[-1] == ',' else k
+                        for k in keys if k != ',']
+            else:
+                keys = line
+            if keys[-1] == '{':
+                if level == 0:
+                    body.append({'keys': keys[:-1],
+                                 'body': cls.parse(lines, [], level=level+1)})
+                elif level == 1:
+                    body.append(
+                        keys[:-1] + [cls.parse(lines, [], level=level+1)])
+                else:
+                    raise Exception('Blocks are not allowed in subdirectives')
+            elif keys == ['}']:
+                return body
+            else:
+                body.append(keys)
+            keys = []
+
+    @classmethod
+    def dumps(cls, caddylist):
+        out = ''
+        for i, host in enumerate(caddylist):
+            out += ', '.join(host['keys']) + ' {\n'
+            for directive in host['body']:
+                for j, diritem in enumerate(directive):
+                    if type(diritem) is list:
+                        out += ' {\n'
+                        for subdir in diritem:
+                            if type(subdir) is list:
+                                out += 8*' ' + ' '.join(subdir) + '\n'
+                            else:
+                                out += subdir + '\n'
+                        out += '    }'
+                    else:
+                        q = '"' if ' ' in diritem or '\n' in diritem else ''
+                        out += (4*' ' if j == 0 else ' ') + q + diritem + q
+                    out += '\n' if j+1 == len(directive) else ''
+            out += '}' + ('\n' if i+1 < len(caddylist) else '')
+        return out
+
+
+class TestCase(unittest.TestCase):
+    data = [
+        {'caddy':  'foo {\n    root /bar\n}',  # 0
+         'json':  '[{"keys":  ["foo"], "body":  [["root", "/bar"]]}]'},
+        {'caddy':  'host1, host2 {\n    dir {\n        def\n    }\n}',  # 1
+         'json':  '[{"keys":  ["host1", "host2"], '
+                  '"body":  [["dir", [["def"]]]]}]'},
+        {'caddy':  'host1, host2 {\n    dir abc {\n'
+                   '        def ghi\n        jkl\n    }\n}',  # 2
+         'json':  '[{"keys": ["host1", "host2"], '
+                  '"body": [["dir", "abc", [["def", "ghi"], ["jkl"]]]]}]'},
+        {'caddy':  'host1:1234, host2:5678 {\n'
+                   '    dir abc {\n    }\n}',  # 3
+         'json':  '[{"keys": ["host1:1234", "host2:5678"], '
+                  '"body": [["dir", "abc", []]]}]'},
+        {'caddy':  'host {\n    foo "bar baz"\n}',  # 4
+         'json':  '[{"keys": ["host"], "body": [["foo", "bar baz"]]}]'},
+        {'caddy':  'host, host:80 {\n    foo "bar \"baz\"\n}',  # 5
+         'json':  '[{"keys": ["host", "host:80"], '
+                  '"body": [["foo", "bar \"baz\""]]}]'},
+        {'caddy':  'host {\n    foo "bar\nbaz"\n}',  # 6
+         'json':  '[{"keys": ["host"], "body": [["foo", "bar\\nbaz"]]}]'},
+        {'caddy':  'host {\n    dir 123 4.56 true\n}',  # 7
+         'json':  '[{"keys": ["host"], '
+                  '"body": [["dir", "123", "4.56", "true"]]}]'},
+        {'caddy':  'http://host, https://host {\n}',  # 8
+         'json':  '[{"keys": ["http://host", "https://host"], "body": []}]'},
+        {'caddy':  'host {\n    dir1 a b\n    dir2 c d\n}',  # 9
+         'json':  '[{"keys": ["host"], '
+                  '"body": [["dir1", "a", "b"], ["dir2", "c", "d"]]}]'},
+        {'caddy':  'host {\n    dir a b\n    dir c d\n}',  # 10
+         'json':  '[{"keys": ["host"], '
+                  '"body": [["dir", "a", "b"], ["dir", "c", "d"]]}]'},
+        {'caddy':  'host {\n    dir1 a b\n    '
+                   'dir2 {\n        c\n        d\n    }\n}',  # 11
+         'json':  '[{"keys": ["host"], '
+                  '"body": [["dir1", "a", "b"], ["dir2", [["c"], ["d"]]]]}]'},
+        {'caddy':  'host1 {\n    dir1\n}\nhost2 {\n    dir2\n}',  # 12
+         'json':  '[{"keys": ["host1"], '
+                  '"body": [["dir1"]]}, '
+                  '{"keys": ["host2"], "body": [["dir2"]]}]'},
+        {'caddy':  '', 'json':  '[]'},  # 13
+        ]
+
+    def test_split(self):
+        self.assertEqual(Caddyfile.split(''), [])
+        self.assertEqual(Caddyfile.split('a z e'), ['a', 'z', 'e'])
+        self.assertEqual(Caddyfile.split('a "z e"'), ['a', 'z e'])
+        self.assertEqual(Caddyfile.split('"a z e"'), ['a z e'])
+        self.assertEqual(Caddyfile.split('az "er ty" ui'),
+                         ['az', 'er ty', 'ui'])
+        self.assertEqual(Caddyfile.split("az 'er ty' ui"),
+                         ['az', 'er ty', 'ui'])
+
+    def test_caddy2json(self):
+        for i, d in enumerate(self.data):
+            if i in (5, 6):
+                print('test # {} skipped, plz help!'.format(i))
+                continue
+            self.assertEqual(
+                json.dumps(json.loads(d['json']), sort_keys=True),
+                json.dumps(Caddyfile.loads(d['caddy']), sort_keys=True))
+            print('test # {} ok'.format(i))
+
+    def test_json2caddy(self):
+        for i, d in enumerate(self.data):
+            if i in (5,):
+                print('test # {} skipped, plz help!'.format(i))
+                continue
+            self.assertEqual(
+                d['caddy'],
+                Caddyfile.dumps(json.loads(d['json'])))
+            print('test # {} ok'.format(i))
+
+    def test_reversibility(self):
+        for i, d in enumerate(self.data):
+            if i in (5, 6):
+                print('test # {} skipped, plz help!'.format(i))
+                continue
+            self.assertEqual(
+                d['caddy'],
+                Caddyfile.dumps(Caddyfile.loads(d['caddy'])))
+            print('test # {} ok'.format(i))
+
+
 if __name__ == '__main__':
+    if len(argv) == 1:
+        # allow to run a few unit test
+        DEPLOY = '/tmp/deploy'
+        os.makedirs(DEPLOY, exist_ok=True)
+    HANDLED = join(DEPLOY, 'events.log')
+    if not exists(HANDLED):
+        open(HANDLED, 'x')
     logging.basicConfig(level=logging.DEBUG,
                         format='{asctime}\t{levelname}\t{message}',
                         filename=join(DEPLOY, 'handler.log'),
                         style='{')
     myself = socket.gethostname()
     manual_input = None
+
     if len(argv) >= 3:
         # allow to launch manually inside consul docker
         event = argv[1]
@@ -650,5 +829,10 @@ if __name__ == '__main__':
         manual_input = json.dumps([{
             'ID': str(uuid1()), 'Name': event,
             'Payload': payload, 'Version': 1, 'LTime': 1}])
-
-    handle(manual_input or stdin.read(), myself)
+        handle(manual_input, myself)
+    elif len(argv) == 1:
+        # run some unittests
+        unittest.main(verbosity=2)
+    else:
+        # run what's given by consul watch
+        handle(stdin.read(), myself)
