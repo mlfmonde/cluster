@@ -130,3 +130,48 @@ connection (like https).
     Caddy server) **have to** understand and accept the proxy protocole.
     (note: but in Caddy conf file once configured to listen proxy protole
     that works even it recived proper http / https)
+
+
+
+Cahier de recette
+-----------------
+
+
+cas à tester:
+* avec tout les serveurs ont accès à internet:
+* l'actuel master n'a pas accès à git
+* le futur master n'a pas d'accès git
+* le send ou la remonté du volume plante
+
+Projet vide (volume, snapshot, container, projet git)
+1. démarrage d'un nouveau projet sur 1 master avec un réplicat
+* nothing -> master
+* nothing -> slave
+* nothing -> nothing
+
+2. inverse master / réplicat
+* master -> slave
+* slave -> master
+* nothing -> nothing
+
+3. relance la même commande (redéploie sur le meme service)
+* master -> master
+* slave -> slave
+* nothing -> nothing
+
+4. on passe sur le troisieme noeud sans réplicat
+* master -> nothing
+* slave -> nothing
+* nothing -> master
+
+Quoi vérifier:
+
+* purges présentes
+* service consul
+* k/v store
+* projet git présent/absent
+* container présent/absent
+* volumes docker présent/absent
+
+transition
+
