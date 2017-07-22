@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 # coding: utf-8
-# TODO identify pure functions
 import hashlib
 import json
 import logging
@@ -22,6 +21,7 @@ from urllib.parse import urlparse
 from uuid import uuid1
 DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 DEPLOY = '/deploy'
+CADDYLOGS = '/var/log'
 log = logging.getLogger()
 
 
@@ -66,6 +66,7 @@ class Application(object):
         self._volumes = None
         self._compose = None
         self._deploy_date = None
+        self._caddy = None
 
     @property
     def deploy_date(self):
@@ -91,12 +92,22 @@ class Application(object):
                     for s in json.loads(do('consul kv export app/'))}
         # check urls are not already used
         for service in self.services:
-            service_urls = self.proxy_conf(service).get('urls', [])
+            try:
+                caddy = Caddyfile.loads(self.caddyfile(service))
+            except Exception as e:
+                log.error("Invalid CADDYFILE: %s", str(e))
+                raise
+            proxy_conf_urls = reduce(list.__add__,
+                                     [c['keys'] for c in caddy])
             for appname, appconf in all_apps.items():
+                app_urls = reduce(
+                    list.__add__,
+                    [c['keys'] for c in
+                     appconf.get('CADDYFILE', {'keys': []})])
                 if appname == self.name:
                     continue
-                for url in [u.get('url') for u in service_urls]:
-                    if (url == appconf.get('url')):
+                for url in proxy_conf_urls:
+                    if url in app_urls:
                         msg = ('Aborting! {} is already deployed by {}'
                                .format(url, appname))
                         log.error(msg)
@@ -110,9 +121,9 @@ class Application(object):
             try:
                 with open(join(self.path, 'docker-compose.yml')) as c:
                     self._compose = yaml.load(c.read())
-            except:
-                log.error('Could not read docker-compose.yml')
-                raise EnvironmentError('Could not read docker-compose.yml')
+            except Exception as e:
+                log.error('Could not read docker-compose.yml: %s', str(e))
+                raise
         return self._compose
 
     @contextmanager
@@ -120,8 +131,8 @@ class Application(object):
         try:
             yield
             do('consul kv put migrate/{}/success'.format(self.name))
-        except:
-            log.error('Volume migrate FAILED!')
+        except Exception as e:
+            log.error('Volume migrate FAILED! : %s', str(e))
             do('consul kv put migrate/{}/failure'.format(self.name))
             self.up()  # TODO move in the deploy
             raise
@@ -240,23 +251,42 @@ class Application(object):
             members[name] = {'ip': ip.split(':')[0], 'status': status}
         return members
 
-    def proxy_conf(self, service):
-        """retrieve the reverse proxy config from the compose
+    def caddyfile(self, service):
+        """retrieve the caddyfile config from the compose
         and add defaults values
         """
-        if self._cluster_conf is None:
+        # read the caddyfile of the service
+        if self._caddy is None:
             try:
-                name = 'PROXY_CONF'
+                name = 'CADDYFILE'
                 val = self.compose['services'][service]['environment'][name]
                 log.info('Found a %s environment variable for '
                          'service %s in the compose file of %s',
                          name, service, self.name)
-                return json.loads(val)
-            except:
+                self._caddy = Caddyfile.loads(val)
+            except Exception as e:
                 log.info('Invalid or missing %s environment variable for '
-                         'service %s in the compose file of %s',
-                         name, service, self.name)
-        return self._cluster_conf or {}
+                         'service %s in the compose file of %s: %s',
+                         name, service, self.name, str(e))
+
+        for host in self._caddy:
+            dirs = host['body']
+            # default or forced values
+            Caddyfile.setdir(dirs, ['gzip'])
+            Caddyfile.setdir(dirs, ['timeouts', '300s'])
+            Caddyfile.setdir(dirs, ['proxyprotocol', '0.0.0.0/0'])
+            Caddyfile.setsubdirs(
+                dirs, 'proxy',
+                ['transparent', 'websocket', 'insecure_skip_verify'],
+                replace=True)
+            Caddyfile.setdir(
+                dirs, 'logs',
+                ['log', join(CADDYLOGS, self.name + '.access.log'),
+                 [['rotate_size', '100'],
+                  ['rotate_age', '14'],
+                  ['rotate_keep', '10']]],
+                replace=True)
+        return self._caddy or []
 
     def ps(self, service):
         ps = do('docker ps -f name=%s --format "table {{.Status}}"'
@@ -271,27 +301,16 @@ class Application(object):
         log.info("Registering URLs of %s in the key/value store",
                  self.name)
         for service in self.services:
-            value = self.proxy_conf(service)
-            value.setdefault('urls', [])
-            value.update({
+            caddy = self.caddyfile(service)
+            value = {
+                'caddyfile': caddy,
                 'repo_url': self.repo_url,
                 'branch': self.branch,
                 'deploy_date': self._deploy_date,
                 'ip': self.members[target]['ip'],
-                'master': target,  # for haproxy and caddy
-                'slave': slave,  # for the handler
-                'volumes': [v.name for v in self.volumes]})
-            for url in value['urls']:
-                if not url['url']:
-                    log.error('Found a PROXY_CONF without url '
-                              'for service %s of %s',
-                              service, self.name)
-                    continue
-                url['domain'] = urlparse(url['url']).netloc.split(':')[0]
-                url.setdefault('port', '80')
-                url.setdefault('proto', 'http://')
-                url.setdefault('ctname', self.container_name(service))
-                url.setdefault('ct', '{proto}{ctname}:{port}'.format(**url))
+                'master': target,
+                'slave': slave,
+                'volumes': [v.name for v in self.volumes]}
 
             do("consul kv put app/{} '{}'"
                .format(self.name, json.dumps(value)))
@@ -304,8 +323,8 @@ class Application(object):
         """register a service and check in consul
         """
         urls = reduce(list.__add__,
-                      [self.proxy_conf(s)['urls'].keys() for s in self.services
-                       if self.proxy_conf(s)['urls']])
+                      [self.caddyfile(s)['urls'].keys() for s in self.services
+                       if self.caddyfile(s)['urls']])
         svc = json.dumps({
             'Name': self.name,
             'Checks': [{
@@ -417,10 +436,10 @@ def handle(events, myself):
                  .format(event_name, event_id, payload))
         try:
             payload = json.loads(payload)
-        except:
-            msg = 'Wrong event payload format. Please provide json'
-            log.error(msg)
-            raise Exception(msg)
+        except Exception as e:
+            msg = 'Wrong event payload format. Please provide json: %s'
+            log.error(msg, str(e))
+            raise
 
         if event_name == 'deploy':
             deploy(payload, myself)
@@ -721,6 +740,32 @@ class Caddyfile():
             out += '}' + ('\n' if i+1 < len(caddylist) else '')
         return out
 
+    @classmethod
+    def setdir(cls, dirs, directive, replace=False):
+        """set a default or forced directive """
+        key = directive[0]
+        if replace:
+            dirs = [d for d in dirs if d[0] != key]
+        if key not in [i[0] for i in dirs]:
+            dirs.append(directive)
+        return dirs
+
+    @classmethod
+    def setsubdirs(cls, dirs, key, subdirs, replace=False):
+        """add or replace subdirs to the directive"""
+        for d in dirs:
+            if d[0] != key:
+                continue
+            if type(d[-1]) is list:
+                if replace:
+                    d.pop(-1)
+                    d.append(subdirs)
+                else:
+                    d[-1] = sorted(set(d[-1]).union(set(subdirs)))
+            else:
+                d.append(subdirs)
+        return dirs
+
 
 class TestCase(unittest.TestCase):
     data = [
@@ -805,6 +850,32 @@ class TestCase(unittest.TestCase):
                 d['caddy'],
                 Caddyfile.dumps(Caddyfile.loads(d['caddy'])))
             print('test # {} ok'.format(i))
+
+    def test_setdir(self):
+        self.assertEqual(
+            [['proxy', '/', 'ct:80'], ['other', 'foo']],
+            Caddyfile.setdir([['proxy', '/', 'ct:80']], ['other', 'foo']))
+        self.assertEqual(
+            [['gzip', 'foo']],
+            Caddyfile.setdir([['gzip']], ['gzip', 'foo'], replace=True))
+
+    def test_setsubdirs(self):
+        self.assertEqual(
+            [['proxy', ['subdir1', 'subdir2']]],
+            Caddyfile.setsubdirs(
+                [['proxy']], 'proxy', ['subdir1', 'subdir2']))
+        self.assertEqual(
+            [['proxy', ['s1', 's2', 's3']]],
+            Caddyfile.setsubdirs(
+                [['proxy', ['s1']]], 'proxy', ['s2', 's3']))
+        self.assertEqual(
+            [['proxy', ['s2', 's3']]],
+            Caddyfile.setsubdirs(
+                [['proxy', ['s1']]], 'proxy', ['s2', 's3'], replace=True))
+        self.assertEqual(
+            [['gzip']],  # would need setdir first
+            Caddyfile.setsubdirs(
+                [['gzip']], 'proxy', ['s2', 's3'], replace=True))
 
 
 if __name__ == '__main__':
