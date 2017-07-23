@@ -18,15 +18,15 @@ frontend https-in
     option socket-stats
     tcp-request inspect-delay 5s
     tcp-request content accept if { req_ssl_hello_type 1 }
-{{ range tree "app" }}{{ with $d := .Value | parseJSON }}
-    {{ range $domain := $d.domains }}use_backend https-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }{{ end }}
+{{ range tree "app" }}{{ $d := .Value | parseJSON }}
+    {{ range $domain := $d.domains }}use_backend https-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }
     {{ end }}
 {{ end }}
 
-{{ range tree "app" }}{{ with $d := .Value | parseJSON }}{{ range $domain := $d.domains }}
+{{ range tree "app" }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}
 backend https-{{ $domain }}
     mode tcp
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:443{{ end }}
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:443
 {{ end }}{{ end }}
 
 
@@ -35,14 +35,14 @@ frontend http-in
     bind *:80
     option socket-stats
 
-{{ range tree "app" }}{ with $d := .Value | parseJSON }}{{ range $domain := $d.domains }}use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }{{ end }}
+{{ range tree "app" }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }
 {{ end }}{{ end }}
 
-{{ range tree "app" }}{{ with $d := .Value | parseJSON }}
+{{ range tree "app" }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}
 backend http-{{ $d.domain }}
     mode http
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:80{{ end }}
-{{ end }}
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:80
+{{ end }}{{ end }}
 
 frontend ssh-in
     mode tcp
