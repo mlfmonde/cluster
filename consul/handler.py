@@ -266,7 +266,7 @@ class Application(object):
         if self._caddy.get(service) is None:
             try:
                 name = 'CADDYFILE'
-                val = self.compose['services'][service]['environment'][name]
+                caddy = self.compose['services'][service]['environment'][name]
             except Exception:
                 log.info('No %s environment variable for '
                          'service %s in the compose file of %s',
@@ -278,7 +278,7 @@ class Application(object):
                          'service %s in the compose file of %s',
                          name, service, self.name)
                 self._caddy[service] = Caddyfile.loads(
-                    val % {'ct': self.container_name(service)})
+                    caddy.replace('$CONTAINER', self.container_name(service)))
             except Exception as e:
                 log.info('Invalid %s environment variable for '
                          'service %s in the compose file of %s: %s',

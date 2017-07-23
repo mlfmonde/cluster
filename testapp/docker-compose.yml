@@ -4,7 +4,7 @@ services:
     environment:
       CADDYFILE: |
         http://test.example.com {
-            proxy / http://%(ct)s:80
+            proxy / http://$CONTAINER:80
         http://www.test.example.com {
             redir http://test.example.com
         }
