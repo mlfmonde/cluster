@@ -933,13 +933,13 @@ class TestCase(unittest.TestCase):
         app = Application(self.repo_url, branch='master')
         self.assertEqual(
             app.repo_url,
-            'https://gitlab.example.com/hosting/foobar')
+            'https://gitlab.example.com/hosting/FooBar')
         self.assertEqual(app.name, 'foobar_master.ddb14')
 
     def test_kv(self):
         self.maxDiff = None
         self.assertEqual(
-            'https://gitlab.example.com/hosting/foobar',
+            'https://gitlab.example.com/hosting/FooBar',
             kv('foobar_master.ddb14', 'repo_url'))
         self.assertEqual(None, kv('foobar_master.ddb14', 'foobar'))
         self.assertEqual(None, kv('foo', 'bar'))
@@ -987,7 +987,7 @@ class FakeExec(object):
     faked = ('consul', 'git')
     foobar = (
         '{"name": "foo-bar_master.ddb14", '
-        '"repo_url": "https://gitlab.example.com/hosting/foobar", '
+        '"repo_url": "https://gitlab.example.com/hosting/FooBar", '
         '"branch": "master", '
         '"domain": "foobar.example.com", '
         '"ip": "163.172.4.172", '
@@ -1008,7 +1008,7 @@ class FakeExec(object):
                     '"flags": 0, "value": "%s"}]'
                     % b64encode(self.foobar.encode('utf-8')).decode('utf-8'))
         elif cmd.startswith('git clone --depth 1 -b master '
-                            'https://gitlab.example.com/hosting/foobar'):
+                            'https://gitlab.example.com/hosting/FooBar'):
             checkout = cmd.split()[-1]
             os.mkdir(join(DEPLOY, checkout))
             copy(join(dirname(HERE), 'testapp', 'docker-compose.yml'),
@@ -1034,8 +1034,7 @@ class TestRequests(object):
         class Result:
             def __init__(self, code):
                 self.status_code = code
-        if ('[{"Interval": "60s", "HTTP": "http://test.example.com"}]'
-                in svc):
+        if '"Checks": [{' in svc and 'test.example.com' in svc:
             return Result(200)
         else:
             return Result(500)
