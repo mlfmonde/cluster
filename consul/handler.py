@@ -1042,7 +1042,7 @@ class TestRequests(object):
 
 if __name__ == '__main__':
     if (len(argv) == 2 and argv[1].lower() == 'test'
-            or (len(argv) >= 1 and argv[1] in FakeExec.faked)):
+            or (len(argv) >= 2 and argv[1] in FakeExec.faked)):
         DEPLOY = '/tmp/deploy'
         os.makedirs(DEPLOY, exist_ok=True)
 
