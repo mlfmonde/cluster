@@ -114,7 +114,8 @@ class Application(object):
                     [c['keys'] for c in
                      Caddyfile.loads(
                         appconf.get('caddyfile', {'caddyfile': []}))])
-                app_domain = appconf['master']
+                app_master = appconf['master']
+                app_domains = appconf['domains']
                 if appname.split('/')[1] == self.name:
                     continue
                 for url in caddy_urls:
@@ -123,9 +124,11 @@ class Application(object):
                                .format(url, appname))
                         log.error(msg)
                         raise ValueError(msg)
-                if app_domain in caddy_domains:
-                    msg = ('Aborting! Domain {} is already routed to {}'
-                           .format(app_domain, master))
+                if any([d in caddy_domains for d in app_domains]
+                       ) and app_master != master:
+                    msg = ('Aborting! A domain of this app is '
+                           'already routed to {}'
+                           .format(master))
                     log.error(msg)
                     raise ValueError(msg)
 
@@ -989,7 +992,7 @@ class FakeExec(object):
         '{"name": "foo-bar_master.ddb14", '
         '"repo_url": "https://gitlab.example.com/hosting/FooBar", '
         '"branch": "master", '
-        '"domain": "foobar.example.com", '
+        '"domains": ["foobar.example.com"], '
         '"ip": "163.172.4.172", '
         '"master": "bigz", '
         '"caddyfile": "http://foobar.example.com {\n'
