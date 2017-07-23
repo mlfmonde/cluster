@@ -109,7 +109,7 @@ class Application(object):
                 raise
             caddy_urls = concat([c['keys'] for c in caddy])
             if len(set(caddy_urls)) != len(caddy_urls):
-                msg = 'Aborting! Duplicate domain'
+                msg = 'Aborting! Duplicate URL in caddyfile'
                 log.error(msg)
                 raise ValueError(msg)
             caddy_domains = {urlparse(u).netloc for u in caddy_urls}
