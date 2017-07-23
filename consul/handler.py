@@ -28,6 +28,10 @@ HERE = dirname(__file__)
 log = logging.getLogger()
 
 
+def concat(l):
+    return reduce(list.__add__, l, [])
+
+
 def do(cmd, cwd=None):
     """ Run a command"""
     cmd = argv[0] + ' ' + cmd if TEST else cmd
@@ -103,11 +107,9 @@ class Application(object):
             except Exception as e:
                 log.error("Invalid CADDYFILE: %s", str(e))
                 raise
-            caddy_urls = reduce(list.__add__,
-                                [c['keys'] for c in caddy], [])
+            caddy_urls = concat([c['keys'] for c in caddy])
             for appname, appconf in all_apps.items():
-                app_urls = reduce(
-                    list.__add__,
+                app_urls = concat(
                     [c['keys'] for c in
                      Caddyfile.loads(
                         appconf.get('caddyfile', {'keys': []}))])
@@ -308,7 +310,7 @@ class Application(object):
                 % self.container_name(service))
         return ps.split('\n')[-1].strip()
 
-    def register_kv(self, target, slave):
+    def register_kv(self, master, slave):
         """register services in the key/value store
         so that consul-template can regenerate the
         caddy and haproxy conf files
@@ -317,6 +319,7 @@ class Application(object):
                  self.name)
         for service in self.services:
             caddy = self.caddyfile(service)
+            urls = concat([c['keys'] for c in caddy])
             if not caddy:
                 continue  # no need?
             value = {
@@ -324,8 +327,9 @@ class Application(object):
                 'repo_url': self.repo_url,
                 'branch': self.branch,
                 'deploy_date': self._deploy_date,
-                'ip': self.members[target]['ip'],
-                'master': target,
+                'domains': [urlparse(u).netloc for u in urls],
+                'ip': self.members[master]['ip'],
+                'master': master,
                 'slave': slave,
                 'ct': self.container_name(service),
                 'volumes': [v.name for v in self.volumes]}
@@ -340,9 +344,8 @@ class Application(object):
     def register_consul(self):
         """register a service and check in consul
         """
-        urls = reduce(list.__add__,
-                      [self.caddyfile(s)['urls'].keys() for s in self.services
-                       if self.caddyfile(s)['urls']])
+        urls = concat([c['keys'] for c in
+                       concat([self.caddyfile(s) for s in self.services])])
         svc = json.dumps({
             'Name': self.name,
             'Checks': [{
@@ -475,13 +478,13 @@ def handle(events, myself):
 def deploy(payload, myself):
     """Keep in mind this is executed in the consul container
     Deployments are done in the DEPLOY folder. Needs:
-    {"repo"': <url>, "branch": <branch>, "target": <host>, "slave": <host>}
+    {"repo"': <url>, "branch": <branch>, "master": <host>, "slave": <host>}
     """
     repo_url = payload['repo']
-    newmaster = payload['target']
+    newmaster = payload['master']
     newslave = payload.get('slave')
     if newmaster == newslave:
-        msg = "Slave must be different than the target Master"
+        msg = "Slave must be different than the Master"
         log.error(msg)
         raise AssertionError(msg)
     branch = payload.get('branch')
@@ -798,6 +801,7 @@ class Caddyfile():
 
 
 class TestCase(unittest.TestCase):
+    repo_url = 'https://gitlab.example.com/hosting/FooBar '
     data = [
         {'caddy':  'foo {\n    root /bar\n}',  # 0
          'json':  '[{"keys":  ["foo"], "body":  [["root", "/bar"]]}]'},
@@ -919,8 +923,7 @@ class TestCase(unittest.TestCase):
                 [['gzip']], 'proxy', ['s2', 's3'], replace=True))
 
     def test_application_init(self):
-        repo_url = 'https://gitlab.example.com/hosting/FooBar '
-        app = Application(repo_url, branch='master')
+        app = Application(self.repo_url, branch='master')
         self.assertEqual(
             app.repo_url,
             'https://gitlab.example.com/hosting/foobar')
@@ -929,13 +932,13 @@ class TestCase(unittest.TestCase):
     def test_kv(self):
         self.maxDiff = None
         self.assertEqual(
-            'http://gitlab.example.com/hosting/foobar',
+            'https://gitlab.example.com/hosting/foobar',
             kv('foobar_master.ddb14', 'repo_url'))
         self.assertEqual(None, kv('foobar_master.ddb14', 'foobar'))
         self.assertEqual(None, kv('foo', 'bar'))
 
     def test_check(self):
-        app = Application('fake://127.0.0.1/testapp/', 'master')
+        app = Application(self.repo_url, 'master')
         app.download()
         self.assertEqual(None, app.check())
         # already deployed
@@ -943,29 +946,32 @@ class TestCase(unittest.TestCase):
         self.assertRaises(ValueError, app.check)
 
     def test_volumes(self):
-        app = Application('fake://127.0.0.1/testapp/', 'master')
+        app = Application(self.repo_url, 'master')
         app.download()
         self.assertEqual(['dbdata', 'socket', 'wwwdata'],
                          sorted(app.compose['volumes'].keys()))
 
     def test_volumes_from_kv(self):
-        repo_url = 'http://gitlab.example.com/hosting/foobar'
-        app = Application(repo_url, 'master')
+        app = Application(self.repo_url, 'master')
         self.assertEqual(
             ['foobarmasterddb14_dbdata', 'foobarmasterddb14_wwwdata'],
             sorted(v.name for v in app.volumes_from_kv))
 
     def test_members(self):
-        repo_url = 'http://gitlab.example.com/hosting/foobar'
-        app = Application(repo_url, 'master')
+        app = Application(self.repo_url, 'master')
         members = app.members
         self.assertEqual(['node1', 'node2', 'node3'], sorted(members.keys()))
         self.assertEqual(['ip', 'status'], sorted(members['node1'].keys()))
 
     def test_register_kv(self):
-        app = Application('fake://127.0.0.1/testapp/', 'master')
+        app = Application(self.repo_url, 'master')
         app.download()
         self.assertEqual(None, app.register_kv('node1', 'node2'))
+
+    def test_register_consul(self):
+        app = Application(self.repo_url, 'master')
+        app.download()
+        self.assertEqual(None, app.register_consul())
 
 
 class FakeExec(object):
@@ -974,7 +980,7 @@ class FakeExec(object):
     faked = ('consul', 'git')
     foobar = (
         '{"name": "foo-bar_master.ddb14", '
-        '"repo_url": "http://gitlab.example.com/hosting/foobar", '
+        '"repo_url": "https://gitlab.example.com/hosting/foobar", '
         '"branch": "master", '
         '"domain": "foobar.example.com", '
         '"ip": "163.172.4.172", '
@@ -995,7 +1001,7 @@ class FakeExec(object):
                     '"flags": 0, "value": "%s"}]'
                     % b64encode(self.foobar.encode('utf-8')).decode('utf-8'))
         elif cmd.startswith('git clone --depth 1 -b master '
-                            'fake://127.0.0.1/testapp/'):
+                            'https://gitlab.example.com/hosting/foobar'):
             checkout = cmd.split()[-1]
             os.mkdir(join(DEPLOY, checkout))
             copy(join(dirname(HERE), 'testapp', 'docker-compose.yml'),
@@ -1007,11 +1013,25 @@ class FakeExec(object):
                 'node2   10.10.10.12:8301  alive   server     dc1\n'
                 'node3   10.10.10.13:8301  alive   server     dc1')
         elif cmd.startswith('consul kv put'):
-            if 'http://testappmasterf4301_wordpress_1:80' not in cmd:
+            if 'http://foobarmasterddb14_wordpress_1:80' not in cmd:
                 raise
             return 'ok'
         else:
             raise NotImplementedError
+
+
+class TestRequests(object):
+    """fake requests.post"""
+    @staticmethod
+    def post(url, svc):
+        class Result:
+            def __init__(self, code):
+                self.status_code = code
+        if ('[{"Interval": "60s", "HTTP": "http://test.example.com"}]'
+                in svc):
+            return Result(200)
+        else:
+            return Result(500)
 
 
 if __name__ == '__main__':
@@ -1032,11 +1052,12 @@ if __name__ == '__main__':
     manual_input = None
 
     if len(argv) >= 2 and argv[1] in FakeExec.faked:
-        # mock consul
+        # mock some executables
         print(FakeExec.run(' '.join(argv[1:])))
     elif len(argv) == 1:
         # run some unittests
         TEST = True
+        requests.post = TestRequests.post
         unittest.main(verbosity=2)
     elif len(argv) >= 3:
         # allow to launch manually inside consul docker
