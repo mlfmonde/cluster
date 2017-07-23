@@ -115,11 +115,11 @@ class Application(object):
                      Caddyfile.loads(
                         appconf.get('caddyfile', {'caddyfile': []}))])
                 app_domain = appconf['master']
-                if appname == self.name:
+                if appname.split('/')[1] == self.name:
                     continue
                 for url in caddy_urls:
                     if url in app_urls:
-                        msg = ('Aborting! {} is already deployed by {}'
+                        msg = ('Aborting! URL {} is already deployed by {}'
                                .format(url, appname))
                         log.error(msg)
                         raise ValueError(msg)
