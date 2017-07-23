@@ -14,8 +14,9 @@ from base64 import b64decode, b64encode
 from contextlib import contextmanager
 from datetime import datetime
 from functools import reduce
-from os.path import basename, join, exists
-from subprocess import run as srun, CalledProcessError, PIPE
+from os.path import basename, join, exists, dirname
+from shutil import copy, rmtree
+from subprocess import run, CalledProcessError, PIPE
 from sys import stdin, argv
 from urllib.parse import urlparse
 from uuid import uuid1
@@ -23,6 +24,7 @@ DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 DEPLOY = '/deploy'
 CADDYLOGS = '/var/log'
 TEST = False
+HERE = dirname(__file__)
 log = logging.getLogger()
 
 
@@ -30,10 +32,10 @@ def do(cmd, cwd=None):
     """ Run a command"""
     cmd = argv[0] + ' ' + cmd if TEST else cmd
     try:
-        if cwd:
+        if cwd and not TEST:
             cmd = 'cd "{}" && {}'.format(cwd, cmd)
         log.info('Running: ' + cmd)
-        res = srun(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
+        res = run(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
         return res.stdout.decode().strip()
     except CalledProcessError as e:
         log.error("Failed to run %s: %s", e.cmd, e.stderr.decode())
@@ -45,10 +47,9 @@ def kv(name, key):
     try:
         cmd = 'consul kv get app/{}'.format(name)
         value = json.loads(do(cmd), strict=False)[key]
-        log.info('Reading %s in kv: %s = %s', name, key, value)
         return value
     except Exception as e:
-        log.warning('Could not determine the %s node for %s: %s',
+        log.warning('Could not read the key "%s" in the KV for %s: %s',
                     key, name, str(e))
         return None
 
@@ -69,7 +70,7 @@ class Application(object):
         self._volumes = None
         self._compose = None
         self._deploy_date = None
-        self._caddy = None
+        self._caddy = {}
 
     @property
     def deploy_date(self):
@@ -91,25 +92,28 @@ class Application(object):
 
     def check(self):
         """consistency check"""
-        all_apps = {s['key']: json.loads(b64decode(s['value']).decode('utf-8'))
-                    for s in json.loads(do('consul kv export app/'))}
+        all_apps = {
+            s['key']: json.loads(
+                b64decode(s['value']).decode('utf-8'), strict=False)
+            for s in json.loads(do('consul kv export app/'))}
         # check urls are not already used
         for service in self.services:
             try:
-                caddy = Caddyfile.loads(self.caddyfile(service))
+                caddy = self.caddyfile(service)
             except Exception as e:
                 log.error("Invalid CADDYFILE: %s", str(e))
                 raise
-            proxy_conf_urls = reduce(list.__add__,
-                                     [c['keys'] for c in caddy])
+            caddy_urls = reduce(list.__add__,
+                                [c['keys'] for c in caddy], [])
             for appname, appconf in all_apps.items():
                 app_urls = reduce(
                     list.__add__,
                     [c['keys'] for c in
-                     appconf.get('CADDYFILE', {'keys': []})])
+                     Caddyfile.loads(
+                        appconf.get('caddyfile', {'keys': []}))])
                 if appname == self.name:
                     continue
-                for url in proxy_conf_urls:
+                for url in caddy_urls:
                     if url in app_urls:
                         msg = ('Aborting! {} is already deployed by {}'
                                .format(url, appname))
@@ -259,20 +263,27 @@ class Application(object):
         and add defaults values
         """
         # read the caddyfile of the service
-        if self._caddy is None:
+        if self._caddy.get(service) is None:
             try:
                 name = 'CADDYFILE'
                 val = self.compose['services'][service]['environment'][name]
+            except Exception as e:
+                log.info('Invalid %s environment variable for '
+                         'service %s in the compose file of %s: %s',
+                         name, service, self.name, str(e))
+                self._caddy[service] = []
+                return self._caddy[service]
+            try:
                 log.info('Found a %s environment variable for '
                          'service %s in the compose file of %s',
                          name, service, self.name)
-                self._caddy = Caddyfile.loads(val)
+                self._caddy[service] = Caddyfile.loads(val)
             except Exception as e:
-                log.info('Invalid or missing %s environment variable for '
+                log.info('Invalid %s environment variable for '
                          'service %s in the compose file of %s: %s',
                          name, service, self.name, str(e))
 
-        for host in self._caddy:
+        for host in self._caddy[service]:
             dirs = host['body']
             # default or forced values
             Caddyfile.setdir(dirs, ['gzip'])
@@ -283,13 +294,13 @@ class Application(object):
                 ['transparent', 'websocket', 'insecure_skip_verify'],
                 replace=True)
             Caddyfile.setdir(
-                dirs, 'logs',
+                dirs,
                 ['log', join(CADDYLOGS, self.name + '.access.log'),
                  [['rotate_size', '100'],
                   ['rotate_age', '14'],
                   ['rotate_keep', '10']]],
                 replace=True)
-        return self._caddy or []
+        return self._caddy[service] or []
 
     def ps(self, service):
         ps = do('docker ps -f name=%s --format "table {{.Status}}"'
@@ -425,6 +436,9 @@ class Volume(object):
 
 
 def handle(events, myself):
+    HANDLED = join(DEPLOY, 'events.log')
+    if not exists(HANDLED):
+        open(HANDLED, 'x')
     for event in json.loads(events):
         event_id = event.get('ID')
         if event_id + '\n' in open(HANDLED, 'r').readlines():
@@ -823,6 +837,14 @@ class TestCase(unittest.TestCase):
         {'caddy':  '', 'json':  '[]'},  # 13
         ]
 
+    def setUp(self):
+        DEPLOY = '/tmp/deploy'
+        os.makedirs(DEPLOY, exist_ok=True)
+
+    def tearDown(self):
+        if DEPLOY.startswith('/tmp'):
+            rmtree(DEPLOY)
+
     def test_split(self):
         self.assertEqual([], Caddyfile.split([], ''))
         self.assertEqual(['a', 'z', 'e'], Caddyfile.split([], 'a z e'))
@@ -902,19 +924,31 @@ class TestCase(unittest.TestCase):
         self.assertEqual(app.name, 'foobar_preprod.ddb14')
 
     def test_kv(self):
+        self.maxDiff = None
         self.assertEqual(
             'http://gitlab.example.com/hosting/foobar',
             kv('foobar_master.1e018', 'repo_url'))
+        self.assertEqual(None, kv('foobar_master.1e018', 'foobar'))
+        self.assertEqual(None, kv('foo', 'bar'))
+
+    def test_check(self):
+        app = Application('fake://127.0.0.1/testapp/', 'master')
+        app.download()
+        self.assertEqual(None, app.check())
+        # already deployed
+        app._caddy['wordpress'][0]['keys'][0] = 'http://foobar.example.com'
+        self.assertRaises(ValueError, app.check)
 
 
-class FakeConsul(object):
+class FakeExec(object):
+    faked = ('consul', 'git')
     foobar = (
         '{"name": "foo-bar_master.1e018", '
         '"repo_url": "http://gitlab.example.com/hosting/foobar", '
-        '"domain": "foobar.test.gorfou.fr", '
+        '"domain": "foobar.example.com", '
         '"ip": "163.172.4.172", '
         '"master": "bigz", '
-        '"caddyfile": "http://foobar.test.gorfou.fr {\n'
+        '"caddyfile": "http://foobar.example.com {\n'
         '    proxy / http://foobarmaster1e018_wordpress_1:80\n}",'
         ' "slave": null, '
         '"volumes": '
@@ -922,39 +956,43 @@ class FakeConsul(object):
         '"ct": "http://foobarmaster1e018_wordpress_1:80"}')
 
     @classmethod
-    def run(self, args):
-        if args == 'kv get app/foobar_master.1e018':
+    def run(self, cmd):
+        if cmd == 'consul kv get app/foobar_master.1e018':
             return self.foobar
-        if args == 'kv export':
-            return ('[{"key": "app/foo-bar_master.1e018/success",'
+        elif cmd == 'consul kv export app/':
+            return ('[{"key": "app/foo-bar_master.1e018",'
                     '"flags": 0, "value": "%s"}]'
-                    % b64encode(self.foobar.encode('utf-8')))
+                    % b64encode(self.foobar.encode('utf-8')).decode('utf-8'))
+        elif cmd.startswith('git clone --depth 1 -b master '
+                            'fake://127.0.0.1/testapp/'):
+            checkout = cmd.split()[-1]
+            os.mkdir(join(DEPLOY, checkout))
+            copy(join(dirname(HERE), 'testapp', 'docker-compose.yml'),
+                 join(DEPLOY, checkout))
         else:
             raise NotImplementedError
 
 
 if __name__ == '__main__':
-    if len(argv) == 1 or (len(argv) >= 1 and argv[1] == 'consul'):
+    if len(argv) == 1 or (len(argv) >= 1 and argv[1] in FakeExec.faked):
         DEPLOY = '/tmp/deploy'
         os.makedirs(DEPLOY, exist_ok=True)
-    HANDLED = join(DEPLOY, 'events.log')
-    if not exists(HANDLED):
-        open(HANDLED, 'x')
+
     logformat = '{asctime}\t{levelname}\t{message}'
     logging.basicConfig(level=logging.DEBUG,
                         format=logformat,
                         filename=join(DEPLOY, 'handler.log'),
                         style='{')
     ch = logging.StreamHandler()
-    ch.setFormatter(logging.Formatter(logformat))
+    ch.setFormatter(logging.Formatter(logformat, style='{'))
     logging.getLogger().addHandler(ch)
 
     myself = socket.gethostname()
     manual_input = None
 
-    if len(argv) >= 2 and argv[1] == 'consul':
+    if len(argv) >= 2 and argv[1] in FakeExec.faked:
         # mock consul
-        print(FakeConsul.run(' '.join(argv[2:])))
+        print(FakeExec.run(' '.join(argv[1:])))
     elif len(argv) == 1:
         # run some unittests
         TEST = True

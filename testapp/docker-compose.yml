@@ -1,0 +1,40 @@
+version: '2'
+services:
+  wordpress:
+    environment:
+      CADDYFILE: |
+        http://test.example.com {
+            proxy / {ct}
+        }
+        http://www.test.example.com {
+            redir http://test.example.com
+        }
+    build: wordpress
+    restart: unless-stopped
+    volumes:
+      - wwwdata:/var/www/html
+      - socket:/var/run/mysqld/
+    networks:
+      - cluster_default
+  mariadb:
+    image: mariadb:10
+    restart: always
+    volumes:
+      - dbdata:/var/lib/mysql
+      - socket:/var/run/mysqld/
+    environment:
+      MYSQL_ROOT_PASSWORD: "rootpasswd"
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: "passwd"
+
+volumes:
+  wwwdata:
+    driver: btrfs
+  dbdata:
+    driver: btrfs
+  socket:
+
+networks:
+  cluster_default:
+    external: true
