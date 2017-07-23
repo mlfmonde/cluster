@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 # coding: utf-8
 import hashlib
 import json
@@ -22,11 +22,13 @@ from uuid import uuid1
 DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 DEPLOY = '/deploy'
 CADDYLOGS = '/var/log'
+TEST = False
 log = logging.getLogger()
 
 
 def do(cmd, cwd=None):
     """ Run a command"""
+    cmd = argv[0] + ' ' + cmd if TEST else cmd
     try:
         if cwd:
             cmd = 'cd "{}" && {}'.format(cwd, cmd)
@@ -35,18 +37,19 @@ def do(cmd, cwd=None):
         return res.stdout.decode().strip()
     except CalledProcessError as e:
         log.error("Failed to run %s: %s", e.cmd, e.stderr.decode())
-        raise
+        raise e
 
 
-def kv(self, name, key):
+def kv(name, key):
     """ return the current value of the key in the kv"""
     try:
         cmd = 'consul kv get app/{}'.format(name)
-        value = json.loads(do(cmd))[key]
+        value = json.loads(do(cmd), strict=False)[key]
         log.info('Reading %s in kv: %s = %s', name, key, value)
         return value
-    except:
-        log.warn('Could not determine the %s node for %s', key, self.name)
+    except Exception as e:
+        log.warning('Could not determine the %s node for %s: %s',
+                    key, name, str(e))
         return None
 
 
@@ -54,10 +57,10 @@ class Application(object):
     """ represents a docker compose, its proxy conf and deployment path
     """
     def __init__(self, repo_url, branch, cwd=None):
-        self.repo_url, self.branch = repo_url.strip(), branch.strip()
+        self.repo_url, self.branch = repo_url.strip().lower(), branch.strip()
         if self.repo_url.endswith('.git'):
             self.repo_url = self.repo_url[:-4]
-        md5 = hashlib.md5(urlparse(self.repo_url.lower()).path.encode('utf-8')
+        md5 = hashlib.md5(urlparse(self.repo_url).path.encode('utf-8')
                           ).hexdigest()
         repo_name = basename(self.repo_url.strip('/'))
         self.name = repo_name + ('_' + self.branch if self.branch else ''
@@ -220,7 +223,7 @@ class Application(object):
             self._compose = None
         except CalledProcessError:
             if not retrying:
-                log.warn("Failed to download %s, retrying", self.repo_url)
+                log.warning("Failed to download %s, retrying", self.repo_url)
                 self.download(retrying=True)
             else:
                 raise
@@ -380,7 +383,7 @@ class Volume(object):
             log.info(u'Snapshotting volume: {}'.format(self.name))
             return do("buttervolume snapshot {}".format(self.name))
         else:
-            log.warn('Could not snapshot unexisting volume %s', self.name)
+            log.warning('Could not snapshot unexisting volume %s', self.name)
 
     def schedule_snapshots(self, timer):
         """schedule snapshots of the volume
@@ -656,28 +659,37 @@ def migrate(payload, myself):
 
 
 class Caddyfile():
+    """https://caddyserver.com/docs/caddyfile#format
+    """
     @classmethod
     def loads(cls, caddyfile):
         return cls.parse(caddyfile.splitlines(), [])
 
     @classmethod
-    def split(cls, line, sep=' '):
-        split = []
-        substring = False
-        for c in line:
-            split = split or ['']
+    def split(cls, lines, line, substring=False, sep=' '):
+        """split the line but take newlines into account in substrings
+        line: the line to split
+        lines: the remaining lines
+        """
+        out = []
+        for i, c in enumerate(line):
+            out = out or ['']
             if c in ('"', "'"):
                 substring = not substring
             elif c == sep:
-                if not split[-1]:
+                if not out[-1]:
                     continue
                 if substring:
-                    split[-1] += c
+                    out[-1] += c
                 else:
-                    split.append('')
+                    out.append('')
             else:
-                split[-1] += c
-        return split
+                out[-1] += c
+        if substring:
+            nextsplit = cls.split(lines, lines.pop(0), substring=True)
+            out[-1] += '\n' + nextsplit[0]
+            out += nextsplit[1:]
+        return out
 
     @classmethod
     def parse(cls, lines, body, level=0):
@@ -689,7 +701,7 @@ class Caddyfile():
         while True:
             if not lines:
                 return body
-            line = cls.split(lines.pop(0))
+            line = cls.split(lines, lines.pop(0))
             if not line:
                 continue
             if level == 0:
@@ -752,7 +764,7 @@ class Caddyfile():
 
     @classmethod
     def setsubdirs(cls, dirs, key, subdirs, replace=False):
-        """add or replace subdirs to the directive"""
+        """add or replace subdirectivess in the directive"""
         for d in dirs:
             if d[0] != key:
                 continue
@@ -788,7 +800,7 @@ class TestCase(unittest.TestCase):
          'json':  '[{"keys": ["host", "host:80"], '
                   '"body": [["foo", "bar \"baz\""]]}]'},
         {'caddy':  'host {\n    foo "bar\nbaz"\n}',  # 6
-         'json':  '[{"keys": ["host"], "body": [["foo", "bar\\nbaz"]]}]'},
+         'json':  '[{"keys": ["host"], "body": [["foo", "bar\nbaz"]]}]'},
         {'caddy':  'host {\n    dir 123 4.56 true\n}',  # 7
          'json':  '[{"keys": ["host"], '
                   '"body": [["dir", "123", "4.56", "true"]]}]'},
@@ -812,38 +824,41 @@ class TestCase(unittest.TestCase):
         ]
 
     def test_split(self):
-        self.assertEqual(Caddyfile.split(''), [])
-        self.assertEqual(Caddyfile.split('a z e'), ['a', 'z', 'e'])
-        self.assertEqual(Caddyfile.split('a "z e"'), ['a', 'z e'])
-        self.assertEqual(Caddyfile.split('"a z e"'), ['a z e'])
-        self.assertEqual(Caddyfile.split('az "er ty" ui'),
-                         ['az', 'er ty', 'ui'])
-        self.assertEqual(Caddyfile.split("az 'er ty' ui"),
-                         ['az', 'er ty', 'ui'])
+        self.assertEqual([], Caddyfile.split([], ''))
+        self.assertEqual(['a', 'z', 'e'], Caddyfile.split([], 'a z e'))
+        self.assertEqual(['a', 'z e'], Caddyfile.split([], 'a "z e"'))
+        self.assertEqual(['a z e'], Caddyfile.split([], '"a z e"'))
+        self.assertEqual(['az', 'er ty', 'ui'],
+                         Caddyfile.split([], 'az "er ty" ui'))
+        self.assertEqual(['az', 'er ty', 'ui'],
+                         Caddyfile.split([], "az 'er ty' ui"))
+        self.assertEqual(['foo\nbar'],
+                         Caddyfile.split(['bar"', 'baz'], '"foo'))
 
     def test_caddy2json(self):
         for i, d in enumerate(self.data):
-            if i in (5, 6):
+            if i == 5:
                 print('test # {} skipped, plz help!'.format(i))
                 continue
             self.assertEqual(
-                json.dumps(json.loads(d['json']), sort_keys=True),
+                json.dumps(json.loads(d['json'], strict=False),
+                           sort_keys=True),
                 json.dumps(Caddyfile.loads(d['caddy']), sort_keys=True))
             print('test # {} ok'.format(i))
 
     def test_json2caddy(self):
         for i, d in enumerate(self.data):
-            if i in (5,):
+            if i == 5:
                 print('test # {} skipped, plz help!'.format(i))
                 continue
             self.assertEqual(
                 d['caddy'],
-                Caddyfile.dumps(json.loads(d['json'])))
+                Caddyfile.dumps(json.loads(d['json'], strict=False)))
             print('test # {} ok'.format(i))
 
     def test_reversibility(self):
         for i, d in enumerate(self.data):
-            if i in (5, 6):
+            if i == 5:
                 print('test # {} skipped, plz help!'.format(i))
                 continue
             self.assertEqual(
@@ -877,23 +892,74 @@ class TestCase(unittest.TestCase):
             Caddyfile.setsubdirs(
                 [['gzip']], 'proxy', ['s2', 's3'], replace=True))
 
+    def test_application_init(self):
+        repo_url = 'https://gitlab.example.com/hosting/FooBar '
+        branch = 'preprod '
+        app = Application(repo_url, branch=branch)
+        self.assertEqual(
+            app.repo_url,
+            'https://gitlab.example.com/hosting/foobar')
+        self.assertEqual(app.name, 'foobar_preprod.ddb14')
+
+    def test_kv(self):
+        self.assertEqual(
+            'http://gitlab.example.com/hosting/foobar',
+            kv('foobar_master.1e018', 'repo_url'))
+
+
+class FakeConsul(object):
+    foobar = (
+        '{"name": "foo-bar_master.1e018", '
+        '"repo_url": "http://gitlab.example.com/hosting/foobar", '
+        '"domain": "foobar.test.gorfou.fr", '
+        '"ip": "163.172.4.172", '
+        '"master": "bigz", '
+        '"caddyfile": "http://foobar.test.gorfou.fr {\n'
+        '    proxy / http://foobarmaster1e018_wordpress_1:80\n}",'
+        ' "slave": null, '
+        '"volumes": '
+        '["foobarmaster1e018_wwwdata", "foobarmaster1e018_dbdata"], '
+        '"ct": "http://foobarmaster1e018_wordpress_1:80"}')
+
+    @classmethod
+    def run(self, args):
+        if args == 'kv get app/foobar_master.1e018':
+            return self.foobar
+        if args == 'kv export':
+            return ('[{"key": "app/foo-bar_master.1e018/success",'
+                    '"flags": 0, "value": "%s"}]'
+                    % b64encode(self.foobar.encode('utf-8')))
+        else:
+            raise NotImplementedError
+
 
 if __name__ == '__main__':
-    if len(argv) == 1:
-        # allow to run a few unit test
+    if len(argv) == 1 or (len(argv) >= 1 and argv[1] == 'consul'):
         DEPLOY = '/tmp/deploy'
         os.makedirs(DEPLOY, exist_ok=True)
     HANDLED = join(DEPLOY, 'events.log')
     if not exists(HANDLED):
         open(HANDLED, 'x')
+    logformat = '{asctime}\t{levelname}\t{message}'
     logging.basicConfig(level=logging.DEBUG,
-                        format='{asctime}\t{levelname}\t{message}',
+                        format=logformat,
                         filename=join(DEPLOY, 'handler.log'),
                         style='{')
+    ch = logging.StreamHandler()
+    ch.setFormatter(logging.Formatter(logformat))
+    logging.getLogger().addHandler(ch)
+
     myself = socket.gethostname()
     manual_input = None
 
-    if len(argv) >= 3:
+    if len(argv) >= 2 and argv[1] == 'consul':
+        # mock consul
+        print(FakeConsul.run(' '.join(argv[2:])))
+    elif len(argv) == 1:
+        # run some unittests
+        TEST = True
+        unittest.main(verbosity=2)
+    elif len(argv) >= 3:
         # allow to launch manually inside consul docker
         event = argv[1]
         payload = b64encode(' '.join(argv[2:]).encode('utf-8')).decode('utf-8')
@@ -901,9 +967,6 @@ if __name__ == '__main__':
             'ID': str(uuid1()), 'Name': event,
             'Payload': payload, 'Version': 1, 'LTime': 1}])
         handle(manual_input, myself)
-    elif len(argv) == 1:
-        # run some unittests
-        unittest.main(verbosity=2)
     else:
         # run what's given by consul watch
         handle(stdin.read(), myself)
