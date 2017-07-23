@@ -108,6 +108,10 @@ class Application(object):
                 log.error("Invalid CADDYFILE: %s", str(e))
                 raise
             caddy_urls = concat([c['keys'] for c in caddy])
+            if len(set(caddy_urls)) != len(caddy_urls):
+                msg = 'Aborting! Duplicate domain'
+                log.error(msg)
+                raise ValueError(msg)
             caddy_domains = {urlparse(u).netloc for u in caddy_urls}
             for appname, appconf in all_apps.items():
                 app_urls = concat(
