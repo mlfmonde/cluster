@@ -11,6 +11,7 @@ defaults
     timeout client 50000ms
     timeout server 50000ms
 
+{{ $apps := tree "app" }}
 
 frontend https-in
     mode tcp
@@ -18,12 +19,12 @@ frontend https-in
     option socket-stats
     tcp-request inspect-delay 5s
     tcp-request content accept if { req_ssl_hello_type 1 }
-{{ range tree "app" }}{{ $d := .Value | parseJSON }}
-    {{ range $domain := $d.domains }}use_backend https-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }
-    {{ end }}
-{{ end }}
 
-{{ range tree "app" }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}
+{{ range $apps }}{{ $d := .Value | parseJSON }}
+    {{ range $domain := $d.domains }}use_backend https-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }
+{{ end }}{{ end }}
+
+{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}
 backend https-{{ $domain }}
     mode tcp
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:443
@@ -35,11 +36,11 @@ frontend http-in
     bind *:80
     option socket-stats
 
-{{ range tree "app" }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }
+{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }
 {{ end }}{{ end }}
 
-{{ range tree "app" }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}
-backend http-{{ $d.domain }}
+{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}
+backend http-{{ $domain }}
     mode http
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:80
 {{ end }}{{ end }}
