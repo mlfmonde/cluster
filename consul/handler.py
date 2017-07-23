@@ -94,7 +94,7 @@ class Application(object):
     def path(self):
         return self._path()
 
-    def check(self):
+    def check(self, master):
         """consistency check"""
         all_apps = {
             s['key']: json.loads(
@@ -108,11 +108,13 @@ class Application(object):
                 log.error("Invalid CADDYFILE: %s", str(e))
                 raise
             caddy_urls = concat([c['keys'] for c in caddy])
+            caddy_domains = {urlparse(u).netloc for u in caddy_urls}
             for appname, appconf in all_apps.items():
                 app_urls = concat(
                     [c['keys'] for c in
                      Caddyfile.loads(
-                        appconf.get('caddyfile', {'keys': []}))])
+                        appconf.get('caddyfile', {'caddyfile': []}))])
+                app_domain = appconf['master']
                 if appname == self.name:
                     continue
                 for url in caddy_urls:
@@ -121,6 +123,11 @@ class Application(object):
                                .format(url, appname))
                         log.error(msg)
                         raise ValueError(msg)
+                if app_domain in caddy_domains:
+                    msg = ('Aborting! Domain {} is already routed to {}'
+                           .format(app_domain, master))
+                    log.error(msg)
+                    raise ValueError(msg)
 
     @property
     def compose(self):
@@ -512,7 +519,7 @@ def deploy(payload, myself):
             for volume in oldapp.volumes_from_kv:
                 volume.snapshot()
             newapp.download()
-            newapp.check()
+            newapp.check(newmaster)
             newapp.up()
             if newslave:
                 newapp.enable_replicate(True, members[newslave]['ip'])
@@ -544,7 +551,7 @@ def deploy(payload, myself):
         if newmaster == myself:  # slave -> master
             log.info("** I'm now the master of %s", newapp.name)
             newapp.download()
-            newapp.check()
+            newapp.check(newmaster)
             newapp.wait_transfer()  # wait for master notification
             for volume in newapp.volumes_from_kv:
                 volume.restore()
@@ -567,7 +574,7 @@ def deploy(payload, myself):
         if newmaster == myself:  # nothing -> master
             log.info("** I'm now the master of %s", newapp.name)
             newapp.download()
-            newapp.check()
+            newapp.check(newmaster)
             if oldslave:
                 newapp.wait_transfer()  # wait for master notification
                 for volume in newapp.volumes_from_kv:
@@ -940,10 +947,10 @@ class TestCase(unittest.TestCase):
     def test_check(self):
         app = Application(self.repo_url, 'master')
         app.download()
-        self.assertEqual(None, app.check())
+        self.assertEqual(None, app.check('node1'))
         # already deployed
         app._caddy['wordpress'][0]['keys'][0] = 'http://foobar.example.com'
-        self.assertRaises(ValueError, app.check)
+        self.assertRaises(ValueError, app.check, 'node1')
 
     def test_volumes(self):
         app = Application(self.repo_url, 'master')
