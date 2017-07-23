@@ -1,4 +1,4 @@
-# This HAProxy should only be used to redirect TCP requests
+# This HAProxy should only be used to redirect requests
 # to the correct node of the cluster.
 # It should not contain any http redirections
 global
@@ -11,74 +11,45 @@ defaults
     timeout client 50000ms
     timeout server 50000ms
 
+
 frontend https-in
     mode tcp
     bind *:443
     option socket-stats
     tcp-request inspect-delay 5s
-    tcp-request content accept if { req_ssl_hello_type 1  }
+    tcp-request content accept if { req_ssl_hello_type 1 }
+{{ range tree "app" }}{{ with $d := .Value | parseJSON }}
+    {{ range $domain := $d.domains }}use_backend https-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }{{ end }}
+    {{ end }}
+{{ end }}
 
-    {{ range tree "site"  }}{{ with $d := .Value | parseJSON }}use_backend https-{{ $d.domain }} if { req_ssl_sni -i {{ $d.domain }}  }{{ end }}
-    {{ end  }}
+{{ range tree "app" }}{{ with $d := .Value | parseJSON }}{{ range $domain := $d.domains }}
+backend https-{{ $domain }}
+    mode tcp
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:443{{ end }}
+{{ end }}{{ end }}
 
-{{ range tree "site"  }}{{ with $d := .Value | parseJSON }}backend https-{{ $d.domain }}
-  mode tcp
-  server {{ $d.node  }} {{ if eq $d.node (env "HOSTNAME") }}caddy{{ else  }}{{ $d.ip  }}{{ end }}:443{{ end }}
-
-{{ end  }}
 
 frontend http-in
     mode http
     bind *:80
     option socket-stats
 
-    # PV: ticket 8499, redirect GEPI urls
-    # http://ee.mlfmonde.org/GEPI/aberdeen-total/ to http://aberdeen-total-gepi.mlfmonde.org
-    # unfurtunetely I haven't found how to redirect prefix and location at once
-    # so we create two redirections:
-    # ee.mlfmonde.org/GEPI/aberdeen-total/
-    # 1 => aberdeen-total-gepi.mlfmonde.org/GEPI/aberdeen-total/
-    # 2    => aberdeen-total-gepi.mlfmonde.org
-    # common ACL
-    acl old_aberd_uri         path_beg  /GEPI/aberdeen-total
-    acl old_okpo_uri          path_beg  /GEPI/okpo-technip
-    acl old_forum_uri         path_beg  /forum
-    # recette ACL
-    acl ee_recette_dns        hdr(host) -i ee.mlf.anybox.eu
-    acl new_aberd_recette_dns hdr(host) -i aberdeen-total.gepi.mlf.anybox.eu
-    acl new_okpo_recette_dns  hdr(host) -i okpo-technip.gepi.mlf.anybox.eu
-    acl new_forum_recette_dns hdr(host) -i forum.ee.mlf.anybox.eu
-    # prod ACL
-    acl ee_prod_dns           hdr(host) -i ee.mlfmonde.org
-    acl new_aberd_prod_dns    hdr(host) -i aberdeen-total-gepi.mlfmonde.org
-    acl new_okpo_prod_dns     hdr(host) -i okpo-technip-gepi.mlfmonde.org
-    acl new_forum_prod_dns    hdr(host) -i forum-ee.mlfmonde.org
-    # Recette redirections
-    http-request redirect code 301 prefix http://aberdeen-total.gepi.mlf.anybox.eu if old_aberd_uri ee_recette_dns
-    http-request redirect code 301 location / if old_aberd_uri new_aberd_recette_dns
-    http-request redirect code 301 prefix http://okpo-technip.gepi.mlf.anybox.eu if old_okpo_uri ee_recette_dns
-    http-request redirect code 301 location / if old_okpo_uri new_okpo_recette_dns
-    http-request redirect code 301 prefix http://forum.ee.mlf.anybox.eu if old_forum_uri ee_recette_dns
-    http-request redirect code 301 location / if old_forum_uri new_forum_recette_dns
-    # Prod redirections
-    http-request redirect code 301 prefix http://aberdeen-total-gepi.mlfmonde.org if old_aberd_uri ee_prod_dns
-    http-request redirect code 301 location / if old_aberd_uri new_aberd_prod_dns
-    http-request redirect code 301 prefix http://okpo-technip-gepi.mlfmonde.org if old_okpo_uri ee_prod_dns
-    http-request redirect code 301 location / if old_okpo_uri new_okpo_prod_dns
-    http-request redirect code 301 prefix http://forum-ee.mlfmonde.org if old_forum_uri ee_prod_dns
-    http-request redirect code 301 location / if old_forum_uri new_forum_prod_dns
+{{ range tree "app" }}{ with $d := .Value | parseJSON }}{{ range $domain := $d.domains }}use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }{{ end }}
+{{ end }}{{ end }}
 
-    {{ range tree "site"  }}{ with $d := .Value | parseJSON }}use_backend http-{{ $d.domain  }} if { hdr(host) -i {{ $d.domain  }}  }{{ end }}
-    {{ end  }}
-    # Special backend for redirect website
-    use_backend http-lyceemlfpalma.org if { hdr(host) -i www.lyceemlfpalma.org }
-    use_backend http-www.lycee-verdun.edu.lb if { hdr(host) -i lycee-verdun.edu.lb }
-    use_backend http-www.lyceemolieresaragosse.fr if { hdr(host) -i lyceemolieresaragosse.fr }
-    use_backend http-www.lyceemolieresaragosse.org if { hdr(host) -i lyceemolieresaragosse.org }
+{{ range tree "app" }}{{ with $d := .Value | parseJSON }}
+backend http-{{ $d.domain }}
+    mode http
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:80{{ end }}
+{{ end }}
 
-{{ range tree "site"  }}{{ with $d := .Value | parseJSON }}backend http-{{ $d.domain }}
-  mode http
-  server {{ $d.node  }} {{ if eq $d.node (env "HOSTNAME")  }}caddy{{ else  }}{{ $d.ip  }}{{ end  }}:80{{ end  }}
+frontend ssh-in
+    mode tcp
+    bind *:22
+    use_backend ssh
 
-{{ end  }}
-
+backend ssh
+    mode tcp
+{{ range tree "app/gitlab"   }}{{ $v := .Value | parseJSON }}    server {{ $v.master }} {{ if eq $v.node (env "HOSTNAME") }}{{ $host := $v.ct | regexReplaceAll "^(http[s]?://)([^/]*)(/?.*)" "$2" }}{{ $host }}{{ else }}{{ $v.ip }}{{ end }}:22
+{{ end }}

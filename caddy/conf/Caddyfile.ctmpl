@@ -1,27 +1,4 @@
-{{ range tree "site" }}{{ $k := .Key }}{{ $v := .Value | parseJSON  }}{{ if eq $v.node (env "HOSTNAME")  }}
-{{ $v.url  }} {
-  {{ if $v.tls }}  tls self_signed{{ end }}
-  timeouts 300s
-
-  proxyprotocol 0.0.0.0/0
-
-  proxy / {{ $v.ct  }}/ {
-    transparent
-    websocket
-    insecure_skip_verify
-  }
-  gzip
-  log /var/log/{{ $k  }}.access.log {
-      rotate_size 100 # Rotate after 100 MB
-      rotate_age  14  # Keep log files for 14 days
-      rotate_keep 10  # Keep at most 10 log files
-  }
-}
+{{ range tree "app" }}{{ $k := .Key }}{{ $v := .Value | parseJSON  }}{{ if eq $v.master (env "HOSTNAME")  }}
+{{ $v.caddyfile  }}
 {{ end  }}
-{{ range $redir := $v.redirect_from }}
-{{ $redir }} {
-  {{ if $v.tls }}  tls self_signed{{ end }}
-  redir {{ $v.url }}{uri}
-}
-{{ end }}
 {{ end  }}

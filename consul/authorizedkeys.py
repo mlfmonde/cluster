@@ -6,14 +6,14 @@ from subprocess import run, PIPE
 from urllib.parse import urlparse
 
 
-def sites():
-    cmd = "consul kv get --recurse site/"
+def apps():
+    cmd = "consul kv get --recurse app/"
     res = run(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
     return res.stdout.decode().strip().splitlines()
 
 
-for site in sites():
-    data = json.loads(site.split(':', 1)[1])
+for app in apps():
+    data = json.loads(app.split(':', 1)[1])
     pubkey = data.get('pubkey')
     ct = urlparse(data.get('ct')).hostname
     domain = data.get('domain')
