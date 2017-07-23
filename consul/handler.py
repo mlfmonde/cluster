@@ -1041,7 +1041,8 @@ class TestRequests(object):
 
 
 if __name__ == '__main__':
-    if len(argv) == 1 or (len(argv) >= 1 and argv[1] in FakeExec.faked):
+    if (len(argv) == 2 and argv[1].lower() == 'test'
+            or (len(argv) >= 1 and argv[1] in FakeExec.faked)):
         DEPLOY = '/tmp/deploy'
         os.makedirs(DEPLOY, exist_ok=True)
 
@@ -1060,8 +1061,9 @@ if __name__ == '__main__':
     if len(argv) >= 2 and argv[1] in FakeExec.faked:
         # mock some executables
         print(FakeExec.run(' '.join(argv[1:])))
-    elif len(argv) == 1:
+    elif len(argv) == 2 and argv[1].lower() == 'test':
         # run some unittests
+        argv.pop(-1)
         TEST = True
         requests.post = TestRequests.post
         unittest.main(verbosity=2)

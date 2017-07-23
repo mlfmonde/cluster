@@ -15,7 +15,7 @@ Run the handler tests with::
     $ python3 -m venv venv
     $ ./venv/bin/pip install PyYAML requests
     $ source ./venv/bin/activate
-    $ ./handler.py
+    $ ./handler.py test
 
 Normal mode
 ***********
