@@ -193,7 +193,7 @@ class Application(object):
                     Volume(v) for v in kv(self.name, 'volumes')]
             except:
                 log.info("No volumes found in the kv")
-            self._volumes = self._volumes or None
+            self._volumes = self._volumes or []
         return self._volumes
 
     @property
