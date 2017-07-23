@@ -62,12 +62,12 @@ class Application(object):
     """ represents a docker compose, its proxy conf and deployment path
     """
     def __init__(self, repo_url, branch, cwd=None):
-        self.repo_url, self.branch = repo_url.strip().lower(), branch.strip()
+        self.repo_url, self.branch = repo_url.strip(), branch.strip()
         if self.repo_url.endswith('.git'):
             self.repo_url = self.repo_url[:-4]
-        md5 = hashlib.md5(urlparse(self.repo_url).path.encode('utf-8')
+        md5 = hashlib.md5(urlparse(self.repo_url.lower()).path.encode('utf-8')
                           ).hexdigest()
-        repo_name = basename(self.repo_url.strip('/'))
+        repo_name = basename(self.repo_url.strip('/').lower())
         self.name = repo_name + ('_' + self.branch if self.branch else ''
                                  ) + '.' + md5[:5]  # don't need full md5
         self._services = None
