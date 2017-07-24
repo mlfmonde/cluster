@@ -779,7 +779,7 @@ class Caddyfile():
                             if type(subdir) is list:
                                 out += 8*' ' + ' '.join(subdir) + '\n'
                             else:
-                                out += subdir + '\n'
+                                out += 8*' ' + subdir + '\n'
                         out += '    }'
                     else:
                         q = '"' if ' ' in diritem or '\n' in diritem else ''
