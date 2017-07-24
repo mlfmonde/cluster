@@ -303,20 +303,21 @@ class Application(object):
         for host in self._caddy[service]:
             dirs = host['body']
             # default or forced values
-            Caddyfile.setdir(dirs, ['gzip'])
-            Caddyfile.setdir(dirs, ['timeouts', '300s'])
-            Caddyfile.setdir(dirs, ['proxyprotocol', '0.0.0.0/0'])
+            dirs = Caddyfile.setdir(dirs, ['gzip'])
+            dirs = Caddyfile.setdir(dirs, ['timeouts', '300s'])
+            dirs = Caddyfile.setdir(dirs, ['proxyprotocol', '0.0.0.0/0'])
             Caddyfile.setsubdirs(
                 dirs, 'proxy',
                 ['transparent', 'websocket', 'insecure_skip_verify'],
                 replace=True)
-            Caddyfile.setdir(
+            dirs = Caddyfile.setdir(
                 dirs,
                 ['log', join(CADDYLOGS, self.name + '.access.log'),
                  [['rotate_size', '100'],
                   ['rotate_age', '14'],
                   ['rotate_keep', '10']]],
                 replace=True)
+            host['body'] = dirs
         return self._caddy[service] or []
 
     def ps(self, service):
