@@ -4,8 +4,8 @@
 chown consul: /deploy
 
 /bin/consul-template \
-    -template="/consul/template/caddy/Caddyfile.ctmpl:/consul/template/caddy/Caddyfile:docker kill -s USR1 cluster_caddy_1" \
-    -template="/consul/template/haproxy/haproxy.cfg.ctmpl:/consul/template/haproxy/haproxy.cfg:docker kill -s HUP cluster_haproxy_1" &
+    -template="/consul/template/caddy/Caddyfile.ctmpl:/consul/template/caddy/Caddyfile:/reload_caddy.sh" \
+    -template="/consul/template/haproxy/haproxy.cfg.ctmpl:/consul/template/haproxy/haproxy.cfg:/reload_haproxy.sh" &
 
 # adapt the docker group of the container to the outside
 DOCKER_GID=$(stat -c %g /var/run/docker.sock)
