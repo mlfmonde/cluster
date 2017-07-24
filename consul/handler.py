@@ -332,26 +332,26 @@ class Application(object):
         """
         log.info("Registering URLs of %s in the key/value store",
                  self.name)
-        for service in self.services:
-            caddy = self.caddyfile(service)
-            urls = concat([c['keys'] for c in caddy])
-            if not caddy:
-                continue  # no need?
-            value = {
-                'caddyfile': Caddyfile.dumps(caddy),
-                'repo_url': self.repo_url,
-                'branch': self.branch,
-                'deploy_date': self._deploy_date,
-                'domains': [urlparse(u).netloc for u in urls],
-                'ip': self.members[master]['ip'],
-                'master': master,
-                'slave': slave,
-                'ct': self.container_name(service),
-                'volumes': [v.name for v in self.volumes]}
+        caddyfiles = concat([self.caddyfile(s) for s in self.services])
+        caddyfiles = [c for c in caddyfiles if c]
+        urls = concat([c['keys'] for c in caddyfiles])
+        if not caddyfiles:
+            return  # no need?
+        value = {
+            'caddyfile': Caddyfile.dumps(caddyfiles),
+            'repo_url': self.repo_url,
+            'branch': self.branch,
+            'deploy_date': self._deploy_date,
+            'domains': [urlparse(u).netloc for u in urls],
+            'ip': self.members[master]['ip'],
+            'master': master,
+            'slave': slave,
+            'ct': {s: self.container_name(s) for s in self.services},
+            'volumes': [v.name for v in self.volumes]}
 
-            do("consul kv put app/{} '{}'"
-               .format(self.name, json.dumps(value)))
-            log.info("Registered %s", self.name)
+        do("consul kv put app/{} '{}'"
+           .format(self.name, json.dumps(value)))
+        log.info("Registered %s", self.name)
 
     def unregister_kv(self):
         do("consul kv delete app/{}".format(self.name))
