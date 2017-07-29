@@ -14,17 +14,18 @@ def apps():
 
 for app in apps():
     data = json.loads(app.split(':', 1)[1])
-    pubkey = data.get('pubkey')
+    pubkeys = data.get('pubkeys')
     ct = urlparse(data.get('ct')).hostname
     domain = data.get('domain')
     ip = data.get('ip')
     target = data.get('node')
     myself = socket.gethostname()
-    if not pubkey:
+    if not pubkeys:
         continue
 
     if myself == target:
-        print('command="docker exec -it {ct} bash" {pubkey}'
-              .format(**locals()))
+        for pubkey in pubkeys:
+            print('command="docker exec -it {ct} bash" {pubkey}'
+                  .format(**locals()))
     else:
         print('command="ssh -At gw@{ip}" {pubkey}'.format(**locals()))
