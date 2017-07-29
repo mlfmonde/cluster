@@ -337,10 +337,9 @@ class Application(object):
         urls = concat([c['keys'] for c in caddyfiles])
         if not caddyfiles:
             return  # no need?
-        pubkeys = [k.strip() for k in concat(
-            [self.compose['services'][s]['environment'].get('PUBKEYS', '')
-             .split('\n') for s in self.services])
-             if k.strip()]
+        pubkeys = {
+            s: self.compose['services'][s]['environment'].get('PUBKEY', '')
+            for s in self.services}
         value = {
             'caddyfile': Caddyfile.dumps(caddyfiles),
             'repo_url': self.repo_url,
