@@ -14,7 +14,7 @@ from base64 import b64decode, b64encode
 from contextlib import contextmanager
 from datetime import datetime
 from functools import reduce
-from os.path import basename, join, exists, dirname
+from os.path import basename, join, exists, dirname, abspath
 from shutil import copy, rmtree
 from subprocess import run, CalledProcessError, PIPE
 from sys import stdin, argv
@@ -24,7 +24,7 @@ DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 DEPLOY = '/deploy'
 CADDYLOGS = '/var/log'
 TEST = False
-HERE = dirname(__file__)
+HERE = abspath(dirname(__file__))
 log = logging.getLogger()
 
 
@@ -337,6 +337,10 @@ class Application(object):
         urls = concat([c['keys'] for c in caddyfiles])
         if not caddyfiles:
             return  # no need?
+        pubkeys = [k.strip() for k in concat(
+            [self.compose['services'][s]['environment'].get('PUBKEYS', '')
+             .split('\n') for s in self.services])
+             if k.strip()]
         value = {
             'caddyfile': Caddyfile.dumps(caddyfiles),
             'repo_url': self.repo_url,
@@ -347,6 +351,7 @@ class Application(object):
             'master': master,
             'slave': slave,
             'ct': {s: self.container_name(s) for s in self.services},
+            'pubkeys': pubkeys,
             'volumes': [v.name for v in self.volumes]}
 
         do("consul kv put app/{} '{}'"
@@ -863,6 +868,7 @@ class TestCase(unittest.TestCase):
     def setUp(self):
         DEPLOY = '/tmp/deploy'
         os.makedirs(DEPLOY, exist_ok=True)
+        open(join(DEPLOY, 'kv'), 'w').write('{}')
 
     def tearDown(self):
         if DEPLOY.startswith('/tmp'):
@@ -946,9 +952,9 @@ class TestCase(unittest.TestCase):
 
     def test_kv(self):
         self.maxDiff = None
-        self.assertEqual(
-            'https://gitlab.example.com/hosting/FooBar',
-            kv('foobar_master.ddb14', 'repo_url'))
+        do('consul kv put app/baz \'{}\''
+           .format(json.dumps({'repo_url': 'adr1'})))
+        self.assertEqual('adr1', kv('baz', 'repo_url'))
         self.assertEqual(None, kv('foobar_master.ddb14', 'foobar'))
         self.assertEqual(None, kv('foo', 'bar'))
 
@@ -957,7 +963,8 @@ class TestCase(unittest.TestCase):
         app.download()
         self.assertEqual(None, app.check('node1'))
         # already deployed
-        app._caddy['wordpress'][0]['keys'][0] = 'http://foobar.example.com'
+        app.register_kv('node1', 'node2')
+        app.name = 'new'
         self.assertRaises(ValueError, app.check, 'node1')
 
     def test_volumes(self):
@@ -968,6 +975,8 @@ class TestCase(unittest.TestCase):
 
     def test_volumes_from_kv(self):
         app = Application(self.repo_url, 'master')
+        app.download()
+        app.register_kv('node1', 'node2')
         self.assertEqual(
             ['foobarmasterddb14_dbdata', 'foobarmasterddb14_wwwdata'],
             sorted(v.name for v in app.volumes_from_kv))
@@ -988,39 +997,33 @@ class TestCase(unittest.TestCase):
         app.download()
         self.assertEqual(None, app.register_consul())
 
+    def test_pubkey(self):
+        app = Application(self.repo_url, 'master')
+        app.download()
+        self.assertEqual(None, app.register_kv('node1', 'node2'))
+
 
 class FakeExec(object):
     """fake executables for tests
     """
     faked = ('consul', 'git')
-    foobar = (
-        '{"name": "foo-bar_master.ddb14", '
-        '"repo_url": "https://gitlab.example.com/hosting/FooBar", '
-        '"branch": "master", '
-        '"domains": ["foobar.example.com"], '
-        '"ip": "163.172.4.172", '
-        '"master": "bigz", '
-        '"caddyfile": "http://foobar.example.com {\n'
-        '    proxy / http://foobarmasterddb14_wordpress_1:80\n}",'
-        ' "slave": null, '
-        '"volumes": '
-        '["foobarmasterddb14_wwwdata", "foobarmasterddb14_dbdata"], '
-        '"ct": "http://foobarmasterddb14_wordpress_1:80"}')
 
     @classmethod
-    def run(self, cmd):
-        if cmd == 'consul kv get app/foobar_master.ddb14':
-            return self.foobar
+    def run(cls, cmd):
+        if cmd.startswith('consul kv get '):
+            return b64decode(json.loads(
+                open(join(DEPLOY, 'kv')).read()
+                     )[cmd.split(' ', 3)[3]]).decode('utf-8')
         elif cmd == 'consul kv export app/':
-            return ('[{"key": "app/foo-bar_master.ddb14",'
-                    '"flags": 0, "value": "%s"}]'
-                    % b64encode(self.foobar.encode('utf-8')).decode('utf-8'))
-        elif cmd.startswith('git clone --depth 1 -b master '
-                            'https://gitlab.example.com/hosting/FooBar'):
-            checkout = cmd.split()[-1]
+            return json.dumps(
+                [{'key': k, 'flags': 0, 'value': v} for k, v in
+                 json.loads(open(join(DEPLOY, 'kv')).read()).items()])
+        elif cmd.startswith('git clone --depth 1 -b master '):
+            appname = cmd.split(' ')[6].split('/')[-1]
+            checkout = cmd.split(' ', 7)[-1]
             os.mkdir(join(DEPLOY, checkout))
-            copy(join(dirname(HERE), 'testapp', 'docker-compose.yml'),
-                 join(DEPLOY, checkout))
+            copy(join(dirname(HERE), 'testapp', '{}.yml'.format(appname)),
+                 join(DEPLOY, checkout, 'docker-compose.yml'))
         elif cmd == 'consul members':
             return (
                 'Node   Address            Status  Type       DC\n'
@@ -1028,9 +1031,10 @@ class FakeExec(object):
                 'node2   10.10.10.12:8301  alive   server     dc1\n'
                 'node3   10.10.10.13:8301  alive   server     dc1')
         elif cmd.startswith('consul kv put'):
-            if 'http://foobarmasterddb14_wordpress_1:80' not in cmd:
-                raise
-            return 'ok'
+            k, v = cmd.split(' ', 3)[-1].split(' ', 1)
+            kv = json.loads(open(join(DEPLOY, 'kv')).read())
+            kv[k] = b64encode(v.encode('utf-8')).decode('utf-8')
+            open(join(DEPLOY, 'kv'), 'w').write(json.dumps(kv))
         else:
             raise NotImplementedError
 

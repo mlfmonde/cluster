@@ -8,6 +8,7 @@ services:
         http://www.test.example.com {
             redir http://test.example.com
         }
+      PUBKEYS: ssh-rsa 123456 test@example
     build: wordpress
     restart: unless-stopped
     volumes:
