@@ -337,7 +337,7 @@ class Application(object):
         urls = concat([c['keys'] for c in caddyfiles])
         if not caddyfiles:
             return  # no need?
-        pubkeys = {
+        pubkey = {
             s: self.compose['services'][s]['environment'].get('PUBKEY', '')
             for s in self.services}
         value = {
@@ -349,8 +349,8 @@ class Application(object):
             'ip': self.members[master]['ip'],
             'master': master,
             'slave': slave,
-            'ct': {s: self.container_name(s) for s in self.services},
-            'pubkeys': pubkeys,
+            'cts': {s: self.container_name(s) for s in self.services},
+            'pubkey': pubkey,
             'volumes': [v.name for v in self.volumes]}
 
         do("consul kv put app/{} '{}'"

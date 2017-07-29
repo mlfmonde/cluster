@@ -14,11 +14,11 @@ def apps():
 
 for app in apps():
     data = json.loads(app.split(':', 1)[1])
-    pubkeys = data.get('pubkeys')
-    cts = {s: urlparse(ct).hostname for s, ct in data.get('ct').items()}
+    pubkeys = data.get('pubkey')
+    cts = data.get('ct')
     domain = data.get('domain')
     ip = data.get('ip')
-    target = data.get('node')
+    target = data.get('master')
     myself = socket.gethostname()
     if not pubkeys:
         continue
