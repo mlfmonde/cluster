@@ -349,7 +349,7 @@ class Application(object):
             'ip': self.members[master]['ip'],
             'master': master,
             'slave': slave,
-            'cts': {s: self.container_name(s) for s in self.services},
+            'ct': {s: self.container_name(s) for s in self.services},
             'pubkey': pubkey,
             'volumes': [v.name for v in self.volumes]}
 
