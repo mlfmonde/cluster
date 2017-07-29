@@ -15,7 +15,7 @@ def apps():
 for app in apps():
     data = json.loads(app.split(':', 1)[1])
     pubkeys = data.get('pubkeys')
-    cts = [urlparse(ct).hostname for ct in data.get('ct').values()]
+    cts = {s: urlparse(ct).hostname for s, ct in data.get('ct').items()}
     domain = data.get('domain')
     ip = data.get('ip')
     target = data.get('node')
@@ -23,11 +23,11 @@ for app in apps():
     if not pubkeys:
         continue
 
-    if myself == target:
-        for s, ct in cts.items():
-            pubkey = pubkeys[s]
-            if pubkey.strip() and '\n' not in pubkey:
+    for s, ct in cts.items():
+        pubkey = pubkeys[s]
+        if pubkey.strip() and '\n' not in pubkey:
+            if myself == target:
                 print('command="docker exec -it {ct} bash" {pubkey}'
                       .format(**locals()))
-    else:
-        print('command="ssh -At gw@{ip}" {pubkey}'.format(**locals()))
+            else:
+                print('command="ssh -At gw@{ip}" {pubkey}'.format(**locals()))
