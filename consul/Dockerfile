@@ -1,6 +1,6 @@
 FROM consul:0.8.5
 
-ARG BUTTERVOLUME=1.2
+ARG BUTTERVOLUME=1.3
 
 RUN apk add --no-cache \
       bash \
