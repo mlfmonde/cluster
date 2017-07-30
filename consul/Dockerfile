@@ -40,8 +40,8 @@ RUN chown -R consul: /home/consul \
     && mkdir -p /run/docker/plugins/ \
     && chmod g+rx /run/docker/plugins/ \
     && adduser consul root \
-    && adduser -D -s /bin/false gw \
-    && adduser gw docker
+    && adduser -D -s /bin/bash gw \
+    && passwd -d gw
 
 COPY authorizedkeys.py /sbin/
 COPY handler.py /

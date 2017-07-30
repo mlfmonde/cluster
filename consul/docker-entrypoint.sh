@@ -13,5 +13,6 @@ delgroup docker
 addgroup -g $DOCKER_GID docker
 adduser -S -u $DOCKER_GID -G $DOCKER_GID docker
 adduser consul docker
+adduser gw docker
 
 exec /usr/local/bin/docker-entrypoint.sh "$@"
