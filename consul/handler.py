@@ -207,7 +207,7 @@ class Application(object):
     def volumes(self):
         """btrfs volumes defined in the compose
         """
-        if self._volumes is None:
+        if not self._volumes:
             try:
                 self._volumes = [
                     Volume(self.project + '_' + v[0])
