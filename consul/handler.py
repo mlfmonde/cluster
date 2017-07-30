@@ -155,11 +155,11 @@ class Application(object):
             yield
             do('consul kv put migrate/{}/success'.format(self.name))
         except Exception as e:
-            log.error('Volume migrate FAILED! : %s', str(e))
+            log.error('Volume migration FAILED! : %s', str(e))
             do('consul kv put migrate/{}/failure'.format(self.name))
             self.up()  # TODO move in the deploy
             raise
-        log.info('Volume migrate SUCCEEDED!')
+        log.info('Volume migration SUCCEEDED!')
 
     def wait_transfer(self):
         loops = 0
