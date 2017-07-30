@@ -969,8 +969,9 @@ class TestCase(unittest.TestCase):
     def test_volumes(self):
         app = Application(self.repo_url, 'master')
         app.download()
-        self.assertEqual(['dbdata', 'socket', 'wwwdata'],
-                         sorted(app.compose['volumes'].keys()))
+        self.assertEqual(
+            ['foobarmasterddb14_dbdata', 'foobarmasterddb14_wwwdata'],
+            sorted(v.name for v in app.volumes))
 
     def test_volumes_from_kv(self):
         app = Application(self.repo_url, 'master')
