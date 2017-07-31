@@ -587,7 +587,7 @@ def deploy(payload, myself):
             log.info("** I'm now the master of %s", newapp.name)
             newapp.download()
             newapp.check(newmaster)
-            if oldslave:
+            if oldmaster:
                 newapp.wait_transfer()  # wait for master notification
                 for volume in newapp.volumes_from_kv:
                     volume.restore()
