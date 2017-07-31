@@ -130,8 +130,8 @@ class Application(object):
                         raise ValueError(msg)
                 if any([d in caddy_domains for d in app_domains]
                        ) and app_master != master:
-                    msg = ('Aborting! A domain of this app is '
-                           'already routed to {}'
+                    msg = ('Warning! A domain of this app is '
+                           'already routed to {}! Also move the other app!'
                            .format(master))
                     log.warning(msg)
 
@@ -160,9 +160,12 @@ class Application(object):
             raise
         log.info('Volume migration SUCCEEDED!')
 
+    def clean_notif(self):
+        do('consul kv delete -recurse migrate/{}/'.format(self.name))
+
     def wait_transfer(self):
         loops = 0
-        while loops < 60:
+        while loops < 120:
             log.info('Waiting migrate notification for %s', self.name)
             res = do('consul kv get -keys migrate/{}/'.format(self.name))
             if res:
@@ -529,6 +532,7 @@ def deploy(payload, myself):
         else:
             oldapp.enable_snapshot(False)
         oldapp.enable_purge(False)
+        newapp.clean_notif()
         if newmaster == myself:  # master -> master
             log.info("** I'm still the master of %s", newapp.name)
             for volume in oldapp.volumes_from_kv:
