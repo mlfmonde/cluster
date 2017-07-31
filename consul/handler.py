@@ -133,8 +133,7 @@ class Application(object):
                     msg = ('Aborting! A domain of this app is '
                            'already routed to {}'
                            .format(master))
-                    log.error(msg)
-                    raise ValueError(msg)
+                    log.warning(msg)
 
     @property
     def compose(self):
