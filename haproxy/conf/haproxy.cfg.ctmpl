@@ -52,5 +52,5 @@ frontend ssh-in
 
 backend ssh
     mode tcp
-{{ range tree "app/gitlab"   }}{{ $v := .Value | parseJSON }}    server {{ $v.master }} {{ if eq $v.master (env "HOSTNAME") }}{{ $host := $v.ct | regexReplaceAll "^(http[s]?://)([^/]*)(/?.*)" "$2" }}{{ $host }}{{ else }}{{ $v.ip }}{{ end }}:22
+{{ range tree "app/gitlab"   }}{{ $v := .Value | parseJSON }}    server {{ $v.master }} {{ if eq $v.master (env "HOSTNAME") }}{{ $v.ct.community }}{{ else }}{{ $v.ip }}{{ end }}:22
 {{ end }}
