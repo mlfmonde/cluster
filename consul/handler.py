@@ -354,7 +354,7 @@ class Application(object):
             'volumes': [v.name for v in self.volumes]}
 
         do("consul kv put app/{} '{}'"
-           .format(self.name, json.dumps(value)))
+           .format(self.name, json.dumps(value, indent=2)))
         log.info("Registered %s", self.name)
 
     def unregister_kv(self):
