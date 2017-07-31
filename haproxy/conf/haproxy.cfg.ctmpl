@@ -24,11 +24,12 @@ frontend https-in
     {{ range $domain := $d.domains }}use_backend https-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }
 {{ end }}{{ end }}
 
-{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}
+{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "domains" | contains $domain }}{{ else }}
 backend https-{{ $domain }}
     mode tcp
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:443
-{{ end }}{{ end }}
+{{ scratch.MapSet "domains" $domain $domain }}
+{{ end }}{{ end }}{{ end }}
 
 
 frontend http-in
@@ -39,11 +40,11 @@ frontend http-in
 {{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }
 {{ end }}{{ end }}
 
-{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}
+{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "domains" | contains $domain }}{{ else }}
 backend http-{{ $domain }}
     mode http
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:80
-{{ end }}{{ end }}
+{{ end }}{{ end }}{{ end }}
 
 frontend ssh-in
     mode tcp

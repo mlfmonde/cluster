@@ -345,7 +345,7 @@ class Application(object):
             'repo_url': self.repo_url,
             'branch': self.branch,
             'deploy_date': self._deploy_date,
-            'domains': [urlparse(u).netloc for u in urls],
+            'domains': list({urlparse(u).netloc for u in urls}),
             'ip': self.members[master]['ip'],
             'master': master,
             'slave': slave,
