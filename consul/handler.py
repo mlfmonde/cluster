@@ -165,7 +165,7 @@ class Application(object):
         loops = 0
         while loops < 60:
             log.info('Waiting migrate notification for %s', self.name)
-            res = do('consul kv get -keys migrate/{}'.format(self.name))
+            res = do('consul kv get -keys migrate/{}/'.format(self.name))
             if res:
                 status = res.split('/')[-1]
                 do('consul kv delete -recurse migrate/{}/'
@@ -517,6 +517,10 @@ def deploy(payload, myself):
     oldslave = kv(oldapp.name, 'slave')
     newapp = Application(repo_url, branch=branch)
     members = newapp.members
+    log.info('oldapp={}, oldmaster={}, oldslave={}, '
+             'newapp={}, newmaster={}, newslave={}'
+             .format(oldapp.name, oldmaster, oldslave,
+                     newapp.name, newmaster, newslave))
 
     if oldmaster == myself:  # master ->
         log.info('** I was the master of %s', oldapp.name)
