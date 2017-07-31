@@ -19,33 +19,23 @@ frontend https-in
     option socket-stats
     tcp-request inspect-delay 5s
     tcp-request content accept if { req_ssl_hello_type 1 }
-
-{{ range $apps }}{{ $d := .Value | parseJSON }}
-    {{ range $domain := $d.domains }}use_backend https-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }
-{{ end }}{{ end }}
-
 {{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "https" | contains $domain }}{{ else }}
+use_backend https-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }
 backend https-{{ $domain }}
     mode tcp
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:443
-{{ scratch.MapSet "https" $domain $domain }}
-{{ end }}{{ end }}{{ end }}
-
+{{ scratch.MapSet "https" $domain $domain }}{{ end }}{{ end }}{{ end }}
 
 frontend http-in
     mode http
     bind *:80
     option socket-stats
-
-{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }
-{{ end }}{{ end }}
-
 {{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "http" | contains $domain }}{{ else }}
+use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }
 backend http-{{ $domain }}
     mode http
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:80
-{{ scratch.MapSet "http" $domain $domain }}
-{{ end }}{{ end }}{{ end }}
+{{ scratch.MapSet "http" $domain $domain }}{{ end }}{{ end }}{{ end }}
 
 frontend ssh-in
     mode tcp
