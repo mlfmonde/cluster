@@ -357,7 +357,7 @@ class Application(object):
             'branch': self.branch,
             'deploy_date': self._deploy_date,
             'domains': list({urlparse(u).netloc for u in urls}),
-            'urls': urls.join(', '),
+            'urls': ', '.join(urls),
             'ip': self.members[master]['ip'],
             'master': master,
             'slave': slave,
