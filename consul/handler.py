@@ -250,12 +250,20 @@ class Application(object):
             else:
                 raise
 
+    def maintenance(self, enable):
+        """maintenance page"""
+        if enable:
+            do('consul kv put maintenance/{}'.format(self.name))
+        else:
+            do('consul kv delete maintenance/{}'.format(self.name))
+
     def up(self):
         if self.path and exists(self.path):
             log.info("Starting %s", self.name)
             do('docker-compose -p "{}" up -d --build'
                .format(self.project),
                cwd=self.path)
+            self.maintenance(enable=False)
         else:
             log.info("No deployment, cannot start %s", self.name)
 
@@ -263,6 +271,7 @@ class Application(object):
         if self.path and exists(self.path):
             log.info("Stopping %s", self.name)
             v = '-v' if deletevolumes else ''
+            self.maintenance(enable=True)
             do('docker-compose -p "{}" down {}'.format(self.project, v),
                cwd=self.path)
         else:
@@ -348,6 +357,7 @@ class Application(object):
             'branch': self.branch,
             'deploy_date': self._deploy_date,
             'domains': list({urlparse(u).netloc for u in urls}),
+            'urls': urls.join(', '),
             'ip': self.members[master]['ip'],
             'master': master,
             'slave': slave,

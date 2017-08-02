@@ -1,4 +1,8 @@
-{{ range tree "app" }}{{ $k := .Key }}{{ $v := .Value | parseJSON  }}{{ if eq $v.master (env "HOSTNAME")  }}
-{{ $v.caddyfile  }}
-{{ end  }}
-{{ end  }}
+{{ range tree "app" }}{{ $k := .Key }}{{ $v := .Value | parseJSON }}{{ if eq $v.master (env "HOSTNAME") }}{{ if keyExists (print "maintenance/" $k) }}
+{{ $v.urls }} {
+  root /srv
+}
+{{ else }}
+{{ $v.caddyfile }}{{ end }}
+{{ end }}
+{{ end }}
