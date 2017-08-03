@@ -323,7 +323,8 @@ class Application(object):
                 replace=True)
             dirs = Caddyfile.setdir(
                 dirs,
-                ['log', join(CADDYLOGS, self.name + '.access.log'),
+                ['log', '/', join(CADDYLOGS, self.name + '.access.log'),
+                 '"{combined}"',
                  [['rotate_size', '100'],
                   ['rotate_age', '365'],
                   ['rotate_compress'],
