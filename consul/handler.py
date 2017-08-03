@@ -325,7 +325,7 @@ class Application(object):
                 dirs,
                 ['log', join(CADDYLOGS, self.name + '.access.log'),
                  [['rotate_size', '100'],
-                  ['rotate_age', '14'],
+                  ['rotate_age', '365'],
                   ['rotate_keep', '10']]],
                 replace=True)
             host['body'] = dirs
