@@ -1,5 +1,6 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 # coding: utf-8
+import hashlib
 import json
 import logging
 import os
@@ -7,53 +8,132 @@ import re
 import requests
 import socket
 import time
+import unittest
 import yaml
-from base64 import b64decode
-from os.path import basename, join, exists
-from subprocess import run as srun, CalledProcessError, PIPE
+from base64 import b64decode, b64encode
+from contextlib import contextmanager
+from datetime import datetime
+from functools import reduce
+from os.path import basename, join, exists, dirname, abspath
+from shutil import copy, rmtree
+from subprocess import run, CalledProcessError, PIPE
 from sys import stdin, argv
 from urllib.parse import urlparse
+from uuid import uuid1
+DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 DEPLOY = '/deploy'
+CADDYLOGS = '/var/log'
+TEST = False
+HERE = abspath(dirname(__file__))
 log = logging.getLogger()
 
 
-def concat(xs):
-    return [y for x in xs for y in x]
+def concat(l):
+    return reduce(list.__add__, l, [])
 
 
-def _run(cmd, cwd=None, test=False):
+def do(cmd, cwd=None):
+    """ Run a command"""
+    cmd = argv[0] + ' ' + cmd if TEST else cmd
     try:
-        if cwd:
+        if cwd and not TEST:
             cmd = 'cd "{}" && {}'.format(cwd, cmd)
-        if test:
-            print(cmd)
-            return ''
-        else:
-            log.info(cmd)
-            res = srun(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
-            out = res.stdout.decode().strip()
-            return out
+        log.info('Running: ' + cmd)
+        res = run(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
+        return res.stdout.decode().strip()
     except CalledProcessError as e:
         log.error("Failed to run %s: %s", e.cmd, e.stderr.decode())
-        raise
+        raise e
+
+
+def kv(name, key):
+    """ return the current value of the key in the kv"""
+    try:
+        cmd = 'consul kv get app/{}'.format(name)
+        value = json.loads(do(cmd), strict=False)[key]
+        return value
+    except Exception as e:
+        log.warning('Could not read the key "%s" in the KV for %s: %s',
+                    key, name, str(e))
+        return None
 
 
 class Application(object):
-    """commands
+    """ represents a docker compose, its proxy conf and deployment path
     """
-    def __init__(self, repo_url, cwd=None, test=False):
-        self.test = test  # for unit tests
-        self.repo_url = repo_url  # of the git repository
-        name = basename(repo_url.strip('/'))
-        self.repo_name = name[:-4] if name.endswith('.git') else name
-        self.path = join(DEPLOY, self.repo_name)  # path of the checkout
+    def __init__(self, repo_url, branch, cwd=None):
+        self.repo_url, self.branch = repo_url.strip(), branch.strip()
+        if self.repo_url.endswith('.git'):
+            self.repo_url = self.repo_url[:-4]
+        md5 = hashlib.md5(urlparse(self.repo_url.lower()).path.encode('utf-8')
+                          ).hexdigest()
+        repo_name = basename(self.repo_url.strip('/').lower())
+        self.name = repo_name + ('_' + self.branch if self.branch else ''
+                                 ) + '.' + md5[:5]  # don't need full md5
         self._services = None
         self._volumes = None
-        self._lock = False
         self._compose = None
+        self._deploy_date = None
+        self._caddy = {}
 
-    def do(self, cmd, cwd=None, runintest=True):
-        return _run(cmd, cwd=cwd, test=self.test and not runintest)
+    @property
+    def deploy_date(self):
+        """date of the last deployment"""
+        if self._deploy_date is None:
+            self._deploy_date = kv(self.name, 'deploy_date')
+        return self._deploy_date
+
+    def _path(self, deploy_date=None):
+        """path of the deployment checkout"""
+        deploy_date = deploy_date or self.deploy_date
+        if deploy_date:
+            return join(DEPLOY, self.name + '@' + deploy_date)
+        return None
+
+    @property
+    def path(self):
+        return self._path()
+
+    def check(self, master):
+        """consistency check"""
+        all_apps = {
+            s['key']: json.loads(
+                b64decode(s['value']).decode('utf-8'), strict=False)
+            for s in json.loads(do('consul kv export app/'))}
+        # check urls are not already used
+        for service in self.services:
+            try:
+                caddy = self.caddyfile(service)
+            except Exception as e:
+                log.error("Invalid CADDYFILE: %s", str(e))
+                raise
+            caddy_urls = concat([c['keys'] for c in caddy])
+            if len(set(caddy_urls)) != len(caddy_urls):
+                msg = 'Aborting! Duplicate URL in caddyfile'
+                log.error(msg)
+                raise ValueError(msg)
+            caddy_domains = {urlparse(u).netloc for u in caddy_urls}
+            for appname, appconf in all_apps.items():
+                app_urls = concat(
+                    [c['keys'] for c in
+                     Caddyfile.loads(
+                        appconf.get('caddyfile', {'caddyfile': []}))])
+                app_master = appconf['master']
+                app_domains = appconf['domains']
+                if appname.split('/')[1] == self.name:
+                    continue
+                for url in caddy_urls:
+                    if url in app_urls:
+                        msg = ('Aborting! URL {} is already deployed by {}'
+                               .format(url, appname))
+                        log.error(msg)
+                        raise ValueError(msg)
+                if any([d in caddy_domains for d in app_domains]
+                       ) and app_master != master:
+                    msg = ('Warning! A domain of this app is '
+                           'already routed to {}! Also move the other app!'
+                           .format(master))
+                    log.warning(msg)
 
     @property
     def compose(self):
@@ -63,30 +143,42 @@ class Application(object):
             try:
                 with open(join(self.path, 'docker-compose.yml')) as c:
                     self._compose = yaml.load(c.read())
-            except:
-                raise EnvironmentError('Could not read docker-compose.yml')
+            except Exception as e:
+                log.error('Could not read docker-compose.yml: %s', str(e))
+                raise
         return self._compose
 
-    def lock(self):
-        self.do('consul kv put deploying/{}'.format(self.repo_name))
+    @contextmanager
+    def notify_transfer(self):
+        try:
+            yield
+            do('consul kv put migrate/{}/success'.format(self.name))
+        except Exception as e:
+            log.error('Volume migration FAILED! : %s', str(e))
+            do('consul kv put migrate/{}/failure'.format(self.name))
+            self.up()  # TODO move in the deploy
+            raise
+        log.info('Volume migration SUCCEEDED!')
 
-    def unlock(self):
-        self.do('consul kv delete deploying/{}'.format(self.repo_name))
+    def clean_notif(self):
+        do('consul kv delete -recurse migrate/{}/'.format(self.name))
 
-    def wait_lock(self):
+    def wait_transfer(self):
         loops = 0
-        while loops < 60:
-            log.info('Waiting lock release for %s', self.repo_name)
-            try:
-                self.do('consul kv get deploying/{}'.format(self.repo_name))
-            except Exception:
-                log.info('Lock released')
-                return
+        while loops < 120:
+            log.info('Waiting migrate notification for %s', self.name)
+            res = do('consul kv get -keys migrate/{}/'.format(self.name))
+            if res:
+                status = res.split('/')[-1]
+                do('consul kv delete -recurse migrate/{}/'
+                   .format(self.name))
+                log.info('Transfer notification status: %s', status)
+                return status
             time.sleep(1)
             loops += 1
-        self.unlock()
-        log.info('Waited too much :(')
-        raise RuntimeError('deployment of {} failed'.format(self.repo_name))
+        msg = ('Waited too much :( Master did not send a notification for %s')
+        log.info(msg, self.name)
+        raise RuntimeError(msg % self.name)
 
     @property
     def services(self):
@@ -98,346 +190,922 @@ class Application(object):
 
     @property
     def project(self):
-        return re.sub(r'[^a-z0-9]', '', self.repo_name.lower())
+        return re.sub(r'[^a-z0-9]', '', self.name)
+
+    @property
+    def volumes_from_kv(self):
+        """volumes defined in the kv
+        """
+        if self._volumes is None:
+            try:
+                self._volumes = [
+                    Volume(v) for v in kv(self.name, 'volumes')]
+            except:
+                log.info("No volumes found in the kv")
+            self._volumes = self._volumes or []
+        return self._volumes
 
     @property
     def volumes(self):
         """btrfs volumes defined in the compose
         """
-        if self._volumes is None:
-            self._volumes = [
-                Volume(self.project + '_' + v[0], test=self.test)
-                for v in self.compose.get('volumes', {}).items()
-                if v[1] and v[1].get('driver') == 'btrfs']
+        if not self._volumes:
+            try:
+                self._volumes = [
+                    Volume(self.project + '_' + v[0])
+                    for v in self.compose.get('volumes', {}).items()
+                    if v[1] and v[1].get('driver') == 'btrfs']
+            except:
+                log.info("No volumes found in the compose")
+                self._volumes = []
         return self._volumes
 
     def container_name(self, service):
         """did'nt find a way to query reliably so do it static
         It assumes there is only 1 container for a project/service couple
         """
-        return self.project + '_' + service + '_1'
-
-    def compose_domain(self):
-        """domain name of the first exposed service in the compose"""
-        # FIXME prevents from exposing two domains in a compose
-        domains = [self.domain(s) for s in self.services]
-        domains = [d for d in domains if d is not None]
-        domain = domains[0] if domains else ''
-        if not domain:
-            urls = [self.url(s) for s in self.services]
-            urls = [d for d in urls if d is not None]
-            url = urls[0] if urls else ''
-            domain = urlparse(url).netloc.split(':')[0]
-        return domain
-
-    def valueof(self, domain, key):
-        """ return the current value of the key in the kv"""
-        cmd = 'consul kv get site/{}'.format(domain)
-        return json.loads(self.do(cmd))[key]
-
-    @property
-    def slave_node(self):
-        """slave node for the current app """
-        domain = ''
-        try:
-            domain = self.compose_domain()
-            return self.valueof(domain, 'slave')
-        except:
-            log.warn('Could not determine the slave node for %s', domain)
-            return None
-
-    @property
-    def master_node(self):
-        """master node for the current app """
-        domain = ''
-        try:
-            domain = self.compose_domain()
-            return self.valueof(domain, 'node')
-        except:
-            log.warn('Could not determine the master node for %s', domain)
-            return None
+        return self.project + '_' + service + '_1'  # FIXME _1
 
     def clean(self):
-        self.do('rm -rf "{}"'.format(self.path))
+        if self.path and exists(self.path):
+            do('rm -rf "{}"'.format(self.path))
 
-    def fetch(self, retrying=False):
+    def download(self, retrying=False):
         try:
-            if exists(self.path):
-                self.clean()
-            self.do('git clone --depth 1 "{}"'
-                    .format(self.repo_url), cwd=DEPLOY)
+            self.clean()
+            deploy_date = datetime.now().strftime(DTFORMAT)
+            path = self._path(deploy_date)
+            do('git clone --depth 1 {} "{}" "{}"'
+               .format('-b "%s"' % self.branch if self.branch else '',
+                       self.repo_url, path),
+               cwd=DEPLOY)
+            self._deploy_date = deploy_date
             self._services = None
             self._volumes = None
             self._compose = None
         except CalledProcessError:
             if not retrying:
-                log.warn("Failed to fetch %s, retrying", self.repo_name)
-                self.fetch(retrying=True)
+                log.warning("Failed to download %s, retrying", self.repo_url)
+                self.download(retrying=True)
             else:
                 raise
 
-    def start(self):
-        log.info("Starting the project %s", self.repo_name)
-        self.do('docker-compose up -d --build', cwd=self.path)
+    def maintenance(self, enable):
+        """maintenance page"""
+        if enable:
+            do('consul kv put maintenance/{}'.format(self.name))
+        else:
+            do('consul kv delete maintenance/{}'.format(self.name))
 
-    def stop(self):
-        log.info("Stopping the project %s", self.repo_name)
-        self.do('docker-compose down', cwd=self.path)
+    def up(self):
+        if self.path and exists(self.path):
+            log.info("Starting %s", self.name)
+            do('docker-compose -p "{}" up -d --build'
+               .format(self.project),
+               cwd=self.path)
+            self.maintenance(enable=False)
+        else:
+            log.info("No deployment, cannot start %s", self.name)
 
-    def _members(self):
-        if self.test:
-            return (
-                'Node   Address            Status  Type       DC\n'
-                'edjo   10.91.210.58:8301  alive   server     dc1\n'
-                'nepri  10.91.210.57:8301  alive   server     dc1\n'
-                'tayt   10.91.210.59:8301  alive   server     dc1')
-        return self.do('consul members')
+    def down(self, deletevolumes=False):
+        if self.path and exists(self.path):
+            log.info("Stopping %s", self.name)
+            v = '-v' if deletevolumes else ''
+            self.maintenance(enable=True)
+            do('docker-compose -p "{}" down {}'.format(self.project, v),
+               cwd=self.path)
+        else:
+            log.info("No deployment, cannot stop %s", self.name)
 
+    @property
     def members(self):
         members = {}
-        for m in self._members().split('\n')[1:]:
+        for m in do('consul members').split('\n')[1:]:
             name, ip, status = m.split()[:3]
             members[name] = {'ip': ip.split(':')[0], 'status': status}
         return members
 
-    def compose_env(self, service, name, default=None):
-        """retrieve an environment variable from the service in the compose
+    def caddyfile(self, service):
+        """retrieve the caddyfile config from the compose
+        and add defaults values
         """
-        try:
-            val = self.compose['services'][service]['environment'][name]
-            log.info('Found a %s environment variable for '
-                     'service %s in the compose file of %s',
-                     name, service, self.repo_name)
-            return val
-        except:
-            log.info('No %s environment variable for '
-                     'service %s in the compose file of %s',
-                     name, service, self.repo_name)
-            return default
+        # read the caddyfile of the service
+        if self._caddy.get(service) is None:
+            try:
+                name = 'CADDYFILE'
+                caddy = self.compose['services'][service]['environment'][name]
+            except Exception:
+                log.info('No %s environment variable for '
+                         'service %s in the compose file of %s',
+                         name, service, self.name)
+                self._caddy[service] = []
+                return self._caddy[service]
+            try:
+                log.info('Found a %s environment variable for '
+                         'service %s in the compose file of %s',
+                         name, service, self.name)
+                self._caddy[service] = Caddyfile.loads(
+                    caddy.replace('$CONTAINER', self.container_name(service)))
+            except Exception as e:
+                log.info('Invalid %s environment variable for '
+                         'service %s in the compose file of %s: %s',
+                         name, service, self.name, str(e))
 
-    def tls(self, service):
-        """used to disable tls with TLS: self_signed """
-        return self.compose_env(service, 'TLS')
-
-    def url(self, service):
-        """end url to expose the service """
-        return self.compose_env(service, 'URL')
-
-    def redirect_from(self, service):
-        """ list of redirects transmitted to caddy """
-        lines = self.compose_env(service, 'REDIRECT_FROM', '').split('\n')
-        return [l.strip() for l in lines if len(l.split()) == 1]
-
-    def domain(self, service):
-        """deprecated option, don't use """
-        self.compose_env(service, 'DOMAIN')
-
-    def proto(self, service):
-        """frontend protocol configured in the compose for the service.
-        """
-        self.compose_env(service, 'PROTO', 'http://')
-
-    def port(self, service):
-        """frontend port configured in the compose for the service.
-        """
-        self.compose_env(service, 'PORT', '80')
+        for host in self._caddy[service]:
+            dirs = host['body']
+            # default or forced values
+            dirs = Caddyfile.setdir(dirs, ['gzip'])
+            dirs = Caddyfile.setdir(dirs, ['timeouts', '300s'])
+            dirs = Caddyfile.setdir(dirs, ['proxyprotocol', '0.0.0.0/0'])
+            Caddyfile.setsubdirs(
+                dirs, 'proxy',
+                ['transparent', 'websocket', 'insecure_skip_verify'],
+                replace=True)
+            dirs = Caddyfile.setdir(
+                dirs,
+                ['log', '/', join(CADDYLOGS, self.name + '.access.log'),
+                 '"{combined}"',
+                 [['rotate_size', '100'],
+                  ['rotate_age', '365'],
+                  ['rotate_compress'],
+                  ['rotate_keep', '10']]],
+                replace=True)
+            host['body'] = dirs
+        return self._caddy[service] or []
 
     def ps(self, service):
-        ps = self.do('docker ps -f name=%s --format "table {{.Status}}"'
-                     % self.container_name(service))
+        ps = do('docker ps -f name=%s --format "table {{.Status}}"'
+                % self.container_name(service))
         return ps.split('\n')[-1].strip()
 
-    def register_kv(self, target, slave, hostname):
-        """register a service in the key/value store
+    def register_kv(self, master, slave):
+        """register services in the key/value store
         so that consul-template can regenerate the
         caddy and haproxy conf files
         """
         log.info("Registering URLs of %s in the key/value store",
-                 self.repo_name)
-        for service in self.services:
-            domain = self.domain(service)
-            url = self.url(service)
-            redirect_from = self.redirect_from(service)
-            tls = self.tls(service)
-            if not domain and not url:
-                # service not exposed to the web
-                continue
-            if not url:
-                # for backward compatibility
-                url = 'https://{}:443'.format(domain)
-            domain = urlparse(url).netloc.split(':')[0]
-            # store the domain and name in the kv
-            ct = self.container_name(service)
-            port = self.port(service)
-            proto = self.proto(service)
-            value = {
-                'domain': domain,  # deprecated, don't use (domain is the key)
-                'url': url,
-                'redirect_from': redirect_from,
-                'tls': tls,
-                'node': target,
-                'slave': slave,
-                'ip': self.members()[target]['ip'],
-                'ct': '{proto}{ct}:{port}'.format(**locals())}
-            cmd = ("consul kv put site/{} '{}'"
-                   .format(domain, json.dumps(value)))
-            self.do(cmd, runintest=False)
-            log.info("Registered: %s", cmd)
+                 self.name)
+        caddyfiles = concat([self.caddyfile(s) for s in self.services])
+        caddyfiles = [c for c in caddyfiles if c]
+        urls = concat([c['keys'] for c in caddyfiles])
+        if not caddyfiles:
+            return  # no need?
+        pubkey = {
+            s: self.compose['services'][s]['environment'].get('PUBKEY', '')
+            for s in self.services}
+        value = {
+            'caddyfile': Caddyfile.dumps(caddyfiles),
+            'repo_url': self.repo_url,
+            'branch': self.branch,
+            'deploy_date': self._deploy_date,
+            'domains': list({urlparse(u).netloc for u in urls}),
+            'urls': ', '.join(urls),
+            'ip': self.members[master]['ip'],
+            'master': master,
+            'slave': slave,
+            'ct': {s: self.container_name(s) for s in self.services},
+            'pubkey': pubkey,
+            'volumes': [v.name for v in self.volumes]}
+
+        do("consul kv put app/{} '{}'"
+           .format(self.name, json.dumps(value, indent=2)))
+        log.info("Registered %s", self.name)
+
+    def unregister_kv(self):
+        do("consul kv delete app/{}".format(self.name))
 
     def register_consul(self):
-        """register a service in consul
+        """register a service and check in consul
         """
-        try:
-            path = '{}/service.json'.format(self.path)
-            log.info("Registering %s in consul", self.path)
-            content = '{}'
-            with open(path) as f:
-                content = f.read()
-        except Exception:
-            log.error('Could not read %s', path)
-            raise
+        urls = concat([c['keys'] for c in
+                       concat([self.caddyfile(s) for s in self.services])])
+        svc = json.dumps({
+            'Name': self.name,
+            'Checks': [{
+                'HTTP': url,
+                'Interval': '60s'} for url in urls if url]})
         url = 'http://localhost:8500/v1/agent/service/register'
-        svc = json.dumps(json.loads(content))
-        if self.test:
-            print('POST', url, content)
-        else:
-            res = requests.post(url, svc)
-            if res.status_code != 200:
-                raise RuntimeError('Consul service register failed: {}'
-                                   .format(res.reason))
-            log.info("Registered %s in consul", self.path)
+        res = requests.post(url, svc)
+        if res.status_code != 200:
+            msg = 'Consul service register failed: {}'.format(res.reason)
+            log.error(msg)
+            raise RuntimeError(msg)
+        log.info("Registered %s in consul", self.name)
+
+    def unregister_consul(self):
+        res = requests.put(
+            'http://localhost:8500/v1/agent/service/deregister/{}'
+            .format(self.name))
+        if res.status_code != 200:
+            msg = 'Consul service deregister failed: {}'.format(res.reason)
+            log.error(msg)
+            raise RuntimeError(msg)
+        log.info("Deregistered %s in consul", self.name)
+
+    def enable_snapshot(self, enable):
+        """enable or disable scheduled snapshots
+        """
+        for volume in self.volumes_from_kv:
+            volume.schedule_snapshots(60 if enable else 0)
+
+    def enable_replicate(self, enable, ip):
+        """enable or disable scheduled replication
+        """
+        for volume in self.volumes_from_kv:
+            volume.schedule_replicate(60 if enable else 0, ip)
+
+    def enable_purge(self, enable):
+        for volume in self.volumes_from_kv:
+            volume.schedule_purge(1440 if enable else 0, '1h:1d:1w:4w:1y')
 
 
 class Volume(object):
     """wrapper for buttervolume cli
     """
-    def __init__(self, volume, test=False):
-        self.test = test
-        self.volume = volume
-
-    def do(self, cmd, cwd=None):
-        return _run(cmd, cwd=cwd, test=self.test)
+    def __init__(self, name):
+        self.name = name
 
     def snapshot(self):
         """snapshot the volume
         """
-        return self.do("buttervolume snapshot {}".format(self.volume))
+        volumes = [l.split()[1] for l in do(
+                   "docker volume ls -f driver=btrfs").splitlines()[1:]]
+        if self.name in volumes:
+            log.info(u'Snapshotting volume: {}'.format(self.name))
+            return do("buttervolume snapshot {}".format(self.name))
+        else:
+            log.warning('Could not snapshot unexisting volume %s', self.name)
 
     def schedule_snapshots(self, timer):
         """schedule snapshots of the volume
         """
-        self.do("buttervolume schedule snapshot {} {}"
-                .format(timer, self.volume))
+        do("buttervolume schedule snapshot {} {}"
+           .format(timer, self.name))
 
     def schedule_replicate(self, timer, slavehost):
         """schedule a replication of the volume
         """
-        self.do("buttervolume schedule replicate:{} {} {}"
-                .format(slavehost, timer, self.volume))
+        do("buttervolume schedule replicate:{} {} {}"
+           .format(slavehost, timer, self.name))
+
+    def schedule_purge(self, timer, pattern):
+        """schedule a purge of the snapshots
+        """
+        do("buttervolume schedule purge:{} {} {}"
+           .format(pattern, timer, self.name))
 
     def delete(self):
         """destroy a volume
         """
-        return self.do("docker volume rm {}".format(self.volume))
+        log.info(u'Destroying volume: {}'.format(self.name))
+        return do("docker volume rm {}".format(self.name))
 
-    def restore(self, snapshot=None):
+    def restore(self, snapshot=None, target=''):
         if snapshot is None:  # use the latest snapshot
-            snapshot = self.volume
-        self.do("buttervolume restore {}".format(snapshot))
+            snapshot = self.name
+        log.info(u'Restoring snapshot: {}'.format(snapshot))
+        restored = do("buttervolume restore {} {}"
+                      .format(snapshot, target))
+        target = 'as {}'.format(target) if target else ''
+        log.info('Restored %s %s (after a backup: %s)',
+                 snapshot, target, restored)
 
     def send(self, snapshot, target):
-        self.do("buttervolume send {} {}".format(target, snapshot))
+        log.info(u'Sending snapshot: {}'.format(snapshot))
+        do("buttervolume send {} {}".format(target, snapshot))
 
 
-def handle_one(event, hostname, test=False):
-    event_name = event.get('Name')
-    payload = event.get('Payload')
-    if not payload:
-        return
-    if event_name == 'deploymaster':
-        deploymaster(b64decode(payload), hostname, test)
-    else:
-        log.error('Unknown event name: {}'.format(event_name))
-
-
-def handle(events, hostname, test=False):
+def handle(events, myself):
+    HANDLED = join(DEPLOY, 'events.log')
+    if not exists(HANDLED):
+        open(HANDLED, 'x')
     for event in json.loads(events):
-        handle_one(event, hostname, test)
+        event_id = event.get('ID')
+        if event_id + '\n' in open(HANDLED, 'r').readlines():
+            log.info('Event already handled in the past: %s', event_id)
+            continue
+        open(HANDLED, 'a').write(event_id + '\n')
+        event_name = event.get('Name')
+        payload = b64decode(event.get('Payload', '')).decode('utf-8')
+        if not payload:
+            return
+        log.info(u'**** Received event: {} with ID: {} and payload: {}'
+                 .format(event_name, event_id, payload))
+        try:
+            payload = json.loads(payload)
+        except Exception as e:
+            msg = 'Wrong event payload format. Please provide json: %s'
+            log.error(msg, str(e))
+            raise
 
-
-def deploymaster(payload, hostname, test):
-    """Keep in mind this is executed in the consul container
-    Deployments are done in the DEPLOY folder.
-    Any remaining stuff in this folder are a sign of a failed deploy
-    """
-    # check
-    try:
-        if len(payload.split()) == 2:  # just target
-            target = payload.split()[0].decode()
-            slave = None
-            repo_url = payload.split()[1].decode()
-        elif len(payload.split()) == 3:  # target + slave
-            target = payload.split()[0].decode()
-            slave = payload.split()[1].decode()
-            repo_url = payload.split()[2].decode()
+        if event_name == 'deploy':
+            deploy(payload, myself)
+        elif event_name == 'destroy':
+            destroy(payload, myself)
+        elif event_name == 'migrate':
+            migrate(payload, myself)
         else:
-            raise Exception
-    except Exception as e:
-        log.error('deploymaster error: '
-                  'you should specify "<target> <repo>" '
-                  'or "<target> <slave> <repo>"')
-        raise(e)
-    app = Application(repo_url, test=test)
-    master_node = app.master_node
-    if hostname == target:
-        app.fetch()
-        oldslave = app.slave_node
-        master_node = app.master_node
-        time.sleep(2)
-        for volume in app.volumes:
-            if oldslave is not None:
-                volume.schedule_replicate(0, app.members()[oldslave]['ip'])
-            volume.schedule_snapshots(0)
-        if master_node is not None and master_node != hostname:
-            app.wait_lock()
-            for volume in app.volumes:
-                volume.restore()
-        for volume in app.volumes:
-            if slave is not None:
-                volume.schedule_replicate(60, app.members()[slave]['ip'])
+            log.error('Unknown event name: {}'.format(event_name))
+
+
+def deploy(payload, myself):
+    """Keep in mind this is executed in the consul container
+    Deployments are done in the DEPLOY folder. Needs:
+    {"repo"': <url>, "branch": <branch>, "master": <host>, "slave": <host>}
+    """
+    repo_url = payload['repo']
+    newmaster = payload['master']
+    newslave = payload.get('slave')
+    if newmaster == newslave:
+        msg = "Slave must be different than the Master"
+        log.error(msg)
+        raise AssertionError(msg)
+    branch = payload.get('branch')
+    if not branch:
+        msg = "Branch is mandatory"
+        log.error(msg)
+        raise AssertionError(msg)
+
+    oldapp = Application(repo_url, branch=branch)
+    oldmaster = kv(oldapp.name, 'master')
+    oldslave = kv(oldapp.name, 'slave')
+    newapp = Application(repo_url, branch=branch)
+    members = newapp.members
+    log.info('oldapp={}, oldmaster={}, oldslave={}, '
+             'newapp={}, newmaster={}, newslave={}'
+             .format(oldapp.name, oldmaster, oldslave,
+                     newapp.name, newmaster, newslave))
+
+    if oldmaster == myself:  # master ->
+        log.info('** I was the master of %s', oldapp.name)
+        oldapp.down()
+        if oldslave:
+            oldapp.enable_replicate(False, members[oldslave]['ip'])
+        else:
+            oldapp.enable_snapshot(False)
+        oldapp.enable_purge(False)
+        newapp.clean_notif()
+        if newmaster == myself:  # master -> master
+            log.info("** I'm still the master of %s", newapp.name)
+            for volume in oldapp.volumes_from_kv:
+                volume.snapshot()
+            newapp.download()
+            newapp.check(newmaster)
+            newapp.up()
+            if newslave:
+                newapp.enable_replicate(True, members[newslave]['ip'])
             else:
-                volume.schedule_snapshots(60)
-        app.register_kv(target, slave, hostname)  # for consul-template
-        app.register_consul()  # for consul check
-        app.start()
-    elif hostname == master_node:
-        app.lock()
-        # first replicate live to lower downtime
-        for volume in app.volumes:
-            volume.schedule_snapshots(0)
-            oldslave = app.slave_node
-            if oldslave is not None:
-                volume.schedule_replicate(0, app.members()[oldslave]['ip'])
-            volume.send(volume.snapshot(), app.members()[target]['ip'])
-        # then stop and replicate again (should be faster)
-        app.stop()
-        for volume in app.volumes:
-            volume.send(volume.snapshot(), app.members()[target]['ip'])
-        app.unlock()
-        for volume in app.volumes:
-            volume.delete()
+                newapp.enable_snapshot(True)
+            newapp.enable_purge(True)
+            newapp.register_kv(newmaster, newslave)  # for consul-template
+            newapp.register_consul()  # for consul check
+        elif newslave == myself:  # master -> slave
+            log.info("** I'm now the slave of %s", newapp.name)
+            with newapp.notify_transfer():
+                for volume in newapp.volumes_from_kv:
+                    volume.send(volume.snapshot(), members[newmaster]['ip'])
+            oldapp.unregister_consul()
+            oldapp.down(deletevolumes=True)
+            newapp.enable_purge(True)
+        else:  # master -> nothing
+            log.info("** I'm nothing now for %s", newapp.name)
+            with newapp.notify_transfer():
+                for volume in newapp.volumes_from_kv:
+                    volume.send(volume.snapshot(), members[newmaster]['ip'])
+            oldapp.unregister_consul()
+            oldapp.down(deletevolumes=True)
+        oldapp.clean()
+
+    elif oldslave == myself:  # slave ->
+        log.info("** I was the slave of %s", oldapp.name)
+        oldapp.enable_purge(False)
+        if newmaster == myself:  # slave -> master
+            log.info("** I'm now the master of %s", newapp.name)
+            newapp.download()
+            newapp.check(newmaster)
+            newapp.wait_transfer()  # wait for master notification
+            for volume in newapp.volumes_from_kv:
+                volume.restore()
+            newapp.up()
+            if newslave:
+                newapp.enable_replicate(True, members[newslave]['ip'])
+            else:
+                newapp.enable_snapshot(True)
+            newapp.enable_purge(True)
+            newapp.register_kv(newmaster, newslave)  # for consul-template
+            newapp.register_consul()  # for consul check
+        elif newslave == myself:  # slave -> slave
+            log.info("** I'm still the slave of %s", newapp.name)
+            newapp.enable_purge(True)
+        else:  # slave -> nothing
+            log.info("** I'm nothing now for %s", newapp.name)
+
+    else:  # nothing ->
+        log.info("** I was nothing for %s", oldapp.name)
+        if newmaster == myself:  # nothing -> master
+            log.info("** I'm now the master of %s", newapp.name)
+            newapp.download()
+            newapp.check(newmaster)
+            if oldmaster:
+                newapp.wait_transfer()  # wait for master notification
+                for volume in newapp.volumes_from_kv:
+                    volume.restore()
+            newapp.up()
+            if newslave:
+                newapp.enable_replicate(True, members[newslave]['ip'])
+            else:
+                newapp.enable_snapshot(True)
+            newapp.enable_purge(True)
+            newapp.register_kv(newmaster, newslave)  # for consul-template
+            newapp.register_consul()  # for consul check
+        elif newslave == myself:  # nothing -> slave
+            log.info("** I'm now the slave of %s", newapp.name)
+            newapp.download()
+            newapp.enable_purge(True)
+        else:  # nothing -> nothing
+            log.info("** I'm still nothing for %s", newapp.name)
+
+
+def destroy(payload, myself):
+    """Destroy containers, unregister, remove schedules and volumes,
+    but keep snapshots. Needs:
+    {"repo"': <url>, "branch": <branch>}
+    """
+    repo_url = payload['repo']
+    branch = payload.get('branch')
+    if not branch:
+        msg = "Branch is mandatory"
+        log.error(msg)
+        raise AssertionError(msg)
+
+    oldapp = Application(repo_url, branch=branch)
+    oldmaster = kv(oldapp.name, 'master')
+    oldslave = kv(oldapp.name, 'slave')
+    members = oldapp.members
+
+    if oldmaster == myself:  # master ->
+        log.info('I was the master of %s', oldapp.name)
+        oldapp.down()
+        oldapp.unregister_consul()
+        if oldslave:
+            oldapp.enable_replicate(False, members[oldslave]['ip'])
+        else:
+            oldapp.enable_snapshot(False)
+        oldapp.enable_purge(False)
+        oldapp.unregister_kv()
+        for volume in oldapp.volumes_from_kv:
+            volume.snapshot()
+        oldapp.down(deletevolumes=True)
+        oldapp.clean()
+    elif oldslave == myself:  # slave ->
+        log.info("I was the slave of %s", oldapp.name)
+        oldapp.enable_purge(False)
+    else:  # nothing ->
+        log.info("I was nothing for %s", oldapp.name)
+    log.info("Successfully destroyed")
+
+
+def migrate(payload, myself):
+    """migrate volumes from one app to another. Needs:
+    {"repo"': <url>, "branch": <branch>,
+     "target": {"repo": <url>, "branch": <branch>}}
+    If the "repo" or "branch" of the "target" is not given, it is the same as
+    the source
+    """
+    repo_url = payload['repo']
+    branch = payload['branch']
+    target = payload['target']
+    assert(target.get('repo') or target.get('branch'))
+
+    sourceapp = Application(repo_url, branch=branch)
+    targetapp = Application(target.get('repo', repo_url),
+                            branch=target.get('branch', branch))
+    source_node = kv(sourceapp.name, 'master')
+    target_node = kv(targetapp.name, 'master')
+    if source_node != myself and target_node != myself:
+        log.info('Not concerned by this event')
+        return
+    source_volumes = []
+    target_volumes = []
+    # find common volumes
+    for source_volume in sourceapp.volumes:
+        source_name = source_volume.name.split('_', 1)[1]
+        for target_volume in targetapp.volumes:
+            target_name = target_volume.name.split('_', 1)[1]
+            if source_name == target_name:
+                source_volumes.append(source_volume)
+                target_volumes.append(target_volume)
+            else:
+                continue
+    log.info('Found %s volumes to restore: %s',
+             len(source_volumes), repr([v.name for v in source_volumes]))
+    # tranfer and restore volumes
+    if source_node != target_node:
+        if source_node == myself:
+            with sourceapp.notify_transfer():
+                for volume in source_volumes:
+                    volume.send(
+                        volume.snapshot(),
+                        targetapp.members[target_node]['ip'])
+        if target_node == myself:
+            sourceapp.wait_transfer()
+    if target_node == myself:
+        targetapp.down()
+        for source_vol, target_vol in zip(source_volumes, target_volumes):
+            source_vol.restore(target=target_vol.name)
+        targetapp.up()
+    log.info('Restored %s to %s', sourceapp.name, targetapp.name)
+
+
+class Caddyfile():
+    """https://caddyserver.com/docs/caddyfile#format
+    """
+    @classmethod
+    def loads(cls, caddyfile):
+        return cls.parse(caddyfile.splitlines(), [])
+
+    @classmethod
+    def split(cls, lines, line, substring=False, sep=' '):
+        """split the line but take newlines into account in substrings
+        line: the line to split
+        lines: the remaining lines
+        """
+        out = []
+        for i, c in enumerate(line):
+            out = out or ['']
+            if c in ('"', "'"):
+                substring = not substring
+            elif c == sep:
+                if not out[-1]:
+                    continue
+                if substring:
+                    out[-1] += c
+                else:
+                    out.append('')
+            else:
+                out[-1] += c
+        if substring:
+            nextsplit = cls.split(lines, lines.pop(0), substring=True)
+            out[-1] += '\n' + nextsplit[0]
+            out += nextsplit[1:]
+        return out
+
+    @classmethod
+    def parse(cls, lines, body, level=0):
+        """level 0 is the root of the caddyfile
+           level 1 is inside the definitions
+           level 2 is forbidden
+        """
+        keys = []
+        while True:
+            if not lines:
+                return body
+            line = cls.split(lines, lines.pop(0))
+            if not line:
+                continue
+            if level == 0:
+                if keys and keys[-1][-1] == ',':
+                    keys += line
+                else:
+                    keys = line
+                if keys[-1][-1] == ',':
+                    continue
+                keys = [k[:-1] if k[-1] == ',' else k
+                        for k in keys if k != ',']
+            else:
+                keys = line
+            if keys[-1] == '{':
+                if level == 0:
+                    body.append({'keys': keys[:-1],
+                                 'body': cls.parse(lines, [], level=level+1)})
+                elif level == 1:
+                    body.append(
+                        keys[:-1] + [cls.parse(lines, [], level=level+1)])
+                else:
+                    raise Exception('Blocks are not allowed in subdirectives')
+            elif keys == ['}']:
+                return body
+            else:
+                body.append(keys)
+            keys = []
+
+    @classmethod
+    def dumps(cls, caddylist):
+        out = ''
+        for i, host in enumerate(caddylist):
+            out += ', '.join(host['keys']) + ' {\n'
+            for directive in host['body']:
+                for j, diritem in enumerate(directive):
+                    if type(diritem) is list:
+                        out += ' {\n'
+                        for subdir in diritem:
+                            if type(subdir) is list:
+                                out += 8*' ' + ' '.join(subdir) + '\n'
+                            else:
+                                out += 8*' ' + subdir + '\n'
+                        out += '    }'
+                    else:
+                        q = '"' if ' ' in diritem or '\n' in diritem else ''
+                        out += (4*' ' if j == 0 else ' ') + q + diritem + q
+                    out += '\n' if j+1 == len(directive) else ''
+            out += '}' + ('\n' if i+1 < len(caddylist) else '')
+        return out
+
+    @classmethod
+    def setdir(cls, dirs, directive, replace=False):
+        """set a default or forced directive """
+        key = directive[0]
+        if replace:
+            dirs = [d for d in dirs if d[0] != key]
+        if key not in [i[0] for i in dirs]:
+            dirs.append(directive)
+        return dirs
+
+    @classmethod
+    def setsubdirs(cls, dirs, key, subdirs, replace=False):
+        """add or replace subdirectivess in the directive"""
+        for d in dirs:
+            if d[0] != key:
+                continue
+            if type(d[-1]) is list:
+                if replace:
+                    d.pop(-1)
+                    d.append(subdirs)
+                else:
+                    d[-1] = sorted(set(d[-1]).union(set(subdirs)))
+            else:
+                d.append(subdirs)
+        return dirs
+
+
+class TestCase(unittest.TestCase):
+    repo_url = 'https://gitlab.example.com/hosting/FooBar '
+    data = [
+        {'caddy':  'foo {\n    root /bar\n}',  # 0
+         'json':  '[{"keys":  ["foo"], "body":  [["root", "/bar"]]}]'},
+        {'caddy':  'host1, host2 {\n    dir {\n        def\n    }\n}',  # 1
+         'json':  '[{"keys":  ["host1", "host2"], '
+                  '"body":  [["dir", [["def"]]]]}]'},
+        {'caddy':  'host1, host2 {\n    dir abc {\n'
+                   '        def ghi\n        jkl\n    }\n}',  # 2
+         'json':  '[{"keys": ["host1", "host2"], '
+                  '"body": [["dir", "abc", [["def", "ghi"], ["jkl"]]]]}]'},
+        {'caddy':  'host1:1234, host2:5678 {\n'
+                   '    dir abc {\n    }\n}',  # 3
+         'json':  '[{"keys": ["host1:1234", "host2:5678"], '
+                  '"body": [["dir", "abc", []]]}]'},
+        {'caddy':  'host {\n    foo "bar baz"\n}',  # 4
+         'json':  '[{"keys": ["host"], "body": [["foo", "bar baz"]]}]'},
+        {'caddy':  'host, host:80 {\n    foo "bar \"baz\"\n}',  # 5
+         'json':  '[{"keys": ["host", "host:80"], '
+                  '"body": [["foo", "bar \"baz\""]]}]'},
+        {'caddy':  'host {\n    foo "bar\nbaz"\n}',  # 6
+         'json':  '[{"keys": ["host"], "body": [["foo", "bar\nbaz"]]}]'},
+        {'caddy':  'host {\n    dir 123 4.56 true\n}',  # 7
+         'json':  '[{"keys": ["host"], '
+                  '"body": [["dir", "123", "4.56", "true"]]}]'},
+        {'caddy':  'http://host, https://host {\n}',  # 8
+         'json':  '[{"keys": ["http://host", "https://host"], "body": []}]'},
+        {'caddy':  'host {\n    dir1 a b\n    dir2 c d\n}',  # 9
+         'json':  '[{"keys": ["host"], '
+                  '"body": [["dir1", "a", "b"], ["dir2", "c", "d"]]}]'},
+        {'caddy':  'host {\n    dir a b\n    dir c d\n}',  # 10
+         'json':  '[{"keys": ["host"], '
+                  '"body": [["dir", "a", "b"], ["dir", "c", "d"]]}]'},
+        {'caddy':  'host {\n    dir1 a b\n    '
+                   'dir2 {\n        c\n        d\n    }\n}',  # 11
+         'json':  '[{"keys": ["host"], '
+                  '"body": [["dir1", "a", "b"], ["dir2", [["c"], ["d"]]]]}]'},
+        {'caddy':  'host1 {\n    dir1\n}\nhost2 {\n    dir2\n}',  # 12
+         'json':  '[{"keys": ["host1"], '
+                  '"body": [["dir1"]]}, '
+                  '{"keys": ["host2"], "body": [["dir2"]]}]'},
+        {'caddy':  '', 'json':  '[]'},  # 13
+        ]
+
+    def setUp(self):
+        DEPLOY = '/tmp/deploy'
+        os.makedirs(DEPLOY, exist_ok=True)
+        open(join(DEPLOY, 'kv'), 'w').write('{}')
+
+    def tearDown(self):
+        if DEPLOY.startswith('/tmp'):
+            rmtree(DEPLOY)
+
+    def test_split(self):
+        self.assertEqual([], Caddyfile.split([], ''))
+        self.assertEqual(['a', 'z', 'e'], Caddyfile.split([], 'a z e'))
+        self.assertEqual(['a', 'z e'], Caddyfile.split([], 'a "z e"'))
+        self.assertEqual(['a z e'], Caddyfile.split([], '"a z e"'))
+        self.assertEqual(['az', 'er ty', 'ui'],
+                         Caddyfile.split([], 'az "er ty" ui'))
+        self.assertEqual(['az', 'er ty', 'ui'],
+                         Caddyfile.split([], "az 'er ty' ui"))
+        self.assertEqual(['foo\nbar'],
+                         Caddyfile.split(['bar"', 'baz'], '"foo'))
+
+    def test_caddy2json(self):
+        for i, d in enumerate(self.data):
+            if i == 5:
+                print('test # {} skipped, plz help!'.format(i))
+                continue
+            self.assertEqual(
+                json.dumps(json.loads(d['json'], strict=False),
+                           sort_keys=True),
+                json.dumps(Caddyfile.loads(d['caddy']), sort_keys=True))
+            print('test # {} ok'.format(i))
+
+    def test_json2caddy(self):
+        for i, d in enumerate(self.data):
+            if i == 5:
+                print('test # {} skipped, plz help!'.format(i))
+                continue
+            self.assertEqual(
+                d['caddy'],
+                Caddyfile.dumps(json.loads(d['json'], strict=False)))
+            print('test # {} ok'.format(i))
+
+    def test_reversibility(self):
+        for i, d in enumerate(self.data):
+            if i == 5:
+                print('test # {} skipped, plz help!'.format(i))
+                continue
+            self.assertEqual(
+                d['caddy'],
+                Caddyfile.dumps(Caddyfile.loads(d['caddy'])))
+            print('test # {} ok'.format(i))
+
+    def test_setdir(self):
+        self.assertEqual(
+            [['proxy', '/', 'ct:80'], ['other', 'foo']],
+            Caddyfile.setdir([['proxy', '/', 'ct:80']], ['other', 'foo']))
+        self.assertEqual(
+            [['gzip', 'foo']],
+            Caddyfile.setdir([['gzip']], ['gzip', 'foo'], replace=True))
+
+    def test_setsubdirs(self):
+        self.assertEqual(
+            [['proxy', ['subdir1', 'subdir2']]],
+            Caddyfile.setsubdirs(
+                [['proxy']], 'proxy', ['subdir1', 'subdir2']))
+        self.assertEqual(
+            [['proxy', ['s1', 's2', 's3']]],
+            Caddyfile.setsubdirs(
+                [['proxy', ['s1']]], 'proxy', ['s2', 's3']))
+        self.assertEqual(
+            [['proxy', ['s2', 's3']]],
+            Caddyfile.setsubdirs(
+                [['proxy', ['s1']]], 'proxy', ['s2', 's3'], replace=True))
+        self.assertEqual(
+            [['gzip']],  # would need setdir first
+            Caddyfile.setsubdirs(
+                [['gzip']], 'proxy', ['s2', 's3'], replace=True))
+
+    def test_application_init(self):
+        app = Application(self.repo_url, branch='master')
+        self.assertEqual(
+            app.repo_url,
+            'https://gitlab.example.com/hosting/FooBar')
+        self.assertEqual(app.name, 'foobar_master.ddb14')
+
+    def test_kv(self):
+        self.maxDiff = None
+        do('consul kv put app/baz \'{}\''
+           .format(json.dumps({'repo_url': 'adr1'})))
+        self.assertEqual('adr1', kv('baz', 'repo_url'))
+        self.assertEqual(None, kv('foobar_master.ddb14', 'foobar'))
+        self.assertEqual(None, kv('foo', 'bar'))
+
+    def test_check(self):
+        app = Application(self.repo_url, 'master')
+        app.download()
+        self.assertEqual(None, app.check('node1'))
+        # already deployed
+        app.register_kv('node1', 'node2')
+        app.name = 'new'
+        self.assertRaises(ValueError, app.check, 'node1')
+
+    def test_volumes(self):
+        app = Application(self.repo_url, 'master')
+        app.download()
+        self.assertEqual(
+            ['foobarmasterddb14_dbdata', 'foobarmasterddb14_wwwdata'],
+            sorted(v.name for v in app.volumes))
+
+    def test_volumes_from_kv(self):
+        app = Application(self.repo_url, 'master')
+        app.download()
+        app.register_kv('node1', 'node2')
+        self.assertEqual(
+            ['foobarmasterddb14_dbdata', 'foobarmasterddb14_wwwdata'],
+            sorted(v.name for v in app.volumes_from_kv))
+
+    def test_members(self):
+        app = Application(self.repo_url, 'master')
+        members = app.members
+        self.assertEqual(['node1', 'node2', 'node3'], sorted(members.keys()))
+        self.assertEqual(['ip', 'status'], sorted(members['node1'].keys()))
+
+    def test_register_kv(self):
+        app = Application(self.repo_url, 'master')
+        app.download()
+        self.assertEqual(None, app.register_kv('node1', 'node2'))
+
+    def test_register_consul(self):
+        app = Application(self.repo_url, 'master')
+        app.download()
+        self.assertEqual(None, app.register_consul())
+
+    def test_pubkey(self):
+        app = Application(self.repo_url, 'master')
+        app.download()
+        self.assertEqual(None, app.register_kv('node1', 'node2'))
+
+
+class FakeExec(object):
+    """fake executables for tests
+    """
+    faked = ('consul', 'git')
+
+    @classmethod
+    def run(cls, cmd):
+        if cmd.startswith('consul kv get '):
+            return b64decode(json.loads(
+                open(join(DEPLOY, 'kv')).read()
+                     )[cmd.split(' ', 3)[3]]).decode('utf-8')
+        elif cmd == 'consul kv export app/':
+            return json.dumps(
+                [{'key': k, 'flags': 0, 'value': v} for k, v in
+                 json.loads(open(join(DEPLOY, 'kv')).read()).items()])
+        elif cmd.startswith('git clone --depth 1 -b master '):
+            appname = cmd.split(' ')[6].split('/')[-1]
+            checkout = cmd.split(' ', 7)[-1]
+            os.mkdir(join(DEPLOY, checkout))
+            copy(join(dirname(HERE), 'testapp', '{}.yml'.format(appname)),
+                 join(DEPLOY, checkout, 'docker-compose.yml'))
+        elif cmd == 'consul members':
+            return (
+                'Node   Address            Status  Type       DC\n'
+                'node1   10.10.10.11:8301  alive   server     dc1\n'
+                'node2   10.10.10.12:8301  alive   server     dc1\n'
+                'node3   10.10.10.13:8301  alive   server     dc1')
+        elif cmd.startswith('consul kv put'):
+            k, v = cmd.split(' ', 3)[-1].split(' ', 1)
+            kv = json.loads(open(join(DEPLOY, 'kv')).read())
+            kv[k] = b64encode(v.encode('utf-8')).decode('utf-8')
+            open(join(DEPLOY, 'kv'), 'w').write(json.dumps(kv))
+        else:
+            raise NotImplementedError
+
+
+class TestRequests(object):
+    """fake requests.post"""
+    @staticmethod
+    def post(url, svc):
+        class Result:
+            def __init__(self, code):
+                self.status_code = code
+        if '"Checks": [{' in svc and 'test.example.com' in svc:
+            return Result(200)
+        else:
+            return Result(500)
 
 
 if __name__ == '__main__':
+    if (len(argv) == 2 and argv[1].lower() == 'test'
+            or (len(argv) >= 2 and argv[1] in FakeExec.faked)):
+        DEPLOY = '/tmp/deploy'
+        os.makedirs(DEPLOY, exist_ok=True)
+
+    logformat = '{asctime}\t{levelname}\t{message}'
     logging.basicConfig(level=logging.DEBUG,
-                        format='{asctime}\t{levelname}\t{message}',
+                        format=logformat,
                         filename=join(DEPLOY, 'handler.log'),
                         style='{')
-    try:  # test mode?
-        test = argv[0] == 'test'
-    except:
-        test = False
-    test = os.environ.get('TEST', test) and True or False
-    hostname = socket.gethostname()
-    # read json from stdin
-    handle(len(argv) == 2 and argv[1] or stdin.read(), hostname, test)
+    ch = logging.StreamHandler()
+    ch.setFormatter(logging.Formatter(logformat, style='{'))
+    logging.getLogger().addHandler(ch)
+
+    myself = socket.gethostname()
+    manual_input = None
+
+    if len(argv) >= 2 and argv[1] in FakeExec.faked:
+        # mock some executables
+        print(FakeExec.run(' '.join(argv[1:])))
+    elif len(argv) == 2 and argv[1].lower() == 'test':
+        # run some unittests
+        argv.pop(-1)
+        TEST = True
+        requests.post = TestRequests.post
+        unittest.main(verbosity=2)
+    elif len(argv) >= 3:
+        # allow to launch manually inside consul docker
+        event = argv[1]
+        payload = b64encode(' '.join(argv[2:]).encode('utf-8')).decode('utf-8')
+        manual_input = json.dumps([{
+            'ID': str(uuid1()), 'Name': event,
+            'Payload': payload, 'Version': 1, 'LTime': 1}])
+        handle(manual_input, myself)
+    else:
+        # run what's given by consul watch
+        handle(stdin.read(), myself)

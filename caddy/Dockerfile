@@ -23,7 +23,7 @@ VOLUME /root/.caddy
 WORKDIR /srv
 
 COPY conf/ /etc/caddy/
-COPY index.html /srv/index.html
+COPY index /srv/
 
 ENTRYPOINT ["/usr/bin/caddy"]
 CMD ["--conf", "/etc/caddy/Caddyfile", "--log", "stdout"]
