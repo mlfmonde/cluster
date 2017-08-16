@@ -25,7 +25,7 @@ frontend https-in
 {{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttps" | contains $domain }}{{ else }}
 backend https-{{ $domain }}
     mode tcp
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:1443 send-proxy
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:1443{{ end }} send-proxy
 {{ scratch.MapSet "backhttps" $domain $domain }}{{ end }}{{ end }}{{ end }}
 
 frontend http-in
@@ -38,7 +38,7 @@ frontend http-in
 {{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttp" | contains $domain }}{{ else }}
 backend http-{{ $domain }}
     mode http
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:1080 send-proxy
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:80{{ else }}{{ $d.ip }}:1080{{ end }} send-proxy
 {{ scratch.MapSet "backhttp" $domain $domain }}{{ end }}{{ end }}{{ end }}
 
 frontend ssh-in
