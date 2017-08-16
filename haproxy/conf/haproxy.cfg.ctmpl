@@ -16,6 +16,7 @@ defaults
 frontend https-in
     mode tcp
     bind *:443
+    bind *:1443 accept-proxy
     option socket-stats
     tcp-request inspect-delay 5s
     tcp-request content accept if { req_ssl_hello_type 1 }
@@ -24,19 +25,20 @@ frontend https-in
 {{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttps" | contains $domain }}{{ else }}
 backend https-{{ $domain }}
     mode tcp
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:443 send-proxy
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:1443 send-proxy
 {{ scratch.MapSet "backhttps" $domain $domain }}{{ end }}{{ end }}{{ end }}
 
 frontend http-in
     mode http
     bind *:80
+    bind *:1080 accept-proxy
     option socket-stats
 {{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "fronthttp" | contains $domain }}{{ else }}    use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }
 {{ scratch.MapSet "fronthttp" $domain $domain }}{{ end }}{{ end }}{{ end }}
 {{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttp" | contains $domain }}{{ else }}
 backend http-{{ $domain }}
     mode http
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:80 send-proxy
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy{{ else }}{{ $d.ip }}{{ end }}:1080 send-proxy
 {{ scratch.MapSet "backhttp" $domain $domain }}{{ end }}{{ end }}{{ end }}
 
 frontend ssh-in
