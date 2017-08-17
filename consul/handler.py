@@ -164,8 +164,7 @@ class Application(object):
         do('consul kv delete -recurse migrate/{}/'.format(self.name))
 
     def wait_transfer(self):
-        loops = 0
-        while loops < 120:
+        for loop in range(120):
             log.info('Waiting migrate notification for %s', self.name)
             res = do('consul kv get -keys migrate/{}/'.format(self.name))
             if res:
@@ -175,7 +174,6 @@ class Application(object):
                 log.info('Transfer notification status: %s', status)
                 return status
             time.sleep(1)
-            loops += 1
         msg = ('Waited too much :( Master did not send a notification for %s')
         log.info(msg, self.name)
         raise RuntimeError(msg % self.name)
