@@ -157,6 +157,7 @@ class Application(object):
             log.error('Volume migration FAILED! : %s', str(e))
             do('consul kv put migrate/{}/failure'.format(self.name))
             self.up()  # TODO move in the deploy
+            self.maintenance(enable=False)  # TODO move
             raise
         log.info('Volume migration SUCCEEDED!')
 
@@ -284,7 +285,6 @@ class Application(object):
             do('docker-compose -p "{}" up -d --build'
                .format(self.project),
                cwd=self.path)
-            self.maintenance(enable=False)
         else:
             log.info("No deployment, cannot start %s", self.name)
 
@@ -292,7 +292,6 @@ class Application(object):
         if self.path and exists(self.path):
             log.info("Stopping %s", self.name)
             v = '-v' if deletevolumes else ''
-            self.maintenance(enable=True)
             do('docker-compose -p "{}" down {}'.format(self.project, v),
                cwd=self.path)
         else:
@@ -561,6 +560,7 @@ def deploy(payload, myself):
 
     if oldmaster == myself:  # master ->
         log.info('** I was the master of %s', oldapp.name)
+        oldapp.maintenance(enable=True)
         oldapp.down()
         if oldslave:
             oldapp.enable_replicate(False, members[oldslave]['ip'])
@@ -582,6 +582,7 @@ def deploy(payload, myself):
             newapp.enable_purge(True)
             newapp.register_kv(newmaster, newslave)  # for consul-template
             newapp.register_consul()  # for consul check
+            newapp.maintenance(enable=False)
         elif newslave == myself:  # master -> slave
             log.info("** I'm now the slave of %s", newapp.name)
             with newapp.notify_transfer():
@@ -617,6 +618,7 @@ def deploy(payload, myself):
             newapp.enable_purge(True)
             newapp.register_kv(newmaster, newslave)  # for consul-template
             newapp.register_consul()  # for consul check
+            newapp.maintenance(enable=False)
         elif newslave == myself:  # slave -> slave
             log.info("** I'm still the slave of %s", newapp.name)
             newapp.enable_purge(True)
@@ -650,6 +652,7 @@ def deploy(payload, myself):
             newapp.enable_purge(True)
             newapp.register_kv(newmaster, newslave)  # for consul-template
             newapp.register_consul()  # for consul check
+            newapp.maintenance(enable=False)
         elif newslave == myself:  # nothing -> slave
             log.info("** I'm now the slave of %s", newapp.name)
             newapp.download()
@@ -742,10 +745,12 @@ def migrate(payload, myself):
         if target_node == myself:
             sourceapp.wait_transfer()
     if target_node == myself:
+        targetapp.maintenance(enable=True)
         targetapp.down()
         for source_vol, target_vol in zip(source_volumes, target_volumes):
             source_vol.restore(target=target_vol.name)
         targetapp.up()
+        targetapp.maintenance(enable=False)
     log.info('Restored %s to %s', sourceapp.name, targetapp.name)
 
 
