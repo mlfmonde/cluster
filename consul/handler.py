@@ -634,11 +634,9 @@ def deploy(payload, myself):
             if newapp.migrating_cluster:  # remove after v2
                 time.sleep(1)
                 newapp.old_wait_lock()
-                for volume in newapp.volumes():
-                    volume.restore()
-                for oldvolume, newvolume in zip(sorted(newapp.old_volumes()),
-                                                sorted(newapp.volumes())):
-                    newvolume.restore(oldvolume.volume)
+                for oldvolume, newvolume in zip(newapp.old_volumes(),
+                                                newapp.volumes):
+                    newvolume.restore(oldvolume.name, newvolume.name)
             else:
                 if oldmaster:
                     newapp.wait_transfer()  # wait for master notification
