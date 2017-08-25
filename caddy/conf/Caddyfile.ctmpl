@@ -1,48 +1,8 @@
-https://consul-mlf.anybox.eu:443 {
-  tls self_signed
-  timeouts 300s
-  proxy / http://127.0.0.1:8500/ {
-    transparent
-  }
-  gzip
-  log /var/log/consul-mlf.anybox.eu.access.log {
-      rotate_size 100 # Rotate after 100 MB
-      rotate_age  14  # Keep log files for 14 days
-      rotate_keep 10  # Keep at most 10 log files
-  }
+{{ range tree "app" }}{{ $k := .Key }}{{ $v := .Value | parseJSON }}{{ if eq $v.master (env "HOSTNAME") }}{{ if keyExists (print "maintenance/" $k) }}
+{{ $v.urls }} {
+  root /srv
 }
-
-{{ range tree "site" }}{{ $k := .Key }}{{ $v := .Value | parseJSON  }}{{ if eq $v.node (env "HOSTNAME")  }}
-{{ $v.url  }} {
-  {{ if $v.tls }}  tls self_signed{{ end }}
-  timeouts 300s
-
-  proxyprotocol 0.0.0.0/0
-
-  proxy / {{ $v.ct  }}/ {
-    transparent
-    websocket
-    insecure_skip_verify
-  }
-  gzip
-  log /var/log/{{ $k  }}.access.log {
-      rotate_size 100 # Rotate after 100 MB
-      rotate_age  14  # Keep log files for 14 days
-      rotate_keep 10  # Keep at most 10 log files
-  }
-}
-{{ end  }}{{ end  }}
-
-# special host for redirection
-http://www.lyceemlfpalma.org {
-  redir http://lyceemlfpalma.org{uri}
-}
-http://lycee-verdun.edu.lb {
-  redir http://www.lycee-verdun.edu.lb{uri}
-}
-http://lyceemolieresaragosse.fr {
-  redir http://www.lyceemolieresaragosse.fr{uri}
-}
-http://lyceemolieresaragosse.org {
-  redir http://www.lyceemolieresaragosse.org{uri}
-}
+{{ else }}
+{{ $v.caddyfile }}{{ end }}
+{{ end }}
+{{ end }}

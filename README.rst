@@ -17,10 +17,12 @@ Then start caddy, haproxy and consul::
     $ popd
     $ docker-compose up -d
 
-Restart
--------
+
+Rebuild and restart
+-------------------
 ::
     $ docker-compose up -d --build
+
 
 Stop
 ----
@@ -31,51 +33,50 @@ Same in reverse order::
     $ cd buttervolume
     $ docker-compose down
 
+
 Consul web UI
 -------------
 
 The consul web UI runs on http://127.0.0.1:8500 on the host, through the consul docker running in host network_driver mode.
 To access it from outside, create a ssh tunnel::
 
-    $ ssh -L 8500:localhost:8500 mlf@nepri.mlfmonde.org
+    $ ssh -L 8500:localhost:8500 user@node1.example.com
     $ firefox localhost:8500
 
-Deploy or move a new app
-------------------------
+
+Deploy or move an app
+---------------------
 
 connect on any node, then run this from the cluster/ directory::
 
-    docker-compose exec consul consul event -name=deploymaster "<masternode> <slavenode> <repository_url>"
+    docker-compose exec consul consul event -name=deploy '{"master": "<master_node>", "slave": "<slave_node>", "branch": "<branch_name>", "repo": "<repository_url>"}'
 
-Example: deploy lycee-test-mlf on nepri and replicate on edjo::
+Example: deploy foobar on node1 and replicate on node2::
 
-    docker-compose exec consul consul event -name=deploymaster "nepri edjo ssh://git@git.mlfmonde.org:2222/hebergement/lycee-test-mlf"
+    docker-compose exec consul consul event -name=deploy '{"master": "node1", "slave": "node2", "branch": "master", "repo": "ssh://git@gitlab.example.com/hosting/foobar"}
 
-Use cluster with local/dev env
-------------------------------
 
-All docker container can be use partially (not with ssl website) on developer
-host.
+Local development environment
+-----------------------------
+
+All docker containers can be used partially (not with ssl website) on the
+developer host.
 
 .. note::
 
-    You can use self signed certificate adding ``TLS: self_signed`` in the
-    docker-compose service as environment variable.
+    You can use a self signed certificate by adding ``tls self_signed`` in the
+    CADDYFILE environment variable in the docker-compose service.
 
-You need to edit docker-compose.dev.yml:
+You need to edit ``docker-compose.dev.yml`` and set the CONSUL_BIND_INTERFACE
+environment variable to define your local interface connected to your
+router/internet.
 
-* Set environment variable CONSUL_BIND_INTERFACE define your local interface
-  connected to your router/internet.
-* Make sure the DOCKER_GID match to the docker group ID availaible on your host
-  machine (look at ``/etc/hosts``)
-
-Make sure docker group has access to:
+Make sure the docker group has access to:
 
 * ``/run/docker/plugins/`` directory with read/execution (``r-x``)
 * ``/run/docker/plugins/btrfs.sock`` file with read/write (``rw-``)
 
-
-After::
+Then::
 
     $ pushd buttervolume
     $ docker-compose up -d
@@ -87,35 +88,32 @@ And you may have buttervolumeplugin/consul/caddy/haproxy on your personal host !
 
 To deploy a website::
 
-    $ docker-compose exec consul consul event -name=deploymaster "localhost.localdomain ssh://git@git.mlfmonde.org:2222/hebergement/primaire.lyceemolieresaragosse.org.git"
+    $ docker-compose exec consul consul event -name=deploy '{"target": "localhost.localdomain", "branch": "master", "repo": "https://gitlab.example.com/hosting/foobar"}'
 
+Possibly replace localhost.localdomain with the hostname of your development machine.
 
 Troubleshooting
 ***************
 
-Caddyfile are not regenerated
------------------------------
+Caddyfile is wrong
+------------------
 
-Probably an error in the consul-template ``caddy/conf/Caddyfile.ctmpl`` or ``haproxy/conf/haproxy.cmtpl``,
-or an invalid value in the KV store of Consul.
+Probably an error in the Caddyfile stored in the consul KV store.
 
 Try to regenerate the Caddyfile or haproxy.cfg manually to detect the error::
 
-    $ ssh nepri  # or edjo or tayt
+    $ ssh node1 -p 4022
     $ cd cluster
     $ docker-compose exec --user consul consul sh
     $ cat /docker-entrypoint.sh
     $ /bin/consul-template -once -template="/consul/template/caddy/Caddyfile.ctmpl:/consul/template/caddy/Caddyfile:docker restart cluster_caddy_1"
-    Consul Template returned errors:
-    /consul/template/caddy/Caddyfile.ctmpl: execute: template: :17:57: executing "" at <parseJSON>: error calling parseJSON: unexpected end of JSON input
 
 Also try to open the web ui to quickly check the deployed parameters::
 
-    $ ssh -L 8500:localhost:8500 mlf@nepri
+    $ ssh -L 8500:localhost:8500 user@node1
     $ firefox localhost:8500
-    - click on Key/Value → Site
+    - click on Key/Value → app
     - You can change values, it should trigger the recompute of the Caddyfile and haproxy.cfg if something changed in the resulting file.
-
 
 
 proxy protocol
@@ -131,3 +129,48 @@ connection (like https).
     Caddy server) **have to** understand and accept the proxy protocole.
     (note: but in Caddy conf file once configured to listen proxy protole
     that works even it recived proper http / https)
+
+
+
+Cahier de recette
+-----------------
+
+
+cas à tester:
+* avec tout les serveurs ont accès à internet:
+* l'actuel master n'a pas accès à git
+* le futur master n'a pas d'accès git
+* le send ou la remonté du volume plante
+
+Projet vide (volume, snapshot, container, projet git)
+1. démarrage d'un nouveau projet sur 1 master avec un réplicat
+* nothing -> master
+* nothing -> slave
+* nothing -> nothing
+
+2. inverse master / réplicat
+* master -> slave
+* slave -> master
+* nothing -> nothing
+
+3. relance la même commande (redéploie sur le meme service)
+* master -> master
+* slave -> slave
+* nothing -> nothing
+
+4. on passe sur le troisieme noeud sans réplicat
+* master -> nothing
+* slave -> nothing
+* nothing -> master
+
+Quoi vérifier:
+
+* purges présentes
+* service consul
+* k/v store
+* projet git présent/absent
+* container présent/absent
+* volumes docker présent/absent
+
+transition
+
