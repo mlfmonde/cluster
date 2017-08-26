@@ -371,7 +371,8 @@ class Application(object):
         if not caddyfiles:
             return  # no need?
         pubkey = {
-            s: self.compose['services'][s]['environment'].get('PUBKEY', '')
+            s: self.compose['services'][s].get('environment', {}
+                                               ).get('PUBKEY', '')
             for s in self.services}
         value = {
             'caddyfile': Caddyfile.dumps(caddyfiles),
