@@ -1,6 +1,9 @@
 {{ range tree "app" }}{{ $k := .Key }}{{ $v := .Value | parseJSON }}{{ if eq $v.master (env "HOSTNAME") }}{{ if keyExists (print "maintenance/" $k) }}
 {{ $v.urls }} {
   root /srv
+  errors {
+    404 index.html
+  }
 }
 {{ else }}
 {{ $v.caddyfile }}{{ end }}
