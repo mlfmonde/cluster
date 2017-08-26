@@ -399,11 +399,19 @@ class Application(object):
         """
         urls = concat([c['keys'] for c in
                        concat([self.caddyfile(s) for s in self.services])])
+        # default for most cases
         svc = json.dumps({
             'Name': self.name,
             'Checks': [{
                 'HTTP': url,
                 'Interval': '60s'} for url in urls if url]})
+
+        # use a file if provided
+        path = '{}/service.json'.format(self.path)
+        if exists(path):
+            with open(path) as f:
+                svc = json.dumps(json.loads(f.read()))
+
         url = 'http://localhost:8500/v1/agent/service/register'
         res = requests.post(url, svc)
         if res.status_code != 200:
