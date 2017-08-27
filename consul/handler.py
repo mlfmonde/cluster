@@ -165,7 +165,7 @@ class Application(object):
         do('consul kv delete -recurse migrate/{}/'.format(self.name))
 
     def wait_transfer(self):
-        for loop in range(120):
+        for loop in range(1200):
             log.info('Waiting migrate notification for %s', self.name)
             res = do('consul kv get -keys migrate/{}/'.format(self.name))
             if res:
