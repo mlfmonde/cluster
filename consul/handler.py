@@ -179,29 +179,6 @@ class Application(object):
         log.info(msg, self.name)
         raise RuntimeError(msg % self.name)
 
-    def old_volumes(self):
-            oldproject = re.sub(r'[^a-z0-9]', '', self.oldname.lower())
-            return [
-                Volume(oldproject + '_' + v[0])
-                for v in self.compose.get('volumes', {}).items()
-                if v[1] and v[1].get('driver') == 'btrfs']
-
-    def old_wait_lock(self):
-        # wait v1 notif
-        loops = 0
-        while loops < 60:
-            log.info('Waiting lock release for %s', self.oldname)
-            try:
-                do('consul kv get deploying/{}'.format(self.oldname))
-            except Exception:
-                log.info('Lock released')
-                return
-            time.sleep(1)
-            loops += 1
-        do('consul kv delete deploying/{}'.format(self.name))
-        log.info('Waited too much :(')
-        raise RuntimeError('deployment of {} failed'.format(self.name))
-
     @property
     def services(self):
         """name of the services in the compose file
@@ -559,8 +536,6 @@ def deploy(payload, myself):
     oldmaster = kv(oldapp.name, 'master')
     oldslave = kv(oldapp.name, 'slave')
     newapp = Application(repo_url, branch=branch)
-    newapp.migrating_cluster = payload.get('migrating_cluster')
-    newapp.oldname = payload.get('oldname')
     members = newapp.members
     log.info('oldapp={}, oldmaster={}, oldslave={}, '
              'newapp={}, newmaster={}, newslave={}'
@@ -640,17 +615,10 @@ def deploy(payload, myself):
             log.info("** I'm now the master of %s", newapp.name)
             newapp.download()
             newapp.check(newmaster)
-            if newapp.migrating_cluster:  # remove after v2
-                time.sleep(1)
-                newapp.old_wait_lock()
-                for oldvolume, newvolume in zip(newapp.old_volumes(),
-                                                newapp.volumes):
-                    newvolume.restore(oldvolume.name, newvolume.name)
-            else:
-                if oldmaster:
-                    newapp.wait_transfer()  # wait for master notification
-                    for volume in newapp.volumes_from_kv:
-                        volume.restore()
+            if oldmaster:
+                newapp.wait_transfer()  # wait for master notification
+                for volume in newapp.volumes_from_kv:
+                    volume.restore()
             newapp.up()
             if newslave:
                 newapp.enable_replicate(True, members[newslave]['ip'])
