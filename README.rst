@@ -129,7 +129,7 @@ Try to regenerate the Caddyfile or haproxy.cfg manually to detect the error::
     $ cd cluster
     $ docker-compose exec --user consul consul sh
     $ cat /docker-entrypoint.sh
-    $ /bin/consul-template -once -template="/consul/template/caddy/Caddyfile.ctmpl:/consul/template/caddy/Caddyfile:docker restart cluster_caddy_1"
+    $ /bin/consul-template -once -template="/consul/template/caddy/Caddyfile.ctmpl:/consul/template/caddy/Caddyfile:/reload_caddy.sh"
 
 Also try to open the web ui to quickly check the deployed parameters::
 
