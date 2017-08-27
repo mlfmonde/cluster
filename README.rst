@@ -55,6 +55,7 @@ Example: deploy foobar on node1 and replicate on node2::
 
     docker-compose exec consul consul event -name=deploy '{"master": "node1", "slave": "node2", "branch": "master", "repo": "ssh://git@gitlab.example.com/hosting/foobar"}
 
+During deployment, volumes are automatically moved to the new master node.
 
 Local development environment
 -----------------------------
@@ -95,6 +96,33 @@ Possibly replace localhost.localdomain with the hostname of your development mac
 Troubleshooting
 ***************
 
+Manually starting, stopping or building containers
+--------------------------------------------------
+
+If you need to manually manage compose projets on a cluster node, you should go
+to the ~/deploy folder and run compose commands as usually but **dont't forget
+to specify the project name with the -p option of docker-compose**
+
+The projet name is computed from the repository name, the branch, and a partial
+hash of the full repository path to avoid conflicts on similar repository
+names.  To know the project name for a specifict projet, you can open the
+consul web UI and click on the KV menu. The project name is the key in the
+"app" folder and looks like ``foo.example.com_prod.36cf2``.
+
+
+Duplicate btrfs/local volumes after a reboot
+--------------------------------------------
+
+Sometimes after a reboot, docker volume ls shows some volume in both local and btrfs driver (docker volume ls).
+This should probably be fixed by letting buttervolume start before all other containers.
+
+To repair the volume, just do that:
+
+sudo -s
+cd /var/lib/docker/volumes/
+for v in `docker volume ls| awk '{print $2}'|sort|uniq -d`; do mv $v $v.tmp && docker volume rm $v && mv $v.tmp $v; done
+
+
 Caddyfile is wrong
 ------------------
 
@@ -114,6 +142,7 @@ Also try to open the web ui to quickly check the deployed parameters::
     $ firefox localhost:8500
     - click on Key/Value → app
     - You can change values, it should trigger the recompute of the Caddyfile and haproxy.cfg if something changed in the resulting file.
+    - WARNING if you make a syntax error the caddyfile won't be regenerated and you may block all future deployments, or even break all the cluster.
 
 
 proxy protocol
@@ -125,11 +154,11 @@ connection (like https).
 
 .. warning::
 
+    send-proxy and accept-proxy are already set in haproxy.
     When setting ``send-proxy`` on haproxy configuration, the backend (the
-    Caddy server) **have to** understand and accept the proxy protocole.
-    (note: but in Caddy conf file once configured to listen proxy protole
-    that works even it recived proper http / https)
-
+    Caddy server) **have to** understand and accept the proxy protocol.
+    (note: but in Caddy conf file once configured to listen proxy protocole
+    that works even it received proper http / https)
 
 
 Cahier de recette

@@ -238,6 +238,9 @@ class Application(object):
                .format('-b "%s"' % self.branch if self.branch else '',
                        self.repo_url, path),
                cwd=DEPLOY)
+            with open(join(path, '.env'), 'a') as env:
+                # to ease manual management without '-p'
+                env.write('COMPOSE_PROJECT_NAME={}\n'.format(self.project))
             self._deploy_date = deploy_date
             self._services = None
             self._volumes = None
