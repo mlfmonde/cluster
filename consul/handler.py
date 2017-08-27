@@ -347,9 +347,11 @@ class Application(object):
         urls = concat([c['keys'] for c in caddyfiles])
         if not caddyfiles:
             return  # no need?
-        pubkey = {
+        pubkey = {  # TODO support environments as lists
             s: self.compose['services'][s].get('environment', {}
                                                ).get('PUBKEY', '')
+            if type(self.compose['services'][s].get('environment', {})
+                    ) is dict else {}
             for s in self.services}
         value = {
             'caddyfile': Caddyfile.dumps(caddyfiles),
