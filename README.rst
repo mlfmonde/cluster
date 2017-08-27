@@ -100,15 +100,10 @@ Manually starting, stopping or building containers
 --------------------------------------------------
 
 If you need to manually manage compose projets on a cluster node, you should go
-to the ~/deploy folder and run compose commands as usually but **dont't forget
-to specify the project name with the -p option of docker-compose**
-
-The projet name is computed from the repository name, the branch, and a partial
-hash of the full repository path to avoid conflicts on similar repository
-names.  To know the project name for a specifict projet, you can open the
-consul web UI and click on the KV menu. The project name is the key in the
-"app" folder and looks like ``foo.example.com_prod.36cf2``.
-
+to the ~/deploy folder and run compose commands as usually.  The compose
+project name is already set in the .env file during deployment because the name
+of the folder contains the deployment date and does not correspond to the
+compose project name.
 
 Duplicate btrfs/local volumes after a reboot
 --------------------------------------------
