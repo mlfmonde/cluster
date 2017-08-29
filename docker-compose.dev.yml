@@ -1,9 +1,6 @@
 version: '2.1'
 services:
   consul:
-    build:
-      args:
-        - DOCKER_GID=131
     environment:
       CONSUL_BIND_INTERFACE: wlan0
     command: ["agent", "-dev", "-ui"]
