@@ -89,7 +89,7 @@ And you may have buttervolumeplugin/consul/caddy/haproxy on your personal host !
 
 To deploy a website::
 
-    $ docker-compose exec consul consul event -name=deploy '{"target": "localhost.localdomain", "branch": "master", "repo": "https://gitlab.example.com/hosting/foobar"}'
+    $ docker-compose exec consul consul event -name=deploy '{"master": "localhost.localdomain", "branch": "master", "repo": "https://gitlab.example.com/hosting/foobar"}'
 
 Possibly replace localhost.localdomain with the hostname of your development machine.
 
