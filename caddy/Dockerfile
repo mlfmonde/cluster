@@ -9,7 +9,7 @@ LABEL caddy_version="0.10.7" architecture="amd64"
 
 ARG plugins=http.proxyprotocol
 
-RUN apk add --no-cache openssh-client tar curl
+RUN apk add --no-cache openssh-client tar curl dumb-init
 
 RUN curl --silent --show-error --fail --location \
       --header "Accept: application/tar+gzip, application/x-gzip, application/octet-stream" -o - \
@@ -25,5 +25,5 @@ WORKDIR /srv
 COPY conf/ /etc/caddy/
 COPY index /srv/
 
-ENTRYPOINT ["/usr/bin/caddy"]
+ENTRYPOINT ["dumb-init", "--", "/usr/bin/caddy"]
 CMD ["--conf", "/etc/caddy/Caddyfile", "--log", "stdout"]
