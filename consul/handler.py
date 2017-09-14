@@ -1086,8 +1086,8 @@ class FakeExec(object):
     def run(cls, cmd):
         if cmd.startswith('consul kv get '):
             return b64decode(json.loads(
-                open(join(DEPLOY, 'kv')).read()
-                     )[cmd.split(' ', 3)[3]]).decode('utf-8')
+                open(join(DEPLOY, 'kv')).read())[cmd.split(' ', 3)[3]]
+            ).decode('utf-8')
         elif cmd == 'consul kv export app/':
             return json.dumps(
                 [{'key': k, 'flags': 0, 'value': v} for k, v in
@@ -1127,8 +1127,10 @@ class TestRequests(object):
 
 
 if __name__ == '__main__':
-    if (len(argv) == 2 and argv[1].lower() == 'test'
-            or (len(argv) >= 2 and argv[1] in FakeExec.faked)):
+    if (
+        len(argv) == 2 and argv[1].lower() == 'test' or
+        (len(argv) >= 2 and argv[1] in FakeExec.faked)
+    ):
         DEPLOY = '/tmp/deploy'
         os.makedirs(DEPLOY, exist_ok=True)
 
