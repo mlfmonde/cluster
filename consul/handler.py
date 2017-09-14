@@ -581,6 +581,9 @@ def deploy(payload, myself):
 
     if oldmaster == myself:  # master ->
         log.info('** I was the master of %s', oldapp.name)
+        if newmaster != myself:
+            for volume in newapp.volumes_from_kv:
+                volume.send(volume.snapshot(), members[newmaster]['ip'])
         oldapp.maintenance(enable=True)
         oldapp.down()
         if oldslave:
