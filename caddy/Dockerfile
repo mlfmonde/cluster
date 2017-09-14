@@ -5,7 +5,7 @@ LABEL maintainer "Pierre Verkest <pverkeset@anybox.fr>"
 # http.proxyprotocol required (by #8847)
 # copy from https://github.com/abiosoft/caddy-docker/blob/master/Dockerfile
 
-LABEL caddy_version="0.10.7" architecture="amd64"
+LABEL caddy_version="0.10.9" architecture="amd64"
 
 ARG plugins=http.proxyprotocol
 
