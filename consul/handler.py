@@ -259,10 +259,42 @@ class Application(object):
         else:
             do('consul kv delete maintenance/{}'.format(self.name))
 
+    def pull(self, ignorefailures=False):
+        """pull images delcare in docker-compose.yml file
+
+        :param ignorefailures: Pull what it can and ignores images with pull
+                               failures.
+        """
+        if self.path and exists(self.path):
+            log.info("Pulling images %s", self.name)
+            ignore = '--ignore-pull-failures' if ignorefailures else ''
+            do('docker-compose -p "{}" pull {}'
+               .format(self.project, ignore),
+               cwd=self.path)
+        else:
+            log.info("No deployment, cannot pull %s", self.name)
+
+    def build(self, nocache=False, forecerm=False):
+        """Build images declare in docker-compose.yml file
+
+        :param nocache: Do not use cache when building the image.
+        :param forecerm: Always remove intermediate containers.
+        :return:
+        """
+        if self.path and exists(self.path):
+            log.info("Starting %s", self.name)
+            cache = '--no-cache' if nocache else ''
+            rm = '--force-rm' if forecerm else ''
+            do('docker-compose -p "{}" build -d {} {}'
+               .format(self.project, cache, rm),
+               cwd=self.path)
+        else:
+            log.info("No deployment, cannot build %s", self.name)
+
     def up(self):
         if self.path and exists(self.path):
             log.info("Starting %s", self.name)
-            do('docker-compose -p "{}" up -d --build'
+            do('docker-compose -p "{}" up -d'
                .format(self.project),
                cwd=self.path)
         else:
@@ -563,6 +595,8 @@ def deploy(payload, myself):
                 volume.snapshot()
             newapp.download()
             newapp.check(newmaster)
+            newapp.pull()
+            newapp.build()
             newapp.up()
             if newslave:
                 newapp.enable_replicate(True, members[newslave]['ip'])
@@ -596,6 +630,8 @@ def deploy(payload, myself):
             log.info("** I'm now the master of %s", newapp.name)
             newapp.download()
             newapp.check(newmaster)
+            newapp.pull()
+            newapp.build()
             newapp.wait_transfer()  # wait for master notification
             for volume in newapp.volumes_from_kv:
                 volume.restore()
@@ -620,6 +656,8 @@ def deploy(payload, myself):
             log.info("** I'm now the master of %s", newapp.name)
             newapp.download()
             newapp.check(newmaster)
+            newapp.pull()
+            newapp.build()
             if oldmaster:
                 newapp.wait_transfer()  # wait for master notification
                 for volume in newapp.volumes_from_kv:
