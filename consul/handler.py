@@ -274,7 +274,7 @@ class Application(object):
         else:
             log.info("No deployment, cannot pull %s", self.name)
 
-    def build(self, nocache=False, forecerm=False):
+    def build(self, pull=True, nocache=False, forecerm=False):
         """Build images declare in docker-compose.yml file
 
         :param nocache: Do not use cache when building the image.
@@ -283,10 +283,11 @@ class Application(object):
         """
         if self.path and exists(self.path):
             log.info("Starting %s", self.name)
+            pull = '--pull' if pull else ''
             cache = '--no-cache' if nocache else ''
             rm = '--force-rm' if forecerm else ''
-            do('docker-compose -p "{}" build -d {} {}'
-               .format(self.project, cache, rm),
+            do('docker-compose -p "{}" build {} {} {}'
+               .format(self.project, pull, cache, rm),
                cwd=self.path)
         else:
             log.info("No deployment, cannot build %s", self.name)
