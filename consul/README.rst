@@ -10,12 +10,18 @@ It receives json through stdin, as a list of events.
 Test
 ****
 
-Run the handler tests with::
+Run the handler tests with, this require python>3.4 (maybe more??)::
 
     $ python3 -m venv venv
     $ ./venv/bin/pip install PyYAML requests
     $ source ./venv/bin/activate
     $ ./handler.py test
+
+If you can't get python>3.4, you can test within the consul image
+wich get python3.6::
+
+    $ docker build -t consul .
+    $ docker run -it --rm --entrypoint python3 consul /handler.py test
 
 Normal mode
 ***********
