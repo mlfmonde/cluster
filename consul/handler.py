@@ -282,7 +282,7 @@ class Application(object):
         :return:
         """
         if self.path and exists(self.path):
-            log.info("Starting %s", self.name)
+            log.info("Building %s", self.name)
             pull = '--pull' if pull else ''
             cache = '--no-cache' if nocache else ''
             rm = '--force-rm' if forecerm else ''
