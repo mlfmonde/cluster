@@ -1,7 +1,6 @@
 version: '2.1'
 services:
   plugin:
-    hostname: nepri
     build: .
     restart: unless-stopped
     privileged: true
