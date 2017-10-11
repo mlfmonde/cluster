@@ -1,5 +1,12 @@
 version: '2.1'
 services:
+
+  caddy:
+    ports:
+      - "880:80"
+    volumes:
+      - ./caddy/index:/srv
+
   consul:
     environment:
       CONSUL_BIND_INTERFACE: wlan0
@@ -10,3 +17,7 @@ services:
       - ./deploy:/deploy
       - ./caddy/conf/:/consul/template/caddy/
       - ./haproxy/conf/:/consul/template/haproxy/
+
+volumes:
+  caddy_log:
+  caddy_ssl:
