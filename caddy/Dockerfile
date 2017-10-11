@@ -1,26 +1,53 @@
-FROM alpine:3.5
+#
+# Builder
+#
+FROM golang:1.9-alpine as builder
 LABEL maintainer "Pierre Verkest <pverkeset@anybox.fr>"
-# This is a copy from the official dockerfile to manage plugins we needs
+# This is a copy from the dockerfile to manage plugins we needs
 # the default image contains http.git wich we don't use but not
 # http.proxyprotocol required (by #8847)
 # copy from https://github.com/abiosoft/caddy-docker/blob/master/Dockerfile
 
-LABEL caddy_version="0.10.9" architecture="amd64"
 
-ARG plugins=http.proxyprotocol
+ARG version="0.10.10"
 
-RUN apk add --no-cache openssh-client tar curl dumb-init
+RUN apk add --no-cache curl git
 
-RUN curl --silent --show-error --fail --location \
-      --header "Accept: application/tar+gzip, application/x-gzip, application/octet-stream" -o - \
-      "https://caddyserver.com/download/linux/amd64?plugins=${plugins}" \
-    | tar --no-same-owner -C /usr/bin/ -xz caddy \
- && chmod 0755 /usr/bin/caddy \
- && /usr/bin/caddy -version
+# caddy
+RUN git clone https://github.com/mholt/caddy --depth 1 -b "v${version}" /go/src/github.com/mholt/caddy \
+    && cd /go/src/github.com/mholt/caddy \
+    && git checkout -b "v${version}"
 
-EXPOSE 80 443 2015
-VOLUME /root/.caddy
-WORKDIR /srv
+# http.proxyprotocol plugin
+RUN go get -v -d github.com/petrus-v/caddy-proxyprotocol \
+    && printf "package caddyhttp\nimport _ \"github.com/petrus-v/caddy-proxyprotocol\"" > \
+        /go/src/github.com/mholt/caddy/caddyhttp/proxyprotocol.go
+
+# builder dependency
+RUN git clone https://github.com/caddyserver/builds /go/src/github.com/caddyserver/builds
+
+# build
+RUN cd /go/src/github.com/mholt/caddy/caddy \
+    && git checkout -f \
+    && go run build.go \
+    && mv caddy /go/bin
+
+#
+# Final stage
+#
+FROM alpine:3.6
+LABEL maintainer "Abiola Ibrahim <abiola89@gmail.com>"
+
+LABEL caddy_version="0.10.10"
+
+RUN apk add --no-cache openssh-client git
+
+# install caddy
+COPY --from=builder /go/bin/caddy /usr/bin/caddy
+
+# validate install
+RUN /usr/bin/caddy -version
+RUN /usr/bin/caddy -plugins
 
 COPY conf/ /etc/caddy/
 COPY index /srv/
