@@ -40,7 +40,7 @@ LABEL maintainer "Abiola Ibrahim <abiola89@gmail.com>"
 
 LABEL caddy_version="0.10.10"
 
-RUN apk add --no-cache openssh-client git
+RUN apk add --no-cache openssh-client git dumb-init
 
 # install caddy
 COPY --from=builder /go/bin/caddy /usr/bin/caddy
