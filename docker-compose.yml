@@ -8,6 +8,18 @@ services:
       - caddy_ssl:/root/.caddy
       - caddy_log:/var/log
       - ./caddy/conf/:/etc/caddy
+    # Once #9710 (config logging options in docker/daemon.json) is deployed,
+    # those logging options can be removed
+    logging:
+      options:
+        "max-size": "3m"
+        "max-file": "5"
+        labels: "format,reseau,ets,service"
+    labels:
+      format: "caddy"
+      reseau: "all"
+      ets: "all"
+      service: "caddy"
 
   haproxy:
     image: haproxy:1.7

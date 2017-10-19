@@ -356,13 +356,9 @@ class Application(object):
                 replace=True)
             dirs = Caddyfile.setdir(
                 dirs,
-                ['log', '/', join(CADDYLOGS, self.name + '.access.log'),
-                 '"{combined}"',
-                 [['rotate_size', '100'],
-                  ['rotate_age', '365'],
-                  ['rotate_compress'],
-                  ['rotate_keep', '10']]],
-                replace=True)
+                ['log', '/', 'stdout', '"{hostonly} - {combined}"'],
+                replace=True
+            )
             host['body'] = dirs
         return self._caddy[service] or []
 
