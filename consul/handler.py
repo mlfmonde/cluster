@@ -356,7 +356,7 @@ class Application(object):
                 replace=True)
             dirs = Caddyfile.setdir(
                 dirs,
-                ['log', '/', 'stdout', '"{hostonly} - {combined}"'],
+                ['log', '/', 'stdout', '{hostonly} - {combined}'],
                 replace=True
             )
             host['body'] = dirs
