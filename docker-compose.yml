@@ -48,6 +48,7 @@ services:
             }'
         CONSUL_BIND_INTERFACE: enp1s0f1
     volumes:
+      - consul_docker_cfg:/home/consul/.docker
       - /var/run/docker.sock:/var/run/docker.sock
       - /run/docker/plugins:/run/docker/plugins
       - ~/deploy:/deploy
@@ -58,4 +59,6 @@ volumes:
   caddy_log:
     driver: btrfs
   caddy_ssl:
+    driver: btrfs
+  consul_docker_cfg:
     driver: btrfs
