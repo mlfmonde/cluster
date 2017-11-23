@@ -371,9 +371,9 @@ class Application(object):
                         '/',
                         'stdout',
                         '{hostonly} - {>X-Forwarded-For} - {user} [{when}] '
-                        '\"{method} {uri} {proto}\" '
+                        '\\"{method} {uri} {proto}\\" '
                         '{status} {size} '
-                        '\"{>Referer}\" \"{>User-Agent}\"'
+                        '\\"{>Referer}\\" \\"{>User-Agent}\\"'
                     ],
                     replace=True
                 )
