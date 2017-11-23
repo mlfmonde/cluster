@@ -16,6 +16,22 @@ services:
       - socket:/var/run/mysqld/
     networks:
       - cluster_default
+  wordpress2:
+    environment:
+      CADDYFILE: |
+        https://test.example.com {
+            proxy / http://$CONTAINER:80
+        }
+        https://www.test.example.com {
+            redir https://test.example.com
+        }
+    build: wordpress
+    restart: unless-stopped
+    volumes:
+      - wwwdata:/var/www/html
+      - socket:/var/run/mysqld/
+    networks:
+      - cluster_default
   mariadb:
     image: mariadb:10
     restart: always

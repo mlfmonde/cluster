@@ -32,6 +32,8 @@ frontend http-in
     mode http
     bind *:80
     option socket-stats
+    option forwardfor except 10.91.0.0/16
+    option forwardfor except 172.18.0.0/24
 {{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "fronthttp" | contains $domain }}{{ else }}    use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }
 {{ scratch.MapSet "fronthttp" $domain $domain }}{{ end }}{{ end }}{{ end }}
 {{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttp" | contains $domain }}{{ else }}

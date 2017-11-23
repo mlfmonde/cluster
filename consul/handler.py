@@ -349,16 +349,39 @@ class Application(object):
             # default or forced values
             dirs = Caddyfile.setdir(dirs, ['gzip'])
             dirs = Caddyfile.setdir(dirs, ['timeouts', '300s'])
-            dirs = Caddyfile.setdir(dirs, ['proxyprotocol', '0.0.0.0/0'])
+            proxy_config = ['websocket', 'insecure_skip_verify']
+            if host['keys'][0].startswith('https://'):
+                dirs = Caddyfile.setdir(dirs, ['proxyprotocol', '0.0.0.0/0'])
+                proxy_config.append('transparent')
+                dirs = Caddyfile.setdir(
+                    dirs,
+                    ['log', '/', 'stdout', '{hostonly} - {combined}'],
+                    replace=True
+                )
+            else:
+                proxy_config.append('header_upstream Host {host}')
+                proxy_config.append('header_upstream X-Real-IP {remote}')
+                proxy_config.append(
+                    'header_upstream X-Forwarded-Proto {scheme}'
+                )
+                dirs = Caddyfile.setdir(
+                    dirs,
+                    [
+                        'log',
+                        '/',
+                        'stdout',
+                        '{hostonly} - {>X-Forwarded-For} - {user} [{when}] '
+                        '\"{method} {uri} {proto}\" '
+                        '{status} {size} '
+                        '\"{>Referer}\" \"{>User-Agent}\"'
+                    ],
+                    replace=True
+                )
+
             Caddyfile.setsubdirs(
                 dirs, 'proxy',
-                ['transparent', 'websocket', 'insecure_skip_verify'],
+                proxy_config,
                 replace=True)
-            dirs = Caddyfile.setdir(
-                dirs,
-                ['log', '/', 'stdout', '{hostonly} - {combined}'],
-                replace=True
-            )
             host['body'] = dirs
         return self._caddy[service] or []
 
@@ -969,6 +992,56 @@ class TestCase(unittest.TestCase):
                            sort_keys=True),
                 json.dumps(Caddyfile.loads(d['caddy']), sort_keys=True))
             print('test # {} ok'.format(i))
+
+    def test_log(self):
+        app = Application(self.repo_url, 'master')
+        app.download()
+        app.caddyfile('wordpress')
+        self.assertEqual(
+            [group for group in app._caddy['wordpress'][0]['body'] if
+             group[0] == 'log'][0],
+            [
+                'log',
+                '/',
+                'stdout',
+                '{hostonly} - {>X-Forwarded-For} - {user} [{when}] '
+                '\"{method} {uri} {proto}\" '
+                '{status} {size} '
+                '\"{>Referer}\" \"{>User-Agent}\"'
+            ],
+        )
+        app.caddyfile('wordpress2')
+        self.assertEqual(
+            [group for group in app._caddy['wordpress2'][0]['body'] if
+             group[0] == 'log'][0],
+            ['log', '/', 'stdout', '{hostonly} - {combined}'],
+        )
+
+    def test_transparent_headers(self):
+        app = Application(self.repo_url, 'master')
+        app.download()
+        app.caddyfile('wordpress')
+        self.assertEqual(
+            [group for group in app._caddy['wordpress'][0]['body'] if
+             group[0] == 'proxy'][0][-1:][0],
+            [
+                'websocket',
+                'insecure_skip_verify',
+                'header_upstream Host {host}',
+                'header_upstream X-Real-IP {remote}',
+                'header_upstream X-Forwarded-Proto {scheme}',
+            ]
+        )
+        app.caddyfile('wordpress2')
+        self.assertEqual(
+            [group for group in app._caddy['wordpress2'][0]['body'] if
+             group[0] == 'proxy'][0][-1:][0],
+            [
+                'websocket',
+                'insecure_skip_verify',
+                'transparent',
+            ]
+        )
 
     def test_json2caddy(self):
         for i, d in enumerate(self.data):
