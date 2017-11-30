@@ -5,6 +5,7 @@ services:
       CADDYFILE: |
         http://test.example.com {
             proxy / http://$CONTAINER:80
+        }
         http://www.test.example.com {
             redir http://test.example.com
         }
