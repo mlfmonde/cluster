@@ -10,4 +10,8 @@ services:
     volumes:
       - /var/lib/docker:/var/lib/docker
       - /run/docker/plugins:/run/docker/plugins
-      - /etc/buttervolume
+      - buttervolume_config:/etc/buttervolume
+
+volumes:
+  buttervolume_config:
+
