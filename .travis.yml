@@ -1,0 +1,43 @@
+sudo: required
+
+
+env:
+  DOCKER_COMPOSE_VERSION: 1.8.0
+
+services:
+  - docker
+
+
+before_install:
+  - sudo apt-get update
+  - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
+  - sudo rm /usr/local/bin/docker-compose
+  - sudo curl -L https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+  - sudo chmod +x /usr/local/bin/docker-compose
+
+install:
+  - sudo apt-get update -q
+  - sudo apt-get install -y qemu-utils btrfs-tools
+
+before_script:
+  - sudo qemu-img create /var/lib/docker/btrfs.img 10G
+  - sudo mkfs.btrfs /var/lib/docker/btrfs.img
+  - sudo mkdir /tmp/btrfs_mount_point
+  - sudo mount -o loop /var/lib/docker/btrfs.img /tmp/btrfs_mount_point/
+  - sudo btrfs subvolume create /tmp/btrfs_mount_point/snapshots
+  - sudo btrfs subvolume create /tmp/btrfs_mount_point/volumes
+  - sudo umount /tmp/btrfs_mount_point/
+  - sudo rm -rf /tmp/btrfs_mount_point/
+  - sudo service docker stop
+  - sudo mkdir -p /var/lib/docker/volumes
+  - sudo mkdir -p /var/lib/docker/snapshots
+  - sudo mount -o loop,subvol=volumes /var/lib/docker/btrfs.img /var/lib/docker/volumes
+  - sudo mount -o loop,subvol=snapshots /var/lib/docker/btrfs.img /var/lib/docker/snapshots
+  - sudo service docker start
+
+script:
+  - docker-compose -f buttervolume/docker-compose.yml up -d
+  - docker-compose -f docker-compose.yml -f docker-compose.travis.yml pull
+  - docker-compose -f docker-compose.yml -f docker-compose.travis.yml build --pull
+  - sudo docker run -it --rm --entrypoint python3 -v $(pwd)/testapp:/testapp cluster_consul /handler.py test
+  - docker-compose -f docker-compose.yml -f docker-compose.travis.yml up -d
