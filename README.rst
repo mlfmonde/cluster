@@ -7,15 +7,22 @@ Basic actions
 Start
 -----
 
-First start the btrfs volume plugin for docker separately::
+* First start the btrfs volume plugin for docker separately::
 
     $ pushd buttervolume
     $ docker-compose up -d
 
-Then start caddy, haproxy and consul::
+* Then start caddy, haproxy and consul::
 
     $ popd
     $ docker-compose up -d
+
+
+* buttervolume ssh configuration
+
+* caddy /srv maintenance page volume configuration
+
+* consul ssh configuration
 
 
 Rebuild and restart
