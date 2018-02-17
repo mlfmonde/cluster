@@ -1,7 +1,7 @@
 version: '2.1'
 services:
   plugin:
-    build: .
+    image: anybox/buttervolume:1.4
     restart: unless-stopped
     privileged: true
     network_mode: host
@@ -11,7 +11,9 @@ services:
       - /var/lib/docker:/var/lib/docker
       - /run/docker/plugins:/run/docker/plugins
       - buttervolume_config:/etc/buttervolume
+      - buttervolume_ssh:/root/.ssh
 
 volumes:
   buttervolume_config:
+  buttervolume_ssh
 

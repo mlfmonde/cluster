@@ -33,10 +33,8 @@ RUN apk add --no-cache \
     && sed -i 's/#AuthorizedKeysCommandUser .*/AuthorizedKeysCommandUser gw/' /etc/ssh/sshd_config
 
 USER consul
-COPY ssh /home/consul/.ssh
 USER root
 RUN chown -R consul: /home/consul \
-    && chmod go-rwx /home/consul/.ssh/id_rsa \
     && mkdir -p /run/docker/plugins/ \
     && chmod g+rx /run/docker/plugins/ \
     && adduser consul root \

@@ -55,6 +55,7 @@ services:
       - ~/deploy:/deploy
       - ./caddy/conf/:/consul/template/caddy/
       - ./haproxy/conf/:/consul/template/haproxy/
+      - consul_ssh:/home/consul/.ssh
 
 volumes:
   caddy_log:
@@ -62,4 +63,6 @@ volumes:
   caddy_ssl:
     driver: btrfs
   consul_docker_cfg:
+    driver: btrfs
+  consul_ssh:
     driver: btrfs
