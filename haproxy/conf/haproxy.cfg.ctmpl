@@ -1,0 +1,51 @@
+# This HAProxy should only be used to redirect requests
+# to the correct node of the cluster.
+# It should not contain any http redirections
+global
+    daemon
+    maxconn 256
+
+defaults
+    mode tcp
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+
+{{ $apps := tree "app" }}
+
+frontend https-in
+    mode tcp
+    bind *:443
+    bind *:1443 accept-proxy
+    option socket-stats
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req_ssl_hello_type 1 }
+{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "fronthttps" | contains $domain }}{{ else }}    use_backend https-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }
+{{ scratch.MapSet "fronthttps" $domain $domain }}{{ end }}{{ end }}{{ end }}
+{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttps" | contains $domain }}{{ else }}
+backend https-{{ $domain }}
+    mode tcp
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:1443{{ end }} send-proxy
+{{ scratch.MapSet "backhttps" $domain $domain }}{{ end }}{{ end }}{{ end }}
+
+frontend http-in
+    mode http
+    bind *:80
+    option socket-stats
+{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "fronthttp" | contains $domain }}{{ else }}    use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }
+{{ scratch.MapSet "fronthttp" $domain $domain }}{{ end }}{{ end }}{{ end }}
+{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttp" | contains $domain }}{{ else }}
+backend http-{{ $domain }}
+    mode http
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:80{{ else }}{{ $d.ip }}:80{{ end }}
+{{ scratch.MapSet "backhttp" $domain $domain }}{{ end }}{{ end }}{{ end }}
+
+frontend ssh-in
+    mode tcp
+    bind *:22
+    use_backend ssh
+
+backend ssh
+    mode tcp
+{{ range tree "app/gitlab"   }}{{ $v := .Value | parseJSON }}    server {{ $v.master }} {{ if eq $v.master (env "HOSTNAME") }}{{ $v.ct.community }}{{ else }}{{ $v.ip }}{{ end }}:22
+{{ end }}

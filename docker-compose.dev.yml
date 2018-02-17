@@ -1,0 +1,28 @@
+version: '2.1'
+services:
+
+  caddy:
+    ports:
+      - "880:80"
+    volumes:
+      - ./caddy/index:/srv
+
+  consul:
+    environment:
+      CONSUL_BIND_INTERFACE: wlan0
+    command: ["agent", "-dev", "-ui"]
+    volumes:
+      - consul_docker_cfg:/home/consul/.docker
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /run/docker/plugins:/run/docker/plugins
+      - ./deploy:/deploy
+      - ./caddy/conf/:/consul/template/caddy/
+      - ./haproxy/conf/:/consul/template/haproxy/
+      - consul_ssh:/home/consul/.ssh
+
+volumes:
+  caddy_log:
+  caddy_ssl:
+  caddy_srv:
+  consul_docker_cfg:
+  consul_ssh:
