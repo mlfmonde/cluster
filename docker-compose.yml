@@ -1,0 +1,57 @@
+version: '2.1'
+services:
+
+  caddy:
+    image: anybox/caddy:0.10.10
+    restart: unless-stopped
+    volumes:
+      - caddy_ssl:/root/.caddy
+      - caddy_log:/var/log
+      - ./caddy/conf/:/etc/caddy
+      - caddy_srv/:/srv
+
+  haproxy:
+    image: haproxy:1.7
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "1443:1443"
+      - "2222:22"
+    volumes:
+      - ./haproxy/conf/:/usr/local/etc/haproxy/
+
+  consul:
+    build: consul
+    depends_on:
+      - caddy
+      - haproxy
+    restart: unless-stopped
+    network_mode: host
+    environment:
+        CONSUL_LOCAL_CONFIG: '{
+            "skip_leave_on_interrupt": true,
+            "watches": [{
+                "type": "event",
+                "handler": "/handler.py"}]
+            }'
+    volumes:
+      - consul_docker_cfg:/home/consul/.docker
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /run/docker/plugins:/run/docker/plugins
+      - ~/deploy:/deploy
+      - ./caddy/conf/:/consul/template/caddy/
+      - ./haproxy/conf/:/consul/template/haproxy/
+      - consul_ssh:/home/consul/.ssh
+
+volumes:
+  caddy_log:
+    driver: btrfs
+  caddy_ssl:
+    driver: btrfs
+  caddy_srv:
+    driver: btrfs
+  consul_docker_cfg:
+    driver: btrfs
+  consul_ssh:
+    driver: btrfs
