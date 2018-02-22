@@ -1,3 +1,7 @@
+.. image:: https://travis-ci.org/mlfmonde/cluster.svg?branch=master
+   :target: https://travis-ci.org/mlfmonde/cluster
+   :alt: Travis state
+
 Cluster management
 ==================
 
