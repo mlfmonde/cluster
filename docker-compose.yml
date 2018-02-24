@@ -6,7 +6,6 @@ services:
     restart: unless-stopped
     volumes:
       - caddy_ssl:/root/.caddy
-      - caddy_log:/var/log
       - ./caddy/conf/:/etc/caddy
       - caddy_srv/:/srv
 
@@ -45,8 +44,6 @@ services:
       - consul_ssh:/home/consul/.ssh
 
 volumes:
-  caddy_log:
-    driver: btrfs
   caddy_ssl:
     driver: btrfs
   caddy_srv:
