@@ -201,6 +201,9 @@ class Application(object):
                     Volume(v) for v in kv(self.name, 'volumes')]
             except:
                 log.info("No volumes found in the kv")
+                # if kv is not present in the store, get a chance to get info
+                # from compose
+                self._volumes = self.volumes
             self._volumes = self._volumes or []
         return self._volumes
 
@@ -1124,6 +1127,13 @@ class TestCase(unittest.TestCase):
         app = Application(self.repo_url, 'master')
         app.download()
         app.register_kv('node1', 'node2')
+        self.assertEqual(
+            ['foobarmasterddb14_dbdata', 'foobarmasterddb14_wwwdata'],
+            sorted(v.name for v in app.volumes_from_kv))
+
+    def test_volumes_from_kv_before_registred(self):
+        app = Application(self.repo_url, 'master')
+        app.download()
         self.assertEqual(
             ['foobarmasterddb14_dbdata', 'foobarmasterddb14_wwwdata'],
             sorted(v.name for v in app.volumes_from_kv))
