@@ -36,13 +36,11 @@ def do(cmd, cwd=None):
     """ Run a command"""
     cmd = argv[0] + ' ' + cmd if TEST else cmd
     try:
-        if cwd and not TEST:
-            cmd = 'cd "{}" && {}'.format(cwd, cmd)
         log.info('Running: ' + cmd)
-        res = run(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE)
+        res = run(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE, cwd=cwd)
         return res.stdout.decode().strip()
     except CalledProcessError as e:
-        log.error("Failed to run %s: %s", e.cmd, e.stderr.decode())
+        log.error("Failed to run %s: return code = %s, %s", e.cmd, e.returncode, e.stderr.decode())
         raise e
 
 
@@ -448,7 +446,7 @@ class Application(object):
                 svc = json.dumps(json.loads(f.read()))
 
         url = 'http://localhost:8500/v1/agent/service/register'
-        res = requests.post(url, svc)
+        res = requests.put(url, svc)
         if res.status_code != 200:
             msg = 'Consul service register failed: {}'.format(res.reason)
             log.error(msg)
@@ -1187,9 +1185,9 @@ class FakeExec(object):
 
 
 class TestRequests(object):
-    """fake requests.post"""
+    """fake requests.put"""
     @staticmethod
-    def post(url, svc):
+    def put(url, svc):
         class Result:
             def __init__(self, code):
                 self.status_code = code
@@ -1226,7 +1224,7 @@ if __name__ == '__main__':
         # run some unittests
         argv.pop(-1)
         TEST = True
-        requests.post = TestRequests.post
+        requests.put = TestRequests.put
         unittest.main(verbosity=2)
     elif len(argv) >= 3:
         # allow to launch manually inside consul docker

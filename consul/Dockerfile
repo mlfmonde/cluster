@@ -1,6 +1,8 @@
-FROM consul:0.8.5
+FROM consul:1.0.6
 
 ARG BUTTERVOLUME=1.4
+ARG CONSULTEMPLATE=0.19.4
+ARG DOCKERCOMPOSE=1.20.0rc2
 
 RUN apk add --no-cache \
       bash \
@@ -17,15 +19,15 @@ RUN apk add --no-cache \
     && rc-update add sshd \
     && /etc/init.d/sshd start \
     && pip install --upgrade pip \
-    && pip install docker-compose==1.11.2 \
+    && pip install docker-compose==${DOCKERCOMPOSE} \
     && pip3 install pyyaml==3.12 \
-    && pip3 install urllib3==1.21.1 \
+    && pip3 install urllib3==1.22 \
     && git clone https://github.com/anybox/buttervolume \
     && cd buttervolume \
     && git checkout $BUTTERVOLUME \
     && python3 setup.py install \
     && cd /bin \
-    && curl -o consul-template.zip https://releases.hashicorp.com/consul-template/0.19.0/consul-template_0.19.0_linux_amd64.zip \
+    && curl -o consul-template.zip https://releases.hashicorp.com/consul-template/${CONSULTEMPLATE}/consul-template_${CONSULTEMPLATE}_linux_amd64.zip \
     && unzip consul-template.zip \
     && rm consul-template.zip \
     && mkdir /consul/template \
@@ -39,7 +41,8 @@ RUN chown -R consul: /home/consul \
     && chmod g+rx /run/docker/plugins/ \
     && adduser consul root \
     && adduser -D -s /bin/bash gw \
-    && passwd -d gw
+    && passwd -d gw \
+    && sed -i 's/.*su-exec consul:consul .*/    set -- su-exec consul:docker "$@"/' /usr/local/bin/docker-entrypoint.sh
 
 COPY authorizedkeys.py /sbin/
 COPY handler.py /

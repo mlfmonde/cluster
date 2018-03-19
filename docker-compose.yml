@@ -1,4 +1,4 @@
-version: '2.1'
+version: '3'
 services:
 
   caddy:
@@ -11,7 +11,7 @@ services:
       - caddy_srv/:/srv
 
   haproxy:
-    image: haproxy:1.7
+    image: haproxy:1.8
     restart: unless-stopped
     ports:
       - "80:80"
@@ -30,14 +30,15 @@ services:
     network_mode: host
     environment:
         CONSUL_LOCAL_CONFIG: '{
-            "skip_leave_on_interrupt": true,
+            "enable_script_checks": true,
             "watches": [{
                 "type": "event",
-                "handler": "/handler.py"}]
+                "handler_type": "script",
+                "args": ["/handler.py"]}]
             }'
     volumes:
       - consul_docker_cfg:/home/consul/.docker
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /run/docker.sock:/run/docker.sock
       - /run/docker/plugins:/run/docker/plugins
       - ~/deploy:/deploy
       - ./caddy/conf/:/consul/template/caddy/
