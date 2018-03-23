@@ -2,6 +2,47 @@
    :target: https://travis-ci.org/mlfmonde/cluster
    :alt: Travis state
 
+Small private cluster
+=====================
+
+This repository contains a self-sufficient configuration allowing to set-up a
+small private cluster to deploy, manage and host your common linux-based web applications.
+
+It is designed with the following goals in mind:
+
+    * Open source : configuration and all components provided and open-source
+    * Masterless : every node at the same level - no single point of failure
+    * Generic : should support any linux-based web application with any database
+    * Affordable : should allow to build a low-cost hosting/CI infrastructure
+    * Replicated : data should be replicated on at least two nodes
+    * Snapshotted : applications can be instantaneously rollbacked to an earlier state (last hour, last day, last week, etc.)
+    * Good performance : no overhead compared to a typical legacy hosting infrastructure
+    * Easily maintained : cluster nodes can be easily maintained and replaced
+    * Flexible : applications can be quickly moved to another host
+    * Secure : applications should be protected by automated TLS certificates
+    * Automated : no manual action on the nodes should be required
+    * Multitenant : external people can also deploy applications
+    * Monitored : light monitoring should be included 
+    * Extendable : new nodes can be easily added (or removed)
+    * Easily configurable : application configs are described by a single file
+    * User friendly : nice user interface to manage the applications
+
+We are not talking about a large googlesque cloud of stateless applications,
+but common applications used by most companies, such as Wordpress, Drupal,
+Moodle, Odoo, Nextcloud, Gitlab, etc.
+
+The current implementation is based on the following components :
+
+    * `CoreOs Container Linux <https://coreos.com/>`_
+    * `Docker <https://www.docker.com/>`_
+    * `Docker Compose <https://docs.docker.com/compose/>`_
+    * `Buttervolume <https://pypi.python.org/pypi/buttervolume>`_
+    * `HAProxy <https://www.haproxy.org/>`_
+    * `Caddy <https://caddyserver.com/>`_
+    * `Consul <https://www.consul.io/>`_
+    * `Consul Template <https://github.com/hashicorp/consul-template>`_
+
+
 Cluster management
 ==================
 
@@ -170,7 +211,7 @@ Also try to open the web ui to quickly check the deployed parameters::
 proxy protocol
 --------------
 
-[Proxy protocol](https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt)
+`Proxy protocol <https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt>`_
 let send real client IP from the first packet header even it's an encrypted
 connection (like https).
 
