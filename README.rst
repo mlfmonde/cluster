@@ -5,6 +5,9 @@
 Small private cluster
 =====================
 
+Original vision
+***************
+
 This repository contains a self-sufficient configuration allowing to set-up a
 small private cluster to deploy, manage and host your common linux-based web applications.
 
@@ -24,12 +27,15 @@ It is designed with the following goals in mind:
     * Multitenant : external people can also deploy applications
     * Monitored : light monitoring should be included 
     * Extendable : new nodes can be easily added (or removed)
-    * Easily configurable : application configs are described by a single file
+    * Easily configurable : simple applications should be described by a single file
     * User friendly : nice user interface to manage the applications
 
 We are not talking about a large googlesque cloud of stateless applications,
 but common applications used by most companies, such as Wordpress, Drupal,
 Moodle, Odoo, Nextcloud, Gitlab, etc.
+
+Current implementation
+**********************
 
 The current implementation is based on the following components :
 
@@ -42,6 +48,40 @@ The current implementation is based on the following components :
     * `Consul <https://www.consul.io/>`_
     * `Consul Template <https://github.com/hashicorp/consul-template>`_
 
+How does it work?
+*****************
+
+Several nodes of the cluster should be registered as a round-robin DNS under a
+common name, such as cluster.yourdomain.tld. Applications should then be
+registered as a CNAME of cluster.yourdomain.tld. A requests can hit any of the
+nodes, it will be TCP-redirected by HAProxy to the node where the application
+lives. Another HAProxy then forwards the requests to a local Caddy reverse
+proxy which automatically manages the TLS certificates. The Caddy finally
+forwards the request to the expected Docker container inside the node.  To
+deploy an application, you just send a JSON message to Consul, which transmits
+the message to all nodes of the cluster. Each node separately handles the
+message with a custom Python handler and take the appropriate decision, such as
+stopping an application, pulling the new version, moving the volumes to the
+right node, starting the application on the correct node, registering
+application metadata in the key-value store of Consul, or setting up the
+monitoring for the application.  Cooperation between nodes is achieved through
+reads and writes of expirable locking informations in the key-value store. Each
+application is started on an active node and its volumes are asynchronously
+replicated on a passive node with Buttervolume, which also periodically
+snapshot the volumes, allowing to rollback to a previous state. This allows to
+quicly move any application to its passive node with a few seconds downtime at
+most. Applications thus live on a single node as they would run on a standalone
+machine, but are scatered through the cluster and replicated on at least two
+nodes.
+
+Future improvements
+*******************
+
+- Allow to load-balance eligible applications on several nodes
+- Allow to setup a synchronous database replication on several nodes
+- Design a nice user interface to manage deployments, snaphots, volume, and so on
+- Include a gitlab (or other forge) configuration with a docker registry
+- ...
 
 Cluster management
 ==================
