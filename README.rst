@@ -11,6 +11,11 @@ Original vision
 This repository contains a self-sufficient configuration allowing to set-up a
 small private cluster to deploy, manage and host your common linux-based web applications.
 
+The original goal was to scatter applications across the cluster on pairs of
+nodes: one active node where the application runs and one passive node where
+data is replicated to be able to quickly turn a passive node into the active
+node.
+
 It is designed with the following goals in mind:
 
     * Open source : configuration and all components provided and open-source
