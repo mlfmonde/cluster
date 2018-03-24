@@ -11,32 +11,33 @@ Original vision
 This repository contains a self-sufficient configuration allowing to set-up a
 small private cluster to deploy, manage and host your common linux-based web applications.
 
-The original goal was to scatter applications across the cluster on pairs of
+The original goal was to scatter many applications across a cluster by pairs of
 nodes: one active node where the application runs and one passive node where
-data is replicated to be able to quickly turn a passive node into the active
-node.
+data is replicated. Each node can then be an active node for an application and
+a passive node for another one, so that applications can be quickly moved to
+their passive node, to balance the load across the cluster.
 
 It is designed with the following goals in mind:
 
-    * Open source : configuration and all components provided and open-source
-    * Masterless : every node at the same level - no single point of failure
-    * Generic : should support any linux-based web application with any database
-    * Affordable : should allow to build a low-cost hosting/CI infrastructure
-    * Replicated : data should be replicated on at least two nodes
-    * Snapshotted : applications can be instantaneously rollbacked to an earlier state (last hour, last day, last week, etc.)
-    * Good performance : no overhead compared to a typical legacy hosting infrastructure
-    * Easily maintained : cluster nodes can be easily maintained and replaced
-    * Flexible : applications can be quickly moved to another host
-    * Secure : applications should be protected by automated TLS certificates
-    * Automated : no manual action on the nodes should be required
-    * Multitenant : external people can also deploy applications
-    * Monitored : light monitoring should be included 
-    * Extendable : new nodes can be easily added (or removed)
-    * Easily configurable : simple applications should be described by a single file
-    * User friendly : nice user interface to manage the applications
+    * **Open source** : configuration and all components provided and open-source
+    * **Masterless** : every node at the same level - no single point of failure
+    * **Generic** : should support any linux-based web application with any database
+    * **Affordable** : should allow to build a low-cost hosting/CI infrastructure
+    * **Replicated** : data should be replicated on at least two nodes
+    * **Snapshotted** : applications can be instantaneously rollbacked to an earlier state (last hour, last day, last week, etc.)
+    * **Good performance** : no overhead compared to a typical legacy hosting infrastructure
+    * **Easily maintained** : cluster nodes can be easily maintained and replaced
+    * **Flexible** : applications can be quickly moved to another host
+    * **Secure** : applications should be protected by automated TLS certificates
+    * **Automated** : no manual action on the nodes should be required
+    * **Multitenant** : external people can also deploy applications
+    * **Monitored** : light monitoring should be included 
+    * **Extendable** : new nodes can be easily added (or removed)
+    * **Easily configurable** : simple applications should be described by a single file
+    * **User friendly** : nice user interface to manage the applications
 
-We are not talking about a large googlesque cloud of stateless applications,
-but common applications used by most companies, such as Wordpress, Drupal,
+We are not talking about a large googlesque public cloud of stateless applications,
+but a small private cluster of common applications used by most companies, such as Wordpress, Drupal,
 Moodle, Odoo, Nextcloud, Gitlab, etc.
 
 Current implementation
