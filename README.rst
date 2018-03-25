@@ -17,7 +17,7 @@ Start
     $ docker-compose up -d
 
 * overwrite ``command`` and environment variables in ``docker-compose.yml``
-  with a ``docker-compose.override.yml`` that may looks likes::
+  with a ``docker-compose.override.yml`` that may looks like::
 
    version: '3'
    services:
