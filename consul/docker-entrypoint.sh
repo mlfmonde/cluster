@@ -18,6 +18,7 @@ adduser consul docker
 adduser gw docker
 PLUGINS=/run/docker/plugins
 if [ -e $PLUGINS ]; then
+    chmod g+rx $PLUGINS
     chgrp -R docker $PLUGINS
 fi
 
