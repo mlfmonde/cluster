@@ -41,8 +41,8 @@ RUN chown -R consul: /home/consul \
     && chmod g+rx /run/docker/plugins/ \
     && adduser consul root \
     && adduser -D -s /bin/bash gw \
-    && sed -i 's/.*su-exec consul:consul .*/    set -- su-exec consul:docker "$@"/' /usr/local/bin/docker-entrypoint.sh
     && passwd -d gw \
+    && sed -i 's/.*su-exec consul:consul .*/    set -- su-exec consul:docker "$@"/' /usr/local/bin/docker-entrypoint.sh
 
 COPY authorizedkeys.py /sbin/
 COPY handler.py /

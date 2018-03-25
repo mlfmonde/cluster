@@ -1,0 +1,6 @@
+version: '3'
+services:
+  consul:
+    command: ["agent", "-server", "-retry-join=163.172.4.125", "-retry-join=163.172.4.172", "-retry-join=163.172.73.252", "-ui"]
+    environment:
+        CONSUL_BIND_INTERFACE: eno1
