@@ -138,6 +138,7 @@ sudo -s
 cd /var/lib/docker/volumes/
 for v in `docker volume ls| awk '{print $2}'|sort|uniq -d`; do mv $v $v.tmp && docker volume rm $v && mv $v.tmp $v; done
 
+Then migrate to buttervolume >= 2.0
 
 Caddyfile is wrong
 ------------------
@@ -172,50 +173,6 @@ connection (like https).
 
     send-proxy and accept-proxy are already set in haproxy.
     When setting ``send-proxy`` on haproxy configuration, the backend (the
-    Caddy server) **have to** understand and accept the proxy protocol.
-    (note: but in Caddy conf file once configured to listen proxy protocole
+    Caddy server) **has to** understand and accept the proxy protocol.
+    (note: but in Caddy conf file once configured to listen to proxy protol
     that works even it received proper http / https)
-
-
-Cahier de recette
------------------
-
-
-cas à tester:
-* avec tout les serveurs ont accès à internet:
-* l'actuel master n'a pas accès à git
-* le futur master n'a pas d'accès git
-* le send ou la remonté du volume plante
-
-Projet vide (volume, snapshot, container, projet git)
-1. démarrage d'un nouveau projet sur 1 master avec un réplicat
-* nothing -> master
-* nothing -> slave
-* nothing -> nothing
-
-2. inverse master / réplicat
-* master -> slave
-* slave -> master
-* nothing -> nothing
-
-3. relance la même commande (redéploie sur le meme service)
-* master -> master
-* slave -> slave
-* nothing -> nothing
-
-4. on passe sur le troisieme noeud sans réplicat
-* master -> nothing
-* slave -> nothing
-* nothing -> master
-
-Quoi vérifier:
-
-* purges présentes
-* service consul
-* k/v store
-* projet git présent/absent
-* container présent/absent
-* volumes docker présent/absent
-
-transition
-

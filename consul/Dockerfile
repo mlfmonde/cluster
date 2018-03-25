@@ -1,6 +1,6 @@
 FROM consul:1.0.6
 
-ARG BUTTERVOLUME=2.0
+ARG BUTTERVOLUME=2.0.0
 ARG CONSULTEMPLATE=0.19.4
 ARG DOCKERCOMPOSE=1.20.1
 
@@ -41,8 +41,8 @@ RUN chown -R consul: /home/consul \
     && chmod g+rx /run/docker/plugins/ \
     && adduser consul root \
     && adduser -D -s /bin/bash gw \
-    && passwd -d gw \
     && sed -i 's/.*su-exec consul:consul .*/    set -- su-exec consul:docker "$@"/' /usr/local/bin/docker-entrypoint.sh
+    && passwd -d gw \
 
 COPY authorizedkeys.py /sbin/
 COPY handler.py /
