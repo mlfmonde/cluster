@@ -812,6 +812,7 @@ class Caddyfile():
         lines: the remaining lines
         """
         out = []
+        line = line.strip()
         for i, c in enumerate(line):
             out = out or ['']
             if c in ('"', "'"):
@@ -1158,6 +1159,14 @@ class TestCase(unittest.TestCase):
         app = Application(self.repo_url, 'master')
         app.download()
         self.assertEqual(None, app.register_kv('node1', 'node2'))
+
+    def test_brackets_generation(self):
+        self.assertEqual(
+            Caddyfile.dumps(Caddyfile.loads(
+                'host1 {\n    dir1\n}  \nhost2 {\n    dir2\n}'
+            )),
+            'host1 {\n    dir1\n}\nhost2 {\n    dir2\n}'
+        )
 
 
 class FakeExec(object):
