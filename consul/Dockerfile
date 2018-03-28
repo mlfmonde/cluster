@@ -1,6 +1,6 @@
-FROM consul:0.8.5
+FROM consul:1.0.6
 
-ARG BUTTERVOLUME=1.4
+ARG BUTTERVOLUME=2
 
 RUN apk add --no-cache \
       bash \
@@ -17,7 +17,7 @@ RUN apk add --no-cache \
     && rc-update add sshd \
     && /etc/init.d/sshd start \
     && pip install --upgrade pip \
-    && pip install docker-compose==1.11.2 \
+    && pip install docker-compose==1.17.1 \
     && pip3 install pyyaml==3.12 \
     && pip3 install urllib3==1.21.1 \
     && git clone https://github.com/anybox/buttervolume \
@@ -25,7 +25,7 @@ RUN apk add --no-cache \
     && git checkout $BUTTERVOLUME \
     && python3 setup.py install \
     && cd /bin \
-    && curl -o consul-template.zip https://releases.hashicorp.com/consul-template/0.19.0/consul-template_0.19.0_linux_amd64.zip \
+    && curl -o consul-template.zip https://releases.hashicorp.com/consul-template/0.19.4/consul-template_0.19.4_linux_amd64.zip \
     && unzip consul-template.zip \
     && rm consul-template.zip \
     && mkdir /consul/template \

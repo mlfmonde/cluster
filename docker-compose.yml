@@ -1,4 +1,4 @@
-version: '2.1'
+version: '3'
 services:
 
   caddy:
@@ -10,7 +10,7 @@ services:
       - caddy_srv/:/srv
 
   haproxy:
-    image: haproxy:1.7
+    image: haproxy:1.8
     restart: unless-stopped
     ports:
       - "80:80"
