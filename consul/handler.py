@@ -875,6 +875,12 @@ class Caddyfile():
     def dumps(cls, caddylist):
         out = ''
         for i, host in enumerate(caddylist):
+            if not isinstance(host, dict):
+                raise Exception(
+                    "Your CADDYFILE env is malformated, "
+                    "you may have missed a space or a bracket.\n"
+                    "current host: %r" % host
+                )
             out += ', '.join(host['keys']) + ' {\n'
             for directive in host['body']:
                 for j, diritem in enumerate(directive):
@@ -1056,6 +1062,10 @@ class TestCase(unittest.TestCase):
                 d['caddy'],
                 Caddyfile.dumps(json.loads(d['json'], strict=False)))
             print('test # {} ok'.format(i))
+
+    def test_missing_space(self):
+        with self.assertRaises(Exception):
+            Caddyfile.dumps(Caddyfile.loads('foo{\n    root /bar\n}'))
 
     def test_reversibility(self):
         for i, d in enumerate(self.data):
