@@ -1,6 +1,6 @@
-FROM consul:1.0.6
+FROM consul:0.8.5
 
-ARG BUTTERVOLUME=2
+ARG BUTTERVOLUME=2.0.0
 
 RUN apk add --no-cache \
       bash \
@@ -25,7 +25,7 @@ RUN apk add --no-cache \
     && git checkout $BUTTERVOLUME \
     && python3 setup.py install \
     && cd /bin \
-    && curl -o consul-template.zip https://releases.hashicorp.com/consul-template/0.19.4/consul-template_0.19.4_linux_amd64.zip \
+    && curl -o consul-template.zip https://releases.hashicorp.com/consul-template/0.19.0/consul-template_0.19.0_linux_amd64.zip \
     && unzip consul-template.zip \
     && rm consul-template.zip \
     && mkdir /consul/template \
