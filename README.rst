@@ -2,6 +2,93 @@
    :target: https://travis-ci.org/mlfmonde/cluster
    :alt: Travis state
 
+Small private cluster
+=====================
+
+Original vision
+***************
+
+This repository contains a self-sufficient configuration allowing to set-up a
+small private cluster to deploy, manage and host your common linux-based web applications.
+
+The original goal was to scatter many applications across a cluster by pairs of
+nodes: one active node where the application runs and one passive node where
+data is replicated. Each node can then be an active node for an application and
+a passive node for another one, so that applications can be quickly moved to
+their passive node, to balance the load across the cluster.
+
+It is designed with the following goals in mind:
+
+    * **Open source** : configuration and all components provided and open-source
+    * **Masterless** : every node at the same level - no single point of failure
+    * **Generic** : should support any linux-based web application with any database
+    * **Affordable** : should allow to build a low-cost hosting/CI infrastructure
+    * **Replicated** : data should be replicated on at least two nodes
+    * **Snapshotted** : applications can be instantaneously rollbacked to an earlier state (last hour, last day, last week, etc.)
+    * **Good performance** : no overhead compared to a typical legacy hosting infrastructure
+    * **Easily maintained** : cluster nodes can be easily maintained and replaced
+    * **Flexible** : applications can be quickly moved to another host
+    * **Secure** : applications should be protected by automated TLS certificates
+    * **Automated** : no manual action on the nodes should be required
+    * **Multitenant** : external people can also deploy applications
+    * **Monitored** : light monitoring should be included 
+    * **Extendable** : new nodes can be easily added (or removed)
+    * **Easily configurable** : simple applications should be described by a single file
+    * **User friendly** : nice user interface to manage the applications
+
+We are not talking about a large googlesque public cloud of stateless applications,
+but a small private cluster of common applications used by most companies, such as Wordpress, Drupal,
+Moodle, Odoo, Nextcloud, Gitlab, etc.
+
+Current implementation
+**********************
+
+The current implementation is based on the following components :
+
+    * `CoreOs Container Linux <https://coreos.com/>`_
+    * `Docker <https://www.docker.com/>`_
+    * `Docker Compose <https://docs.docker.com/compose/>`_
+    * `Buttervolume <https://pypi.python.org/pypi/buttervolume>`_
+    * `HAProxy <https://www.haproxy.org/>`_
+    * `Caddy <https://caddyserver.com/>`_
+    * `Consul <https://www.consul.io/>`_
+    * `Consul Template <https://github.com/hashicorp/consul-template>`_
+
+How does it work?
+*****************
+
+Several nodes of the cluster should be registered as a round-robin DNS under a
+common name, such as cluster.yourdomain.tld. Applications should then be
+registered as a CNAME of cluster.yourdomain.tld. A requests can hit any of the
+nodes, it will be TCP-redirected by HAProxy to the node where the application
+lives. Another HAProxy then forwards the requests to a local Caddy reverse
+proxy which automatically manages the TLS certificates. The Caddy finally
+forwards the request to the expected Docker container inside the node.  To
+deploy an application, you just send a JSON message to Consul, which transmits
+the message to all nodes of the cluster. Each node separately handles the
+message with a custom Python handler and take the appropriate decision, such as
+stopping an application, pulling the new version, moving the volumes to the
+right node, starting the application on the correct node, registering
+application metadata in the key-value store of Consul, or setting up the
+monitoring for the application.  Cooperation between nodes is achieved through
+reads and writes of expirable locking informations in the key-value store. Each
+application is started on an active node and its volumes are asynchronously
+replicated on a passive node with Buttervolume, which also periodically
+snapshot the volumes, allowing to rollback to a previous state. This allows to
+quicly move any application to its passive node with a few seconds downtime at
+most. Applications thus live on a single node as they would run on a standalone
+machine, but are scatered through the cluster and replicated on at least two
+nodes.
+
+Future improvements
+*******************
+
+- Allow to load-balance eligible applications on several nodes
+- Allow to setup a synchronous database replication on several nodes
+- Design a nice user interface to manage deployments, snaphots, volume, and so on
+- Include a gitlab (or other forge) configuration with a docker registry
+- ...
+
 Cluster management
 ==================
 
@@ -170,7 +257,7 @@ Also try to open the web ui to quickly check the deployed parameters::
 proxy protocol
 --------------
 
-[Proxy protocol](https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt)
+`Proxy protocol <https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt>`_
 let send real client IP from the first packet header even it's an encrypted
 connection (like https).
 
