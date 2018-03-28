@@ -1,6 +1,6 @@
 FROM consul:0.8.5
 
-ARG BUTTERVOLUME=1.4
+ARG BUTTERVOLUME=2.0.0
 
 RUN apk add --no-cache \
       bash \
@@ -17,7 +17,7 @@ RUN apk add --no-cache \
     && rc-update add sshd \
     && /etc/init.d/sshd start \
     && pip install --upgrade pip \
-    && pip install docker-compose==1.11.2 \
+    && pip install docker-compose==1.17.1 \
     && pip3 install pyyaml==3.12 \
     && pip3 install urllib3==1.21.1 \
     && git clone https://github.com/anybox/buttervolume \
