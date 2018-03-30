@@ -20,7 +20,7 @@ from subprocess import run, CalledProcessError, PIPE
 from sys import stdin, argv
 from urllib.parse import urlparse
 from uuid import uuid1
-DTFORMAT = "%Y-%m-%dT%H:%M:%S.%f"
+DTFORMAT = "%Y-%m-%dT%H%M%S.%f"
 DEPLOY = '/deploy'
 CADDYLOGS = '/var/log'
 TEST = False

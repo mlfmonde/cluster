@@ -38,7 +38,7 @@ services:
       - consul_docker_cfg:/home/consul/.docker
       - /var/run/docker.sock:/var/run/docker.sock
       - /run/docker/plugins:/run/docker/plugins
-      - ~/deploy:/deploy
+      - /deploy:/deploy
       - ./caddy/conf/:/consul/template/caddy/
       - ./haproxy/conf/:/consul/template/haproxy/
       - consul_ssh:/home/consul/.ssh
