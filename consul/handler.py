@@ -1142,7 +1142,7 @@ class TestCase(unittest.TestCase):
             ['foobarmasterddb14_dbdata', 'foobarmasterddb14_wwwdata'],
             sorted(v.name for v in app.volumes_from_kv))
 
-    def test_volumes_from_kv_before_registred(self):
+    def test_volumes_from_kv_before_registered(self):
         app = Application(self.repo_url, 'master')
         app.download()
         self.assertEqual(
