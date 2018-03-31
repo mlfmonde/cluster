@@ -104,25 +104,19 @@ Start
     $ docker-compose up -d
 
 * overwrite ``command`` and environment variables in ``docker-compose.yml``
-  with a ``docker-compose.prod.yml`` that may looks likes::
+  with a ``docker-compose.override.yml`` that may looks like::
 
    version: '2.1'
    services:
      consul:
        command: ["agent", "-server", "-retry-join=10.10.20.1", "-retry-join=10.10.20.2", "-retry-join=10.10.20.3", "-ui"]
        environment:
-           CONSUL_LOCAL_CONFIG: '{
-               "skip_leave_on_interrupt": true,
-               "watches": [{
-                   "type": "event",
-                   "handler": "/handler.py"}]
-               }'
            CONSUL_BIND_INTERFACE: eth1
 
 * Then start caddy, haproxy and consul::
 
     $ popd
-    $ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+    $ docker-compose up -d
 
 
 * buttervolume ssh configuration
