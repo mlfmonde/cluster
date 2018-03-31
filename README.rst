@@ -104,25 +104,19 @@ Start
     $ docker-compose up -d
 
 * overwrite ``command`` and environment variables in ``docker-compose.yml``
-  with a ``docker-compose.prod.yml`` that may looks likes::
+  with a ``docker-compose.override.yml`` that may looks like::
 
-   version: '2.1'
+   version: '3'
    services:
      consul:
        command: ["agent", "-server", "-retry-join=10.10.20.1", "-retry-join=10.10.20.2", "-retry-join=10.10.20.3", "-ui"]
        environment:
-           CONSUL_LOCAL_CONFIG: '{
-               "skip_leave_on_interrupt": true,
-               "watches": [{
-                   "type": "event",
-                   "handler": "/handler.py"}]
-               }'
            CONSUL_BIND_INTERFACE: eth1
 
 * Then start caddy, haproxy and consul::
 
     $ popd
-    $ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+    $ docker-compose up -d
 
 
 * buttervolume ssh configuration
@@ -231,6 +225,7 @@ sudo -s
 cd /var/lib/docker/volumes/
 for v in `docker volume ls| awk '{print $2}'|sort|uniq -d`; do mv $v $v.tmp && docker volume rm $v && mv $v.tmp $v; done
 
+Then migrate to buttervolume >= 2.0
 
 Caddyfile is wrong
 ------------------
@@ -265,8 +260,8 @@ connection (like https).
 
     send-proxy and accept-proxy are already set in haproxy.
     When setting ``send-proxy`` on haproxy configuration, the backend (the
-    Caddy server) **have to** understand and accept the proxy protocol.
-    (note: but in Caddy conf file once configured to listen proxy protocole
+    Caddy server) **has to** understand and accept the proxy protocol.
+    (note: but in Caddy conf file once configured to listen to proxy protol
     that works even it received proper http / https)
 
 
