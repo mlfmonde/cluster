@@ -10,11 +10,16 @@ haproxytemplate="/consul/template/haproxy/haproxy.cfg.ctmpl:/consul/template/hap
 /bin/consul-template       -template=$caddytemplate -template=$haproxytemplate &
 
 # adapt the docker group of the container to the outside
-DOCKER_GID=$(stat -c %g /var/run/docker.sock)
+DOCKER_GID=$(stat -c %g /run/docker.sock)
 delgroup docker
 addgroup -g $DOCKER_GID docker
 adduser -S -u $DOCKER_GID -G $DOCKER_GID docker
 adduser consul docker
 adduser gw docker
+PLUGINS=/run/docker/plugins
+if [ -e $PLUGINS ]; then
+    chmod g+rx $PLUGINS
+    chgrp -R docker $PLUGINS
+fi
 
 exec /usr/local/bin/docker-entrypoint.sh "$@"
