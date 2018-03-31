@@ -20,10 +20,10 @@ frontend https-in
     option socket-stats
     tcp-request inspect-delay 5s
     tcp-request content accept if { req_ssl_hello_type 1 }
-{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "fronthttps" | contains $domain }}{{ else }}    use_backend https-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }
+{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "fronthttps" | contains $domain }}{{ else }}    use_backend https-{{ $domain | replaceAll "*" "" }} if { req_ssl_sni -i -m end {{ $domain | replaceAll "*" "" }} }
 {{ scratch.MapSet "fronthttps" $domain $domain }}{{ end }}{{ end }}{{ end }}
 {{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttps" | contains $domain }}{{ else }}
-backend https-{{ $domain }}
+backend https-{{ $domain  | replaceAll "*" "" }}
     mode tcp
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:1443{{ end }} send-proxy
 {{ scratch.MapSet "backhttps" $domain $domain }}{{ end }}{{ end }}{{ end }}
@@ -32,10 +32,10 @@ frontend http-in
     mode http
     bind *:80
     option socket-stats
-{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "fronthttp" | contains $domain }}{{ else }}    use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }
+{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "fronthttp" | contains $domain }}{{ else }}    use_backend http-{{ $domain | replaceAll "*" "" }} if { hdr_end(host) -i {{ $domain | replaceAll "*" "" }} }
 {{ scratch.MapSet "fronthttp" $domain $domain }}{{ end }}{{ end }}{{ end }}
 {{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttp" | contains $domain }}{{ else }}
-backend http-{{ $domain }}
+backend http-{{ $domain | replaceAll "*" "" }}
     mode http
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:80{{ else }}{{ $d.ip }}:80{{ end }}
 {{ scratch.MapSet "backhttp" $domain $domain }}{{ end }}{{ end }}{{ end }}
