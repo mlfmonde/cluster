@@ -44,6 +44,25 @@ services:
       MYSQL_DATABASE: wordpress
       MYSQL_USER: wordpress
       MYSQL_PASSWORD: "passwd"
+  sshservice:
+    image: panubo/sshd
+    environment:
+      HAPROXY: '{
+          "ssh-config-name": {
+            "frontend": {
+              "mode": "tcp",
+              "bind": ["*:2222"]
+            },
+            "backends": [{
+              "name": "ssh-service",
+              "use_backend_option": "",
+              "port": "22",
+              "peer_port": "2222"
+            }]
+          }
+        }'
+    networks:
+      - cluster_default
 
 volumes:
   wwwdata:

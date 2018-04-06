@@ -165,6 +165,100 @@ Example: deploy foobar on node1 and replicate on node2::
 
 During deployment, volumes are automatically moved to the new master node.
 
+Define a service
+----------------
+
+A service must be defined in a git repository in a docker-compose.yml file.
+
+There are some special feature to manage redirect trafic to your container
+through environment variables:
+
+* ``CADDYFILE``:
+
+  In the following example haproxy will redirect the traffic to the node where
+  the master is deployed, on the master node, haproxy will send the traffic
+  to the central caddyserver. So the  ``CADDYFILE`` should looks likes to a
+  `Caddyfile configuration <https://caddyserver.com/docs>`_::
+
+      version: '3'
+      services:
+        wordpress:
+          environment:
+            CADDYFILE: |
+              http://test.example.com {
+                  proxy / http://$CONTAINER:80
+              }
+              http://www.test.example.com {
+                  redir http://test.example.com
+              }
+          build: wordpress
+          restart: unless-stopped
+          volumes:
+            - wwwdata:/var/www/html
+            - socket:/var/run/mysqld/
+          networks:
+            - cluster_default
+
+         [...]
+
+.. note::
+
+   ``$CONTAINER`` will be replaced by the consul handler while deploying
+   the service by the name of the container.
+
+.. warning::
+
+   You must link the container to the cluster_default network
+
+.. note::
+
+   Some default settings are added by the handler if not set likes logging,
+   etc...
+
+
+
+* ``HAPROXY``:
+
+  The intent of this variable is to manage haproxy configuration to avoid
+  running over the central caddyserver::
+
+      sshservice:
+         image: panubo/sshd
+         environment:
+            HAPROXY: '{
+                "ssh-config-name": {
+                  "frontend": {
+                    "mode": "tcp",
+                    "bind": ["*:2222"]
+                  },
+                  "backends": [{
+                    "name": "ssh-service",
+                    "use_backend_option": "",
+                    "port": "22",
+                    "peer_port": "2222"
+                  }]
+                }
+           }'
+         networks:
+            - cluster_default
+
+  The above configuration should produce the following haproxy config::
+
+      frontend front-ssh-config-name
+          mode tcp
+          bind *:2222
+          use_backend backend-ssh-service
+
+      backend backend-ssh-service
+          mode tcp
+          server node1 sshservice_container_name:22
+
+
+.. warning::
+
+   You must link the container to the cluster_default network
+
+
 Local development environment
 -----------------------------
 

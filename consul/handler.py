@@ -393,6 +393,41 @@ class Application(object):
                 % self.container_name(service))
         return ps.split('\n')[-1].strip()
 
+    def haproxy(self, services):
+        result = {}
+        for service in services:
+            hapx = {}
+            name = 'HAPROXY'
+            try:
+                env = self.compose['services'][service]['environment']
+                haproxy = env[name]
+            except Exception:
+                log.debug(
+                    'No %s environment variable for '
+                    'service %s in the compose file of %s',
+                    name, service, self.name
+                )
+                continue
+            try:
+                log.info('Found a %s environment variable for '
+                         'service %s in the compose file of %s',
+                         name, service, self.name)
+                hapx = json.loads(haproxy)
+            except Exception as e:
+                log.warning(
+                    'Invalid %s environment variable for '
+                    'service %s in the compose file of %s: %s. \nCaused by '
+                    'the following configuration wich will be ignored, '
+                    'make sure it\'s a valid json: ',
+                    name, service, self.name, str(e)
+                )
+                continue
+            for key, conf in hapx.items():
+                for backend in conf['backends']:
+                    backend['ct'] = self.container_name(service)
+            result.update(hapx)
+        return result
+
     def register_kv(self, master, slave):
         """register services in the key/value store
         so that consul-template can regenerate the
@@ -412,6 +447,7 @@ class Application(object):
                     ) is dict else {}
             for s in self.services}
         value = {
+            'haproxy': self.haproxy(self.services),
             'caddyfile': Caddyfile.dumps(caddyfiles),
             'repo_url': self.repo_url,
             'branch': self.branch,
@@ -1176,6 +1212,28 @@ class TestCase(unittest.TestCase):
                 'host1 {\n    dir1\n}  \nhost2 {\n    dir2\n}'
             )),
             'host1 {\n    dir1\n}\nhost2 {\n    dir2\n}'
+        )
+
+    def test_happroxy_config(self):
+        app = Application(self.repo_url, 'master')
+        app.download()
+        self.assertEqual(
+            {
+                "ssh-config-name": {
+                    "frontend": {
+                        "mode": "tcp",
+                        "bind": ["*:2222"]
+                    },
+                    "backends": [{
+                        "name": "ssh-service",
+                        "use_backend_option": "",
+                        "port": "22",
+                        "peer_port": "2222",
+                        "ct": "foobarmasterddb14_sshservice_1"
+                    }]
+                }
+            },
+            app.haproxy(app.services)
         )
 
 

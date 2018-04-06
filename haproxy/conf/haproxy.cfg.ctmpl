@@ -40,35 +40,15 @@ backend http-{{ $domain }}
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:80{{ else }}{{ $d.ip }}:80{{ end }}
 {{ scratch.MapSet "backhttp" $domain $domain }}{{ end }}{{ end }}{{ end }}
 
-{{ if and (keyExists "app/cluster_gitlab_prod.2e066") (not (keyExists "maintenance/cluster_gitlab_prod.2e066")) }}
-frontend git-prod-ssh-in
-    mode tcp
-    bind *:2222
-    use_backend ssh-prod-git
-
-backend ssh-prod-git
-    mode tcp
-{{ with $v := key "app/cluster_gitlab_prod.2e066" | parseJSON }}    server {{ $v.master }} {{ if eq $v.master (env "HOSTNAME") }}{{ $v.ct.web }}:22{{ else }}{{ $v.ip }}:2222{{ end }}{{ end }}
-{{ end }}
-
-{{ if and (keyExists "app/cluster_gitlab_master.2e066") (not (keyExists "maintenance/cluster_gitlab_master.2e066")) }}
-frontend git-ppd-ssh-in
-    mode tcp
-    bind *:2525
-    use_backend ssh-ppd-git
-
-backend ssh-ppd-git
-    mode tcp
-{{ with $v := key "app/cluster_gitlab_master.2e066" | parseJSON }}    server {{ $v.master }} {{ if eq $v.master (env "HOSTNAME") }}{{ $v.ct.web }}:22{{ else }}{{ $v.ip }}:2525{{ end }}{{ end }}
-{{ end }}
-
-{{ if and (keyExists "app/cluster_gitlab_dev.2e066") (not (keyExists "maintenance/cluster_gitlab_dev.2e066")) }}
-frontend git-dev-ssh-in
-    mode tcp
-    bind *:2626
-    use_backend ssh-dev-git
-
-backend ssh-dev-git
-    mode tcp
-{{ with $v := key "app/cluster_gitlab_dev.2e066" | parseJSON }}    server {{ $v.master }} {{ if eq $v.master (env "HOSTNAME") }}{{ $v.ct.web }}:22{{ else }}{{ $v.ip }}:2626{{ end }}{{ end }}
-{{ end }}
+{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $confname, $conf := $d.haproxy }}
+frontend front-{{ $confname }}
+    mode {{ $conf.frontend.mode }}
+    {{ range $bind := $conf.bind }}bind {{ $bind }}
+    {{ end }}
+    {{ range $backend := $conf.backends }}use_backend backend-{{ $backend.name }} {{ $backend.use_backend_option }}
+    {{ end }}
+{{ range $backend := $conf.backends }}
+backend backend-{{ $backend.name }}
+    mode {{ $conf.frontend.mode }}
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }}
+{{ end }}{{ end }}{{ end }}
