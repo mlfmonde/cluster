@@ -40,7 +40,7 @@ backend http-{{ $domain }}
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:80{{ else }}{{ $d.ip }}:80{{ end }}
 {{ scratch.MapSet "backhttp" $domain $domain }}{{ end }}{{ end }}{{ end }}
 
-{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $confname, $conf := $d.haproxy }}
+{{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}
 frontend front-{{ $confname }}
     mode {{ $conf.frontend.mode }}
     {{ range $bind := $conf.frontend.bind }}bind {{ $bind }}{{ end }}
@@ -49,4 +49,4 @@ frontend front-{{ $confname }}
 backend backend-{{ $backend.name }}
     mode {{ $conf.frontend.mode }}
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }}
-{{ end }}{{ end }}{{ end }}
+{{ end }}{{ end }}{{ end }}{{ end }}
