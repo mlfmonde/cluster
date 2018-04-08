@@ -396,7 +396,6 @@ class Application(object):
     def haproxy(self, services):
         result = {}
         for service in services:
-            hapx = {}
             name = 'HAPROXY'
             try:
                 env = self.compose['services'][service]['environment']
@@ -412,20 +411,36 @@ class Application(object):
                 log.info('Found a %s environment variable for '
                          'service %s in the compose file of %s',
                          name, service, self.name)
-                hapx = json.loads(haproxy)
+                hapx = yaml.load(haproxy)
             except Exception as e:
                 log.warning(
                     'Invalid %s environment variable for '
                     'service %s in the compose file of %s: %s. \nCaused by '
                     'the following configuration wich will be ignored, '
-                    'make sure it\'s a valid json: ',
+                    'make sure it\'s a valid json/yaml: ',
                     name, service, self.name, str(e)
                 )
                 continue
             for key, conf in hapx.items():
                 for backend in conf['backends']:
                     backend['ct'] = self.container_name(service)
-            result.update(hapx)
+                if key in result:
+                    bind = conf.get('frontend', {}).get('bind', [])
+                    bind.extend(
+                        result[key].get('frontend', {}).get('bind', [])
+                    )
+                    if bind:
+                        result[key]['frontend']["bind"] = list(set(bind))
+
+                    options = conf.get('frontend', {}).get('options', [])
+                    options.extend(
+                        result[key].get('frontend', {}).get('options', [])
+                    )
+                    if options:
+                        result[key]['frontend']['options'] = list(set(options))
+                    result[key]['backends'].extend(conf['backends'])
+                else:
+                    result[key] = conf
         return result
 
     def register_kv(self, master, slave):
@@ -1214,7 +1229,7 @@ class TestCase(unittest.TestCase):
             'host1 {\n    dir1\n}\nhost2 {\n    dir2\n}'
         )
 
-    def test_happroxy_config(self):
+    def test_haproxy_config(self):
         app = Application(self.repo_url, 'master')
         app.download()
         self.assertEqual(
@@ -1234,6 +1249,121 @@ class TestCase(unittest.TestCase):
                 }
             },
             app.haproxy(app.services)
+        )
+
+    def test_merge_service_configs_haproxy(self):
+        app = Application(
+            'https://gitlab.example.com/hosting/FooBar2',
+            'master'
+        )
+        app.download()
+        self.maxDiff = None
+        expected = {
+            "https-in": {
+                "backends": [{
+                    "name": "an.example.com",
+                    "use_backend_option": "if { req_ssl_sni -i an.example.com"
+                                          " }",
+                    "port": "443",
+                    "peer_port": "1443",
+                    "server_option": "send_proxy",
+                    "ct": "foobar2masterdec69_wordpress_1"
+                }]
+            },
+            "http-in": {
+                "backends": [{
+                    "name": "an.example.com",
+                    "use_backend_option":
+                        " if { hdr(host) -i an.example.com }",
+                    "port": "80",
+                    "peer_port": "80",
+                    "ct": "foobar2masterdec69_wordpress_1"
+                }, {
+                    "name": "another.example.com",
+                    "use_backend_option":
+                        " if { hdr(host) -i another.example.com }",
+                    "port": "80",
+                    "peer_port": "80",
+                    "ct": "foobar2masterdec69_wordpress2_1"
+                }]
+            },
+            "other-config": {
+                "frontend": {
+                    "mode": "tcp",
+                    "bind": ["*:1111"],
+                    "options": [
+                        "option socket-stats",
+                        "tcp-request inspect-delay 5s",
+                        "tcp-request content accept "
+                        "if { req_ssl_hello_type 1 }"
+                    ]
+                },
+                "backends": [{
+                    "name": "other-config",
+                    "use_backend_option":
+                        "if { req_ssl_sni -i other.example.com }",
+                    "port": "11",
+                    "peer_port": "1111",
+                    "ct": "foobar2masterdec69_wordpress_1"
+                }]
+            },
+            "ssh-config-name": {
+                "frontend": {
+                    "mode": "tcp",
+                    "bind": ["*:2222", "*:4444"],
+                    "options": [
+                        "option socket-stats",
+                        "tcp-request inspect-delay 5s",
+                        "tcp-request content accept "
+                        "if { req_ssl_hello_type 1 }",
+                        "test",
+                        "test2"
+                    ]
+                },
+                "backends": [{
+                        "name": "ssh-service-wordpress2",
+                        "use_backend_option": "",
+                        "port": "22",
+                        "peer_port": "2222",
+                        "server_option": "send_proxy",
+                        "ct": "foobar2masterdec69_wordpress2_1"
+                    }, {
+                        "name": "ssh-service",
+                        "use_backend_option": "",
+                        "port": "22",
+                        "peer_port": "2222",
+                        "ct": "foobar2masterdec69_sshservice_1"
+                    }, {
+                        "name": "ssh-service2",
+                        "use_backend_option": "",
+                        "port": "22",
+                        "peer_port": "4444",
+                        "ct": "foobar2masterdec69_sshservice2_1"
+                    },
+                ]
+            }
+        }
+        got = app.haproxy(app.services)
+        self.assertEqual(len(got), len(expected))
+        self.assertEqual(
+            len(got['ssh-config-name']),
+            len(expected['ssh-config-name'])
+        )
+        self.assertEqual(
+            len(got['ssh-config-name']['backends']),
+            len(expected['ssh-config-name']['backends'])
+        )
+        self.assertEqual(
+            sorted(got['ssh-config-name']['frontend']['bind']),
+            sorted(expected['ssh-config-name']['frontend']['bind'])
+        )
+        self.assertEqual(
+            sorted(got['ssh-config-name']['frontend']['options']),
+            sorted(expected['ssh-config-name']['frontend']['options'])
+        )
+        self.assertEqual(
+            len(got['http-in']),
+            len(expected['http-in'])
         )
 
 
