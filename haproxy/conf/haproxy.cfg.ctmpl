@@ -22,7 +22,7 @@ frontend https-in
     tcp-request content accept if { req_ssl_hello_type 1 }
 {{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "fronthttps" | contains $domain }}{{ else }}    use_backend https-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }
 {{ scratch.MapSet "fronthttps" $domain $domain }}{{ end }}{{ end }}
-{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if eq $confname "https-in" }}{{ range $backend := $conf.backends }}    use_backend https-{{ or ($backend.name) $backend.ct }} {{ or ($backend.use_backend_option) "" }}
+{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if eq $confname "https-in" }}{{ range $backend := $conf.backends }}    use_backend https-{{ or (index $backend "name") $backend.ct }} {{ $or (index $backend "use_backend_option") "" }}
 {{ end }}{{ end }}{{ end }}{{ end }}{{ end }}
 
 {{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttps" | contains $domain }}{{ else }}
@@ -31,9 +31,9 @@ backend https-{{ $domain }}
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:1443{{ end }} send-proxy
 {{ scratch.MapSet "backhttps" $domain $domain }}{{ end }}{{ end }}
 {{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if eq $confname "https-in" }}{{ range $backend := $conf.backends }}
-backend https-{{ or ($backend.name) $backend.ct }}
+backend https-{{ or (index $backend "name") $backend.ct }}
     mode http
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or ($backend.server_option) "" }}
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
 {{ end }}{{ end }}{{ end }}{{ end }}{{ end }}
 
 frontend http-in
@@ -42,7 +42,7 @@ frontend http-in
     option socket-stats
 {{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "fronthttp" | contains $domain }}{{ else }}    use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }
 {{ scratch.MapSet "fronthttp" $domain $domain }}{{ end }}{{ end }}
-{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if eq $confname "http-in" }}{{ range $backend := $conf.backends }}    use_backend http-{{ or ($backend.name) $backend.ct }} {{ or ($backend.use_backend_option) "" }}
+{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if eq $confname "http-in" }}{{ range $backend := $conf.backends }}    use_backend http-{{ or (index $backend "name") $backend.ct }} {{ $or (index $backend "use_backend_option") "" }}
 {{ end }}{{ end }}{{ end }}{{ end }}{{ end }}
 
 {{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttp" | contains $domain }}{{ else }}
@@ -51,9 +51,9 @@ backend http-{{ $domain }}
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:80{{ else }}{{ $d.ip }}:80{{ end }}
 {{ scratch.MapSet "backhttp" $domain $domain }}{{ end }}{{ end }}
 {{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if eq $confname "https-in" }}{{ range $backend := $conf.backends }}
-backend http-{{ or ($backend.name) $backend.ct }}
+backend http-{{ or (index $backend "name") $backend.ct }}
     mode http
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or ($backend.server_option) "" }}
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
 {{ end }}{{ end }}{{ end }}{{ end }}{{ end }}
 
 {{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}
@@ -61,9 +61,9 @@ frontend front-{{ $confname }}
     mode {{ $conf.frontend.mode }}
     {{ range $option := $conf.frontend.options }}{{ $option }}{{ end }}
     {{ range $bind := $conf.frontend.bind }}bind {{ $bind }}{{ end }}
-    {{ range $backend := $conf.backends }}use_backend backend-{{ or ($backend.name) $backend.ct }} {{ or ($backend.use_backend_option) "" }}{{ end }}
+    {{ range $backend := $conf.backends }}use_backend backend-{{ or (index $backend "name") $backend.ct }} {{ $or (index $backend "use_backend_option") "" }}{{ end }}
 {{ range $backend := $conf.backends }}
-backend backend-{{ or ($backend.name) $backend.ct }}
+backend backend-{{ or (index $backend "name") $backend.ct }}
     mode {{ $conf.frontend.mode }}
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or ($backend.server_option) "" }}
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
 {{ end }}{{ end }}{{ end }}{{ end }}
