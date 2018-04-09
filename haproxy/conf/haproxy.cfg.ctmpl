@@ -50,7 +50,7 @@ backend http-{{ $domain }}
     mode http
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:80{{ else }}{{ $d.ip }}:80{{ end }}
 {{ scratch.MapSet "backhttp" $domain $domain }}{{ end }}{{ end }}
-{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if eq $confname "https-in" }}{{ range $backend := $conf.backends }}
+{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if eq $confname "http-in" }}{{ range $backend := $conf.backends }}
 backend http-{{ or (index $backend "name") $backend.ct }}
     mode http
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
