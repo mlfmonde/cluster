@@ -2,6 +2,7 @@ version: '2'
 services:
   wordpress:
     environment:
+      CONSUL_CHECK_URLS: '["https://an.example.com", "http://an.example.com"]'
       HAPROXY: '{
           "https-in": {
             "backends": [{
@@ -55,6 +56,8 @@ services:
         https://www.test.example.com {
             redir https://test.example.com
         }
+      CONSUL_CHECK_URLS: |
+        - http://another.example.com
       HAPROXY: |
         http-in:
           backends:

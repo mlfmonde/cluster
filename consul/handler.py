@@ -395,8 +395,8 @@ class Application(object):
 
     def haproxy(self, services):
         result = {}
+        name = 'HAPROXY'
         for service in services:
-            name = 'HAPROXY'
             try:
                 env = self.compose['services'][service]['environment']
                 haproxy = env[name]
@@ -443,6 +443,41 @@ class Application(object):
                     result[key] = conf
         return result
 
+    def consul_extra_check_urls(self, services):
+        """urls to use in default consul checks were add by introspecting
+         caddyfile, this offer the capabilities to add extra urls or in case
+         using only HAPROXY config by using CONSUL_CHECK_URLS.
+        """
+        name = 'CONSUL_CHECK_URLS'
+        extra_urls = []
+        for service in services:
+            try:
+                env = self.compose['services'][service]['environment']
+                urls = env[name]
+            except Exception:
+                log.debug(
+                    'No %s environment variable for '
+                    'service %s in the compose file of %s',
+                    name, service, self.name
+                )
+                continue
+            try:
+                log.info('Found a %s environment variable for '
+                         'service %s in the compose file of %s',
+                         name, service, self.name)
+                urls_list = yaml.load(urls)
+            except Exception as e:
+                log.warning(
+                    'Invalid %s environment variable for '
+                    'service %s in the compose file of %s: %s. \nCaused by '
+                    'the following configuration wich will be ignored, '
+                    'make sure it\'s a valid json/yaml: ',
+                    name, service, self.name, str(e)
+                )
+                continue
+            extra_urls.extend(urls_list)
+        return extra_urls
+
     def register_kv(self, master, slave):
         """register services in the key/value store
         so that consul-template can regenerate the
@@ -453,8 +488,7 @@ class Application(object):
         caddyfiles = concat([self.caddyfile(s) for s in self.services])
         caddyfiles = [c for c in caddyfiles if c]
         urls = concat([c['keys'] for c in caddyfiles])
-        if not caddyfiles:
-            return  # no need?
+        urls.extend(self.consul_extra_check_urls(self.services))
         pubkey = {  # TODO support environments as lists
             s: self.compose['services'][s].get('environment', {}
                                                ).get('PUBKEY', '')
@@ -463,7 +497,7 @@ class Application(object):
             for s in self.services}
         value = {
             'haproxy': self.haproxy(self.services),
-            'caddyfile': Caddyfile.dumps(caddyfiles),
+            'caddyfile': Caddyfile.dumps(caddyfiles) if caddyfiles else "",
             'repo_url': self.repo_url,
             'branch': self.branch,
             'deploy_date': self._deploy_date,
@@ -488,6 +522,7 @@ class Application(object):
         """
         urls = concat([c['keys'] for c in
                        concat([self.caddyfile(s) for s in self.services])])
+        urls.extend(self.consul_extra_check_urls(self.services))
         # default for most cases
         svc = json.dumps({
             'Name': self.name,
@@ -1249,6 +1284,21 @@ class TestCase(unittest.TestCase):
                 }
             },
             app.haproxy(app.services)
+        )
+
+    def test_urls(self):
+        app = Application(
+            'https://gitlab.example.com/hosting/FooBar2',
+            'master'
+        )
+        app.download()
+        self.assertEqual(
+            sorted(app.consul_extra_check_urls(app.services)),
+            sorted([
+                'http://another.example.com',
+                'http://an.example.com',
+                'https://an.example.com',
+            ])
         )
 
     def test_merge_service_configs_haproxy(self):
