@@ -259,6 +259,75 @@ through environment variables:
    You must link the container to the cluster_default network
 
 
+``HAPROXY`` can be a yaml or json format (as far python ``yaml.load`` car parse
+json) so a more exhaustive config may looks like this::
+
+        http-in:
+          backends:
+            - name: another.example.com
+              use_backend_option: "if { hdr(host) -i another.example.com }"
+              port: 80
+              peer_port: 80
+        ssh-config-name:
+          frontend:
+            mode: tcp
+            bind:
+              - "*:2222"
+            options:
+              - "test"
+              - "test2"
+          backends:
+            - name: ssh-service-wordpress2
+              port: 22
+              peer_port: 2222
+              server_option: send_proxy
+
+
+* ``http-in`` and ``https-in`` are special values to manage HTTP (80) and
+  HTTPS (443) ports. frontend configuration will be ignored, you needs to
+  write the configuration in the ``haproxy.cfg.tmpl``. Otherwhise
+  ``ssh-config-name`` will be the name of the frontend in the haproxy
+  configuration. It MUST be unique over services (different docker-compose.yml).
+
+.. note::
+
+    If a frontend name is the same over services in the same docker-compose.yml
+    frontend options, bind and backends are aggregated.
+
+* ``frontend``: define frontend configuration. Required if config name is not
+  one of ``http-in``, ``https-in``.
+
+    * ``mode`` (required): `mode or protocole <https://cbonte.github.io/
+      haproxy-dconv/1.8/configuration.html#4.2-mode>`_
+    * ``bind`` (required): refer to `haproxy bind options <https://
+      cbonte.github.io/haproxy-dconv/1.8/configuration.html#5.1>`_
+    * ``options`` (optional): a list of valid frontend options to add to the
+      frontend. on line per item.
+* ``backends`` (required): a list of backend
+    * ``use_backend_option`` (optional, you sould provide it in case of
+      ``http-in`` or ``https-in``): options added in the frontend part to
+      properly select the current backend. Learn more on `haproxy
+      documentation <https://cbonte.github.io/haproxy-dconv/1.8/
+      configuration.html#4.2-use_backend>`_.
+    * ``port`` (required): listening service port
+    * ``peer_port`` (required): listening port by haproxy while forwarding
+      traffic to another host
+    * ``server_option``: add options to the server directive which forward
+      traffic to the service or other nodes, refer to the haproxy `server
+      and default server options <https://cbonte.github.io/haproxy-dconv/1.8/
+      configuration.html#5.2>`_.
+
+* ``CONSUL_CHECK_URLS``: `Consul can check <https://www.consul.io/docs/agent/
+  checks.html>`_ if the service is healthy. By default the handler introspect
+  your ``CADDYFILE`` environment to add checks. You can use this one to add
+  extra check or if you are using only ``HAPROXY`` config.
+
+  .. note::
+
+    If you provide a ``service.json`` it will overwrite introspected checks
+    and checks defined in ``CONSUL_CHECK_URLS``
+
+
 Local development environment
 -----------------------------
 
