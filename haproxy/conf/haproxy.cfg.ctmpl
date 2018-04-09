@@ -56,7 +56,7 @@ backend http-{{ or (index $backend "name") $backend.ct }}
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
 {{ end }}{{ end }}{{ end }}{{ end }}{{ end }}
 
-{{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}
+{{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if not (or (eq $confname "http-in") (eq $confname "https-in")) }}
 frontend front-{{ $confname }}
     mode {{ $conf.frontend.mode }}
     {{ range $option := $conf.frontend.options }}{{ $option }}{{ end }}
@@ -66,4 +66,4 @@ frontend front-{{ $confname }}
 backend backend-{{ or (index $backend "name") $backend.ct }}
     mode {{ $conf.frontend.mode }}
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
-{{ end }}{{ end }}{{ end }}{{ end }}
+{{ end }}{{ end }}{{ end }}{{ end }}{{ end }}
