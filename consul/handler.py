@@ -488,7 +488,6 @@ class Application(object):
         caddyfiles = concat([self.caddyfile(s) for s in self.services])
         caddyfiles = [c for c in caddyfiles if c]
         urls = concat([c['keys'] for c in caddyfiles])
-        urls.extend(self.consul_extra_check_urls(self.services))
         pubkey = {  # TODO support environments as lists
             s: self.compose['services'][s].get('environment', {}
                                                ).get('PUBKEY', '')
