@@ -1,0 +1,154 @@
+version: '2'
+services:
+  wordpress:
+    environment:
+      CONSUL_CHECK_URLS: '["https://an.example.com", "http://an.example.com"]'
+      HAPROXY: '{
+          "https-in": {
+            "backends": [{
+              "name": "an.example.com",
+              "use_backend_option": "if { req_ssl_sni -i an.example.com }",
+              "port": "443",
+              "peer_port": "1443",
+              "server_option": "send_proxy"
+            }]
+          },
+          "http-in": {
+            "backends": [{
+              "name": "an.example.com",
+              "use_backend_option": " if { hdr(host) -i an.example.com }",
+              "port": "80",
+              "peer_port": "80"
+            }]
+          },
+          "other-config": {
+            "frontend": {
+              "mode": "tcp",
+              "bind": ["*:1111"],
+              "options": [
+                "option socket-stats",
+                "tcp-request inspect-delay 5s",
+                "tcp-request content accept if { req_ssl_hello_type 1 }"
+              ]
+            },
+            "backends": [{
+              "name": "other-config",
+              "use_backend_option": "if { req_ssl_sni -i other.example.com }",
+              "port": "11",
+              "peer_port": "1111"
+            }]
+          }
+        }'
+      PUBKEYS: ssh-rsa 123456 test@example
+    build: wordpress
+    restart: unless-stopped
+    volumes:
+      - wwwdata:/var/www/html
+      - socket:/var/run/mysqld/
+    networks:
+      - cluster_default
+  wordpress2:
+    environment:
+      CADDYFILE: |
+        https://test.example.com {
+            proxy / http://$CONTAINER:80
+        }
+        https://www.test.example.com {
+            redir https://test.example.com
+        }
+      CONSUL_CHECK_URLS: |
+        - http://another.example.com
+      HAPROXY: |
+        http-in:
+          backends:
+            - name: another.example.com
+              use_backend_option: "if { hdr(host) -i another.example.com }"
+              port: 80
+              peer_port: 80
+        ssh-config-name:
+          frontend:
+            mode: tcp
+            bind:
+              - "*:2222"
+            options:
+              - "test"
+              - "test2"
+          backends:
+            - name: ssh-service-wordpress2
+              port: 22
+              peer_port: 2222
+              server_option: send_proxy
+    build: wordpress
+    restart: unless-stopped
+    volumes:
+      - wwwdata:/var/www/html
+      - socket:/var/run/mysqld/
+    networks:
+      - cluster_default
+  mariadb:
+    image: mariadb:10
+    restart: always
+    volumes:
+      - dbdata:/var/lib/mysql
+      - socket:/var/run/mysqld/
+    environment:
+      MYSQL_ROOT_PASSWORD: "rootpasswd"
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: "passwd"
+  sshservice:
+    image: panubo/sshd
+    environment:
+      HAPROXY: '{
+          "ssh-config-name": {
+            "frontend": {
+              "mode": "tcp",
+              "bind": ["*:2222"],
+              "options": [
+                "option socket-stats",
+                "tcp-request inspect-delay 5s"
+              ]
+            },
+            "backends": [{
+              "name": "ssh-service",
+              "use_backend_option": "",
+              "port": "22",
+              "peer_port": "2222"
+            }]
+          }
+        }'
+    networks:
+      - cluster_default
+  sshservice2:
+    image: panubo/sshd
+    environment:
+      HAPROXY: '{
+          "ssh-config-name": {
+            "frontend": {
+              "mode": "tcp",
+              "bind": ["*:4444"],
+              "options": [
+                "tcp-request inspect-delay 5s",
+                "tcp-request content accept if { req_ssl_hello_type 1 }"
+              ]
+            },
+            "backends": [{
+              "name": "ssh-service2",
+              "port": "22",
+              "peer_port": "4444"
+            }]
+          }
+        }'
+    networks:
+      - cluster_default
+
+volumes:
+  wwwdata:
+    driver: btrfs
+  dbdata:
+    driver: btrfs
+  socket:
+
+networks:
+  cluster_default:
+    external: true

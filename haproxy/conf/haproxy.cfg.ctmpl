@@ -20,55 +20,50 @@ frontend https-in
     option socket-stats
     tcp-request inspect-delay 5s
     tcp-request content accept if { req_ssl_hello_type 1 }
-{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "fronthttps" | contains $domain }}{{ else }}    use_backend https-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }
-{{ scratch.MapSet "fronthttps" $domain $domain }}{{ end }}{{ end }}{{ end }}
-{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttps" | contains $domain }}{{ else }}
+{{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "fronthttps" | contains $domain }}{{ else }}    use_backend https-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }
+{{ scratch.MapSet "fronthttps" $domain $domain }}{{ end }}{{ end }}
+{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if eq $confname "https-in" }}{{ range $backend := $conf.backends }}    use_backend https-{{ or (index $backend "name") $backend.ct }} {{ or (index $backend "use_backend_option") "" }}
+{{ end }}{{ end }}{{ end }}{{ end }}{{ end }}
+
+{{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttps" | contains $domain }}{{ else }}
 backend https-{{ $domain }}
     mode tcp
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:1443{{ end }} send-proxy
-{{ scratch.MapSet "backhttps" $domain $domain }}{{ end }}{{ end }}{{ end }}
+{{ scratch.MapSet "backhttps" $domain $domain }}{{ end }}{{ end }}
+{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if eq $confname "https-in" }}{{ range $backend := $conf.backends }}
+backend https-{{ or (index $backend "name") $backend.ct }}
+    mode http
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
+{{ end }}{{ end }}{{ end }}{{ end }}{{ end }}
 
 frontend http-in
     mode http
     bind *:80
     option socket-stats
-{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "fronthttp" | contains $domain }}{{ else }}    use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }
-{{ scratch.MapSet "fronthttp" $domain $domain }}{{ end }}{{ end }}{{ end }}
-{{ range $apps }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttp" | contains $domain }}{{ else }}
+{{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "fronthttp" | contains $domain }}{{ else }}    use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }
+{{ scratch.MapSet "fronthttp" $domain $domain }}{{ end }}{{ end }}
+{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if eq $confname "http-in" }}{{ range $backend := $conf.backends }}    use_backend http-{{ or (index $backend "name") $backend.ct }} {{ or (index $backend "use_backend_option") "" }}
+{{ end }}{{ end }}{{ end }}{{ end }}{{ end }}
+
+{{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttp" | contains $domain }}{{ else }}
 backend http-{{ $domain }}
     mode http
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:80{{ else }}{{ $d.ip }}:80{{ end }}
-{{ scratch.MapSet "backhttp" $domain $domain }}{{ end }}{{ end }}{{ end }}
+{{ scratch.MapSet "backhttp" $domain $domain }}{{ end }}{{ end }}
+{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if eq $confname "http-in" }}{{ range $backend := $conf.backends }}
+backend http-{{ or (index $backend "name") $backend.ct }}
+    mode http
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
+{{ end }}{{ end }}{{ end }}{{ end }}{{ end }}
 
-{{ if and (keyExists "app/cluster_gitlab_prod.2e066") (not (keyExists "maintenance/cluster_gitlab_prod.2e066")) }}
-frontend git-prod-ssh-in
-    mode tcp
-    bind *:2222
-    use_backend ssh-prod-git
-
-backend ssh-prod-git
-    mode tcp
-{{ with $v := key "app/cluster_gitlab_prod.2e066" | parseJSON }}    server {{ $v.master }} {{ if eq $v.master (env "HOSTNAME") }}{{ $v.ct.web }}:22{{ else }}{{ $v.ip }}:2222{{ end }}{{ end }}
-{{ end }}
-
-{{ if and (keyExists "app/cluster_gitlab_master.2e066") (not (keyExists "maintenance/cluster_gitlab_master.2e066")) }}
-frontend git-ppd-ssh-in
-    mode tcp
-    bind *:2525
-    use_backend ssh-ppd-git
-
-backend ssh-ppd-git
-    mode tcp
-{{ with $v := key "app/cluster_gitlab_master.2e066" | parseJSON }}    server {{ $v.master }} {{ if eq $v.master (env "HOSTNAME") }}{{ $v.ct.web }}:22{{ else }}{{ $v.ip }}:2525{{ end }}{{ end }}
-{{ end }}
-
-{{ if and (keyExists "app/cluster_gitlab_dev.2e066") (not (keyExists "maintenance/cluster_gitlab_dev.2e066")) }}
-frontend git-dev-ssh-in
-    mode tcp
-    bind *:2626
-    use_backend ssh-dev-git
-
-backend ssh-dev-git
-    mode tcp
-{{ with $v := key "app/cluster_gitlab_dev.2e066" | parseJSON }}    server {{ $v.master }} {{ if eq $v.master (env "HOSTNAME") }}{{ $v.ct.web }}:22{{ else }}{{ $v.ip }}:2626{{ end }}{{ end }}
-{{ end }}
+{{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if not (or (eq $confname "http-in") (eq $confname "https-in")) }}
+frontend front-{{ $confname }}
+    mode {{ $conf.frontend.mode }}
+    {{ range $option := $conf.frontend.options }}{{ $option }}{{ end }}
+    {{ range $bind := $conf.frontend.bind }}bind {{ $bind }}{{ end }}
+    {{ range $backend := $conf.backends }}use_backend backend-{{ or (index $backend "name") $backend.ct }} {{ or (index $backend "use_backend_option") "" }}{{ end }}
+{{ range $backend := $conf.backends }}
+backend backend-{{ or (index $backend "name") $backend.ct }}
+    mode {{ $conf.frontend.mode }}
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
+{{ end }}{{ end }}{{ end }}{{ end }}{{ end }}
