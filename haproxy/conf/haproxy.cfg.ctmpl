@@ -28,7 +28,7 @@ frontend https-in
 {{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ range $domain := $d.domains }}{{ if scratch.MapValues "backhttps" | contains $domain }}{{ else }}
 backend https-{{ $domain }}
     mode tcp
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:1443{{ end }} send-proxy
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:443{{ end }}
 {{ scratch.MapSet "backhttps" $domain $domain }}{{ end }}{{ end }}
 {{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if eq $confname "https-in" }}{{ range $backend := $conf.backends }}
 backend https-{{ or (index $backend "name") $backend.ct }}

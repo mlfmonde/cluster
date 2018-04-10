@@ -354,7 +354,6 @@ class Application(object):
             dirs = Caddyfile.setdir(dirs, ['timeouts', '300s'])
             proxy_config = ['websocket', 'insecure_skip_verify']
             if host['keys'][0].startswith('https://'):
-                dirs = Caddyfile.setdir(dirs, ['proxyprotocol', '0.0.0.0/0'])
                 proxy_config.append('transparent')
                 dirs = Caddyfile.setdir(
                     dirs,
