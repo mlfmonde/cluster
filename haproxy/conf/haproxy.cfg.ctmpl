@@ -32,7 +32,7 @@ backend https-{{ $domain }}
 {{ scratch.MapSet "backhttps" $domain $domain }}{{ end }}{{ end }}
 {{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if eq $confname "https-in" }}{{ range $backend := $conf.backends }}
 backend https-{{ or (index $backend "name") $backend.ct }}
-    mode http
+    mode tcp
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
 {{ end }}{{ end }}{{ end }}{{ end }}{{ end }}
 
