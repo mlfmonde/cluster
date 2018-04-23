@@ -60,7 +60,9 @@ backend http-{{ or (index $backend "name") $backend.ct }}
 frontend front-{{ $confname }}
     mode {{ $conf.frontend.mode }}
     {{ range $option := $conf.frontend.options }}{{ $option }}{{ end }}
-    {{ range $bind := $conf.frontend.bind }}bind {{ $bind }}{{ end }}
+    {{- range $bind := $conf.frontend.bind }}
+    bind {{ $bind }}
+    {{- end }}
     {{ range $backend := $conf.backends }}use_backend backend-{{ or (index $backend "name") $backend.ct }} {{ or (index $backend "use_backend_option") "" }}{{ end }}
 {{ range $backend := $conf.backends }}
 backend backend-{{ or (index $backend "name") $backend.ct }}
