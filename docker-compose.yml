@@ -2,7 +2,7 @@ version: '3'
 services:
 
   caddy:
-    image: anybox/caddy:0.10.10
+    image: anybox/caddy:0.10.12
     restart: unless-stopped
     volumes:
       - caddy_ssl:/root/.caddy
@@ -16,7 +16,6 @@ services:
       - "80:80"
       - "443:443"
       - "1443:1443"
-      - "2222:22"
     volumes:
       - ./haproxy/conf/:/usr/local/etc/haproxy/
 
@@ -42,7 +41,6 @@ services:
       - /deploy:/deploy
       - ./caddy/conf/:/consul/template/caddy/
       - ./haproxy/conf/:/consul/template/haproxy/
-      - consul_ssh:/home/consul/.ssh
 
 volumes:
   caddy_ssl:
@@ -50,6 +48,4 @@ volumes:
   caddy_srv:
     driver: btrfs
   consul_docker_cfg:
-    driver: btrfs
-  consul_ssh:
     driver: btrfs
