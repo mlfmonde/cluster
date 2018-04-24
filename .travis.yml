@@ -21,23 +21,18 @@ install:
   - sudo apt-get install -y qemu-utils btrfs-tools
 
 before_script:
-  - sudo qemu-img create /var/lib/docker/btrfs.img 10G
-  - sudo mkfs.btrfs /var/lib/docker/btrfs.img
-  - sudo mkdir /tmp/btrfs_mount_point
-  - sudo mount -o loop /var/lib/docker/btrfs.img /tmp/btrfs_mount_point/
-  - sudo btrfs subvolume create /tmp/btrfs_mount_point/snapshots
-  - sudo btrfs subvolume create /tmp/btrfs_mount_point/volumes
-  - sudo umount /tmp/btrfs_mount_point/
-  - sudo rm -rf /tmp/btrfs_mount_point/
-  - sudo service docker stop
-  - sudo mkdir -p /var/lib/buttervolume/volumes
-  - sudo mkdir -p /var/lib/buttervolume/snapshots
-  - sudo mount -o loop,subvol=volumes /var/lib/docker/btrfs.img /var/lib/buttervolume/volumes
-  - sudo mount -o loop,subvol=snapshots /var/lib/docker/btrfs.img /var/lib/buttervolume/snapshots
-  - sudo service docker start
+  - sudo qemu-img create /var/lib/buttervolume.img 10G
+  - sudo mkfs.btrfs /var/lib/buttervolume.img
+  - sudo mkdir -p /var/lib/buttervolume
+  - sudo mount -o loop /var/lib/buttervolume.img /var/lib/buttervolume
+  - sudo mkdir -p /var/lib/buttervolume/config
+  - sudo mkdir -p /var/lib/buttervolume/ssh
+  - sudo btrfs subvolume create /var/lib/buttervolume/snapshots
+  - sudo btrfs subvolume create /var/lib/buttervolume/volumes
+  - docker plugin install --grant-all-permissions anybox/buttervolume
+  - docker plugin ls
 
 script:
-  - docker-compose -f buttervolume/docker-compose.yml up -d
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml pull
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml build --pull
   - sudo docker run -it --rm --entrypoint python3 -v $(pwd)/testapp:/testapp cluster_consul /handler.py test
