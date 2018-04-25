@@ -98,10 +98,13 @@ Basic actions
 Start
 -----
 
-* First start the btrfs volume plugin for docker separately::
+* First install the buttervolume plugin for docker separately::
 
-    $ pushd buttervolume
-    $ docker-compose up -d
+    $ docker plugin install anybox/buttervolume
+
+Check it is running::
+
+    $ docker plugin ls
 
 * overwrite ``command`` and environment variables in ``docker-compose.yml``
   with a ``docker-compose.override.yml`` that may looks like::
@@ -343,16 +346,9 @@ You need to edit ``docker-compose.dev.yml`` and set the CONSUL_BIND_INTERFACE
 environment variable to define your local interface connected to your
 router/internet.
 
-Make sure the docker group has access to:
-
-* ``/run/docker/plugins/`` directory with read/execution (``r-x``)
-* ``/run/docker/plugins/btrfs.sock`` file with read/write (``rw-``)
-
 Then::
 
-    $ pushd buttervolume
-    $ docker-compose up -d
-    $ popd
+    $ docker plugin install anybox/buttervolume
     $ mkdir deploy
     $ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 
@@ -375,20 +371,6 @@ to the ~/deploy folder and run compose commands as usually.  The compose
 project name is already set in the .env file during deployment because the name
 of the folder contains the deployment date and does not correspond to the
 compose project name.
-
-Duplicate btrfs/local volumes after a reboot
---------------------------------------------
-
-Sometimes after a reboot, docker volume ls shows some volume in both local and btrfs driver (docker volume ls).
-This should probably be fixed by letting buttervolume start before all other containers.
-
-To repair the volume, just do that:
-
-sudo -s
-cd /var/lib/docker/volumes/
-for v in `docker volume ls| awk '{print $2}'|sort|uniq -d`; do mv $v $v.tmp && docker volume rm $v && mv $v.tmp $v; done
-
-Then migrate to buttervolume >= 2.0
 
 Caddyfile is wrong
 ------------------
