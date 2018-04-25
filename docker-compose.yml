@@ -44,8 +44,8 @@ services:
 
 volumes:
   caddy_ssl:
-    driver: btrfs
+    driver: anybox/buttervolume
   caddy_srv:
-    driver: btrfs
+    driver: anybox/buttervolume
   consul_docker_cfg:
-    driver: btrfs
+    driver: anybox/buttervolume
