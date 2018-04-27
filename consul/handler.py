@@ -27,7 +27,7 @@ BTRFSDRIVER = os.environ['BTRFSDRIVER']
 TEST = False
 HERE = abspath(dirname(__file__))
 log = logging.getLogger()
-
+BTRFSDRIVER = os.environ.get('BTRFSDRIVER', 'anybox/buttervolume:latest')
 
 def concat(l):
     return reduce(list.__add__, l, [])

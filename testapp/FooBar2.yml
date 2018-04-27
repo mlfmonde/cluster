@@ -144,9 +144,9 @@ services:
 
 volumes:
   wwwdata:
-    driver: btrfs
+    driver: anybox/buttervolume:latest
   dbdata:
-    driver: btrfs
+    driver: anybox/buttervolume:latest
   socket:
 
 networks:
