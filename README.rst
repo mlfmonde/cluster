@@ -98,8 +98,11 @@ Basic actions
 Start
 -----
 
+* Make sure `/var/lib/buttervolume/` is on a BTRFS partition or subvolume
+
 * First install the buttervolume plugin for docker separately::
 
+    $ sudo mkdir /var/lib/buttervolume/{config,ssh}
     $ docker plugin install anybox/buttervolume
 
 Check it is running::
