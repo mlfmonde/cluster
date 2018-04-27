@@ -27,6 +27,7 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
+        BTRFSDRIVER: anybox/buttervolume:latest
         CONSUL_LOCAL_CONFIG: '{
             "enable_script_checks": true,
             "watches": [{
@@ -44,8 +45,8 @@ services:
 
 volumes:
   caddy_ssl:
-    driver: btrfs
+    driver: anybox/buttervolume:latest
   caddy_srv:
-    driver: btrfs
+    driver: anybox/buttervolume:latest
   consul_docker_cfg:
-    driver: btrfs
+    driver: anybox/buttervolume:latest

@@ -23,10 +23,11 @@ from uuid import uuid1
 DTFORMAT = "%Y-%m-%dT%H%M%S.%f"
 DEPLOY = '/deploy'
 CADDYLOGS = '/var/log'
+BTRFSDRIVER = os.environ['BTRFSDRIVER']
 TEST = False
 HERE = abspath(dirname(__file__))
 log = logging.getLogger()
-
+BTRFSDRIVER = os.environ.get('BTRFSDRIVER', 'anybox/buttervolume:latest')
 
 def concat(l):
     return reduce(list.__add__, l, [])
@@ -216,7 +217,7 @@ class Application(object):
                 self._volumes = [
                     Volume(self.project + '_' + v[0])
                     for v in self.compose.get('volumes', {}).items()
-                    if v[1] and v[1].get('driver') == 'btrfs']
+                    if v[1] and v[1].get('driver') == BTRFSDRIVER]
             except:
                 log.info("No volumes found in the compose")
                 self._volumes = []
@@ -579,7 +580,8 @@ class Volume(object):
         """snapshot the volume
         """
         volumes = [l.split()[1] for l in do(
-                   "docker volume ls -f driver=btrfs").splitlines()[1:]]
+                   "docker volume ls -f driver={}".format(BTRFSDRIVER)
+                   ).splitlines()[1:]]
         if self.name in volumes:
             log.info(u'Snapshotting volume: {}'.format(self.name))
             return do("buttervolume snapshot {}".format(self.name))
