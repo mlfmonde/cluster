@@ -119,6 +119,9 @@ Check it is running::
        environment:
            CONSUL_BIND_INTERFACE: eth1
 
+* During the first run of the consul cluster, you should add "-bootstrap" in one of
+  the nodes, then remove it when a leader is elected
+
 * Then start caddy, haproxy and consul::
 
     $ popd
