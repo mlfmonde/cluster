@@ -115,7 +115,7 @@ Check it is running::
    version: '3'
    services:
      consul:
-       command: ["agent", "-server", "-retry-join=10.10.20.1", "-retry-join=10.10.20.2", "-retry-join=10.10.20.3", "-ui"]
+       command: ["agent", "-server", "-retry-join=10.10.20.1", "-retry-join=10.10.20.2", "-retry-join=10.10.20.3", "-ui", "-bootstrap-expect=3"]
        environment:
            CONSUL_BIND_INTERFACE: eth1
 
