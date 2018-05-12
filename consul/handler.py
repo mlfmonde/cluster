@@ -23,7 +23,7 @@ from uuid import uuid1
 DTFORMAT = "%Y-%m-%dT%H%M%S.%f"
 DEPLOY = '/deploy'
 CADDYLOGS = '/var/log'
-BTRFSDRIVER = os.environ['BTRFSDRIVER']
+BTRFSDRIVER = os.environ.get('BTRFSDRIVER', 'anybox/buttervolume:latest') 
 TEST = False
 HERE = abspath(dirname(__file__))
 log = logging.getLogger()
