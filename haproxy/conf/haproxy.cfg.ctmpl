@@ -59,7 +59,9 @@ backend http-{{ or (index $backend "name") $backend.ct }}
 {{ range $apps }}{{ $k := .Key }}{{ $d := .Value | parseJSON }}{{ if not (keyExists (print "maintenance/" $k)) }}{{ range $confname, $conf := $d.haproxy }}{{ if not (or (eq $confname "http-in") (eq $confname "https-in")) }}
 frontend front-{{ $confname }}
     mode {{ $conf.frontend.mode }}
-    {{ range $option := $conf.frontend.options }}{{ $option }}{{ end }}
+    {{- range $option := $conf.frontend.options }}
+    {{ $option }}
+    {{- end }}
     {{- range $bind := $conf.frontend.bind }}
     bind {{ $bind }}
     {{- end }}
