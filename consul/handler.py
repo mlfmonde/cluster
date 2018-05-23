@@ -846,6 +846,7 @@ def destroy(payload, myself):
     elif oldslave == myself:  # slave ->
         log.info("I was the slave of %s", oldapp.name)
         oldapp.enable_purge(False)
+        oldapp.clean()
     else:  # nothing ->
         log.info("I was nothing for %s", oldapp.name)
     log.info("Successfully destroyed")
