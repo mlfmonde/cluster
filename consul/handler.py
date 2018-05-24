@@ -62,7 +62,28 @@ def kv(name, key):
 class Application(object):
     """ represents a docker compose, its proxy conf and deployment path
     """
-    def __init__(self, repo_url, branch, cwd=None):
+    def __init__(
+        self, repo_url, branch, event_id=None, current_event_id=None
+    ):
+        """Init application object
+
+        :param repo_url: repo where the docker-compose is stored
+        :param branch: the repo branch/tag/ref to use
+        :param event_id: the consul event id, only use it if it's a new app
+                         that is going to be deployed and will be stored in kv
+                         store. If it's app alredy deployed you must leave it
+                         to None, it will get information from the k/v store
+        :param current_event_id: the current event id which we are handling,
+                                 the intent is to manage weired case where
+                                 an old app object may be instanciate after
+                                 the new master already save values in k/v
+                                 store. This could happen when deploy using
+                                 sames master/slave and slave were busy while
+                                 master handling the event. if event_id is
+                                 define this value is ignored. If this value
+                                 is set you should not save in k/v store.
+        """
+
         self.repo_url, self.branch = repo_url.strip(), branch.strip()
         if self.repo_url.endswith('.git'):
             self.repo_url = self.repo_url[:-4]
@@ -77,6 +98,27 @@ class Application(object):
         self._compose = None
         self._deploy_date = None
         self._caddy = {}
+        self._previous_event_id = None
+        self._event_id = None
+        if event_id:
+            self._previous_event_id = self.event_id
+            self._event_id = event_id
+        elif current_event_id == self.event_id:
+            self._event_id = self.previous_event_id
+
+    @property
+    def previous_event_id(self):
+        """date of the last deployment"""
+        if self._previous_event_id is None:
+            self._previous_event_id = kv(self.name, 'previous_event_id')
+        return self._previous_event_id
+
+    @property
+    def event_id(self):
+        """date of the last deployment"""
+        if self._event_id is None:
+            self._event_id = kv(self.name, 'event_id')
+        return self._event_id
 
     @property
     def deploy_date(self):
@@ -85,8 +127,11 @@ class Application(object):
             self._deploy_date = kv(self.name, 'deploy_date')
         return self._deploy_date
 
-    def _path(self, deploy_date=None):
+    def _path(self, deploy_date=None, event_id=None):
         """path of the deployment checkout"""
+        event_id = event_id or self.event_id
+        if event_id:
+            return join(DEPLOY, self.name + '-' + event_id)
         deploy_date = deploy_date or self.deploy_date
         if deploy_date:
             return join(DEPLOY, self.name + '@' + deploy_date)
@@ -238,7 +283,7 @@ class Application(object):
         try:
             self.clean()
             deploy_date = datetime.now().strftime(DTFORMAT)
-            path = self._path(deploy_date)
+            path = self._path(deploy_date=deploy_date)
             do('git clone --depth 1 {} "{}" "{}"'
                .format('-b "%s"' % self.branch if self.branch else '',
                        self.repo_url, path),
@@ -277,7 +322,7 @@ class Application(object):
                .format(self.project, ignore),
                cwd=self.path)
         else:
-            log.info("No deployment, cannot pull %s", self.name)
+            log.warning("No deployment, cannot pull %s", self.name)
 
     def build(self, pull=True, nocache=False, forecerm=False):
         """Build images declare in docker-compose.yml file
@@ -295,7 +340,7 @@ class Application(object):
                .format(self.project, pull, cache, rm),
                cwd=self.path)
         else:
-            log.info("No deployment, cannot build %s", self.name)
+            log.warning("No deployment, cannot build %s", self.name)
 
     def up(self):
         if self.path and exists(self.path):
@@ -304,7 +349,7 @@ class Application(object):
                .format(self.project),
                cwd=self.path)
         else:
-            log.info("No deployment, cannot start %s", self.name)
+            log.warning("No deployment, cannot start %s", self.name)
 
     def down(self, deletevolumes=False):
         if self.path and exists(self.path):
@@ -313,7 +358,7 @@ class Application(object):
             do('docker-compose -p "{}" down {}'.format(self.project, v),
                cwd=self.path)
         else:
-            log.info("No deployment, cannot stop %s", self.name)
+            log.warning("Cannot stop %s", self.name)
 
     @property
     def members(self):
@@ -501,6 +546,8 @@ class Application(object):
             'repo_url': self.repo_url,
             'branch': self.branch,
             'deploy_date': self._deploy_date,
+            'event_id': self.event_id,
+            'previous_event_id': self.previous_event_id,
             'domains': list({urlparse(u).netloc for u in urls}),
             'urls': ', '.join(urls),
             'ip': self.members[master]['ip'],
@@ -655,7 +702,7 @@ def handle(events, myself):
             raise
 
         if event_name == 'deploy':
-            deploy(payload, myself)
+            deploy(payload, myself, event_id)
         elif event_name == 'destroy':
             destroy(payload, myself)
         elif event_name == 'migrate':
@@ -664,7 +711,7 @@ def handle(events, myself):
             log.error('Unknown event name: {}'.format(event_name))
 
 
-def deploy(payload, myself):
+def deploy(payload, myself, event_id):
     """Keep in mind this is executed in the consul container
     Deployments are done in the DEPLOY folder. Needs:
     {"repo"': <url>, "branch": <branch>, "master": <host>, "slave": <host>}
@@ -682,10 +729,10 @@ def deploy(payload, myself):
         log.error(msg)
         raise AssertionError(msg)
 
-    oldapp = Application(repo_url, branch=branch)
+    oldapp = Application(repo_url, branch=branch, current_event_id=event_id)
     oldmaster = kv(oldapp.name, 'master')
     oldslave = kv(oldapp.name, 'slave')
-    newapp = Application(repo_url, branch=branch)
+    newapp = Application(repo_url, branch=branch, event_id=event_id)
     members = newapp.members
     log.info('oldapp={}, oldmaster={}, oldslave={}, '
              'newapp={}, newmaster={}, newslave={}'
@@ -1267,6 +1314,41 @@ class TestCase(unittest.TestCase):
         app = Application(self.repo_url, 'master')
         app.download()
         self.assertEqual(None, app.register_kv('node1', 'node2'))
+
+    def test_path(self):
+        app = Application(self.repo_url, 'master')
+        app.download()
+        app.register_kv('node1', 'node2')
+        self.assertTrue(
+            app.path.startswith("/tmp/deploy/foobar_master.ddb14@")
+        )
+        oldapp = Application(self.repo_url, 'master')
+        self.assertEqual(app.path, oldapp.path)
+        newapp = Application(self.repo_url, 'master', event_id='abc')
+        self.assertEqual(newapp.path, "/tmp/deploy/foobar_master.ddb14-abc")
+        newapp.download()
+        newapp.register_kv('node2', 'node1')
+        oldapp = Application(self.repo_url, 'master', current_event_id='abc')
+        self.assertEqual(
+            app.path, oldapp.path
+        )
+        newapp = Application(self.repo_url, 'master', event_id='abc2')
+        oldapp = Application(self.repo_url, 'master', current_event_id='abc2')
+        self.assertEqual(newapp.path, "/tmp/deploy/foobar_master.ddb14-abc2")
+        self.assertEqual(oldapp.path, "/tmp/deploy/foobar_master.ddb14-abc")
+
+    def test_event_ids(self):
+        app = Application(self.repo_url, 'master', event_id='abc1')
+        app.download()
+        app.register_kv('node1', 'node2')
+        app = Application(self.repo_url, 'master', event_id='abc2')
+        app.download()
+        self.assertEqual(app.previous_event_id, 'abc1')
+        self.assertEqual(app.event_id, 'abc2')
+        app.register_kv('node1', 'node2')
+        app = Application(self.repo_url, 'master')
+        self.assertEqual(app.previous_event_id, 'abc1')
+        self.assertEqual(app.event_id, 'abc2')
 
     def test_register_consul(self):
         app = Application(self.repo_url, 'master')
