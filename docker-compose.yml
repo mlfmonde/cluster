@@ -7,7 +7,7 @@ services:
     volumes:
       - caddy_ssl:/root/.caddy
       - ./caddy/conf/:/etc/caddy
-      - caddy_srv/:/srv
+      - ./caddy/www/:/srv
 
   haproxy:
     image: haproxy:1.8
