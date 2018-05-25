@@ -1,0 +1,61 @@
+HTTP/1.0 408 Request Time-out
+Cache-Control: no-cache
+Connection: close
+Content-Type: text/html
+
+<!doctype html>
+<html>
+    <head>
+
+        <title>Erreur du client web</title>
+        <meta charset="UTF-8">
+        <style>
+            body { text-align: center; padding: 20px; }
+            @media (min-width: 768px){
+            body{ padding-top: 150px; }
+            }
+            h1 { font-size: 50px; }
+            body { font: 20px Helvetica, sans-serif; color: #333; }
+            article { display: block; text-align: left; max-width: 650px; margin: 0 auto; }
+            footer {
+                display: block;
+                text-align: right;
+                max-width: 650px;
+                margin: 0 auto;
+                font: 10px Helvetica, sans-serif; color: #aaa;
+            }
+        </style>
+    </head>
+    <body>
+        <article>
+            <h1>Temps d'attente écoulé</h1>
+            <div>
+                <p>
+                    Temps d'attente d'une requête du client, écoulé côté
+                    serveur. D'après les spécifications HTTP: "Le client n'a
+                    pas produit de requête dans le délai que le serveur
+                    était prêt à attendre. Le client PEUT répéter la demande
+                    sans modifications à tout moment ultérieur".
+                </p>
+                <p>&mdash; L'équipe d'administration syst&egraveme</p>
+            </div>
+        </article>
+        &mdash;
+        <article>
+            <h1>Request Time-out</h1>
+            <div>
+                <p>
+                    The server timed out waiting for the request. According
+                    to HTTP specifications: "The client did not produce a
+                    request within the time that the server was prepared to
+                    wait. The client MAY repeat the request without
+                    modifications at any later time
+                </p>
+                <p>&mdash; The adminsys Team</p>
+            </div>
+        </article>
+    </body>
+    <footer>
+        Page distribuée par le serveur Caddy
+    </footer>
+</html>

@@ -1,0 +1,57 @@
+HTTP/1.0 400 Bad request
+Cache-Control: no-cache
+Connection: close
+Content-Type: text/html
+
+<!doctype html>
+<html>
+    <head>
+
+        <title>Erreur du client web</title>
+        <meta charset="UTF-8">
+        <style>
+            body { text-align: center; padding: 20px; }
+            @media (min-width: 768px){
+            body{ padding-top: 150px; }
+            }
+            h1 { font-size: 50px; }
+            body { font: 20px Helvetica, sans-serif; color: #333; }
+            article { display: block; text-align: left; max-width: 650px; margin: 0 auto; }
+            footer {
+                display: block;
+                text-align: right;
+                max-width: 650px;
+                margin: 0 auto;
+                font: 10px Helvetica, sans-serif; color: #aaa;
+            }
+        </style>
+    </head>
+    <body>
+        <article>
+            <h1>Mauvaise requête</h1>
+            <div>
+                <p>
+                    La syntaxe de la requête envoyé par votre navigateur est
+                    erronée.
+                </p>
+                <p>&mdash; L'équipe d'administration syst&egraveme</p>
+            </div>
+        </article>
+        &mdash;
+        <article>
+            <h1>Bad Request</h1>
+            <div>
+                <p>
+                     The server cannot or will not process the request due to
+                     an apparent client error (e.g., malformed request syntax,
+                     size too large, invalid request message framing, or
+                     deceptive request routing).
+                </p>
+                <p>&mdash; The adminsys Team</p>
+            </div>
+        </article>
+    </body>
+    <footer>
+        Page distribuée par haproxy
+    </footer>
+</html>

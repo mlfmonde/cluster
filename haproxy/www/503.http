@@ -1,0 +1,55 @@
+HTTP/1.0 503 Service Unavailable
+Cache-Control: no-cache
+Connection: close
+Content-Type: text/html
+
+<!doctype html>
+<html>
+    <head>
+
+        <title>Erreur du serveur</title>
+        <meta charset="UTF-8">
+        <style>
+            body { text-align: center; padding: 20px; }
+            @media (min-width: 768px){
+            body{ padding-top: 150px; }
+            }
+            h1 { font-size: 50px; }
+            body { font: 20px Helvetica, sans-serif; color: #333; }
+            article { display: block; text-align: left; max-width: 650px; margin: 0 auto; }
+            footer {
+                display: block;
+                text-align: right;
+                max-width: 650px;
+                margin: 0 auto;
+                font: 10px Helvetica, sans-serif; color: #aaa;
+            }
+        </style>
+    </head>
+    <body>
+        <article>
+            <h1>Service non disponible</h1>
+            <div>
+                <p>
+                    Service temporairement indisponible ou en maintenance.
+                </p>
+                <p>&mdash; L'équipe d'administration syst&egraveme</p>
+            </div>
+        </article>
+        &mdash;
+        <article>
+            <h1>Service Unavailable</h1>
+            <div>
+                <p>
+                    The server is currently unavailable (because it is
+                    overloaded or down for maintenance). Generally, this is
+                    a temporary state.
+                </p>
+                <p>&mdash; The adminsys Team</p>
+            </div>
+        </article>
+    </body>
+    <footer>
+        Page distribuée par haproxy
+    </footer>
+</html>

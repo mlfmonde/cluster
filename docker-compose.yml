@@ -18,6 +18,7 @@ services:
       - "1443:1443"
     volumes:
       - ./haproxy/conf/:/usr/local/etc/haproxy/
+      - ./haproxy/www/:/var/www/
 
   consul:
     build: consul

@@ -3,13 +3,24 @@
 # It should not contain any http redirections
 global
     daemon
-    maxconn 256
 
 defaults
     mode tcp
-    timeout connect 5000ms
-    timeout client 50000ms
-    timeout server 50000ms
+    log /dev/log    local0
+    log /dev/log    local1 notice
+
+    timeout client 15mn
+    timeout server 300s
+    timeout connect 5s
+    log     global
+    option  dontlognull
+    errorfile 400 /var/www/400.http
+    errorfile 403 /var/www/403.http
+    errorfile 408 /var/www/408.http
+    errorfile 500 /var/www/500.http
+    errorfile 502 /var/www/502.http
+    errorfile 503 /var/www/503.http
+    errorfile 504 /var/www/504.http
 
 {{- $apps := tree "app" }}
 {{- $swarmapps := tree "swarm" }}
@@ -19,6 +30,7 @@ frontend https-in
     bind *:443
     bind *:1443 accept-proxy
     option socket-stats
+    option tcplog
     tcp-request inspect-delay 5s
     tcp-request content accept if { req_ssl_hello_type 1 }
 {{- range $apps }}
@@ -68,7 +80,8 @@ frontend https-in
 
 backend https-{{ $domain }}
     mode tcp
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:443{{ end }}
+    option tcp-check
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:443{{ end }} check
             {{- scratch.MapSet "backhttps" $domain $domain }}
         {{- end }}
     {{- end }}
@@ -79,7 +92,8 @@ backend https-{{ $domain }}
 
 backend https-{{ or (index $backend "name") $backend.ct }}
     mode tcp
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
+    option tcp-check
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }} check
                 {{- end }}
             {{- end }}
         {{- end }}
@@ -94,7 +108,8 @@ backend https-{{ or (index $backend "name") $backend.ct }}
 
 backend https-swarm-{{ $domain }}
     mode tcp
-    server swarm_service swarm_reverse:443
+    option tcp-check
+    server swarm_service swarm_reverse:443 check
             {{- scratch.MapSet "backhttps" $domain $domain }}
         {{- end }}
     {{- end }}
@@ -105,7 +120,8 @@ backend https-swarm-{{ $domain }}
 
 backend https-swarm-{{ or (index $backend "name") $backend.ct }}
     mode tcp
-    server swarm_service {{ $backend.ct }}:{{ $backend.port }} {{ or (index $backend "server_option") "" }}
+    option tcp-check
+    server swarm_service {{ $backend.ct }}:{{ $backend.port }} {{ or (index $backend "server_option") "" }} check
                 {{- end }}
             {{- end }}
         {{- end }}
@@ -115,6 +131,7 @@ backend https-swarm-{{ or (index $backend "name") $backend.ct }}
 frontend http-in
     mode http
     bind *:80
+    option httplog
     option socket-stats
 {{- range $apps }}
     {{- $k := .Key }}
@@ -163,7 +180,7 @@ frontend http-in
 
 backend http-{{ $domain }}
     mode http
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:80{{ else }}{{ $d.ip }}:80{{ end }}
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:80{{ else }}{{ $d.ip }}:80{{ end }} check
             {{- scratch.MapSet "backhttp" $domain $domain }}
         {{- end }}
     {{- end }}
@@ -174,7 +191,7 @@ backend http-{{ $domain }}
 
 backend http-{{ or (index $backend "name") $backend.ct }}
     mode http
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }} check
                 {{- end }}
             {{- end }}
         {{- end }}
@@ -189,7 +206,7 @@ backend http-{{ or (index $backend "name") $backend.ct }}
 
 backend http-swarm-{{ $domain }}
     mode http
-    server swarm_service swarm_reverse:80
+    server swarm_service swarm_reverse:80 check
             {{- scratch.MapSet "backhttp" $domain $domain }}
         {{- end }}
     {{- end }}
@@ -200,7 +217,7 @@ backend http-swarm-{{ $domain }}
 
 backend http-swarm-{{ or (index $backend "name") $backend.ct }}
     mode http
-    server swarm_service {{ $backend.ct }}:{{ $backend.port }} {{ or (index $backend "server_option") "" }}
+    server swarm_service {{ $backend.ct }}:{{ $backend.port }} {{ or (index $backend "server_option") "" }} check
                 {{- end }}
             {{- end }}
         {{- end }}
