@@ -12,6 +12,7 @@ defaults
     timeout server 50000ms
 
 {{- $apps := tree "app" }}
+{{- $swarmapps := tree "swarm" }}
 
 frontend https-in
     mode tcp
@@ -34,6 +35,25 @@ frontend https-in
             {{- if eq $confname "https-in" }}
                 {{- range $backend := $conf.backends }}
     use_backend https-{{ or (index $backend "name") $backend.ct }} {{ or (index $backend "use_backend_option") "" }}
+                {{- end }}
+            {{- end }}
+        {{- end }}
+    {{- end }}
+{{- end }}
+{{- range $swarmapps }}
+    {{- $k := .Key }}
+    {{- $d := .Value | parseJSON }}
+    {{- range $domain := $d.domains }}
+        {{- if not (scratch.MapValues "fronthttps" | contains $domain) }}
+    use_backend https-swarm-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }
+            {{- scratch.MapSet "fronthttps" $domain $domain }}
+        {{- end }}
+    {{- end }}
+    {{- if not (keyExists (print "maintenance/" $k)) }}
+        {{- range $confname, $conf := $d.haproxy }}
+            {{- if eq $confname "https-in" }}
+                {{- range $backend := $conf.backends }}
+    use_backend https-swarm-{{ or (index $backend "name") $backend.ct }} {{ or (index $backend "use_backend_option") "" }}
                 {{- end }}
             {{- end }}
         {{- end }}
@@ -66,6 +86,32 @@ backend https-{{ or (index $backend "name") $backend.ct }}
     {{- end }}
 {{- end }}
 
+{{- range $swarmapps }}
+    {{- $k := .Key }}
+    {{- $d := .Value | parseJSON }}
+    {{- range $domain := $d.domains }}
+        {{- if not (scratch.MapValues "backhttps" | contains $domain) }}
+
+backend https-swarm-{{ $domain }}
+    mode tcp
+    server swarm_service swarm_reverse:443
+            {{- scratch.MapSet "backhttps" $domain $domain }}
+        {{- end }}
+    {{- end }}
+    {{- if not (keyExists (print "maintenance/" $k)) }}
+        {{- range $confname, $conf := $d.haproxy }}
+            {{- if eq $confname "https-in" }}
+                {{- range $backend := $conf.backends }}
+
+backend https-swarm-{{ or (index $backend "name") $backend.ct }}
+    mode tcp
+    server swarm_service {{ $backend.ct }}:{{ $backend.port }} {{ or (index $backend "server_option") "" }}
+                {{- end }}
+            {{- end }}
+        {{- end }}
+    {{- end }}
+{{- end }}
+
 frontend http-in
     mode http
     bind *:80
@@ -84,6 +130,25 @@ frontend http-in
             {{- if eq $confname "http-in" }}
                 {{- range $backend := $conf.backends }}
     use_backend http-{{ or (index $backend "name") $backend.ct }} {{ or (index $backend "use_backend_option") "" }}
+                {{- end }}
+            {{- end }}
+        {{- end }}
+    {{- end }}
+{{- end }}
+{{- range $swarmapps }}
+    {{- $k := .Key }}
+    {{- $d := .Value | parseJSON }}
+    {{- range $domain := $d.domains }}
+        {{- if not (scratch.MapValues "fronthttp" | contains $domain) }}
+    use_backend http-swarm-{{ $domain }} if { hdr(host) -i {{ $domain }} }
+            {{- scratch.MapSet "fronthttp" $domain $domain }}
+        {{- end }}
+    {{- end }}
+    {{- if not (keyExists (print "maintenance/" $k)) }}
+        {{- range $confname, $conf := $d.haproxy }}
+            {{- if eq $confname "http-in" }}
+                {{- range $backend := $conf.backends }}
+    use_backend http-swarm-{{ or (index $backend "name") $backend.ct }} {{ or (index $backend "use_backend_option") "" }}
                 {{- end }}
             {{- end }}
         {{- end }}
@@ -116,6 +181,32 @@ backend http-{{ or (index $backend "name") $backend.ct }}
     {{- end }}
 {{- end }}
 
+{{- range $swarmapps }}
+    {{- $k := .Key }}
+    {{- $d := .Value | parseJSON }}
+    {{- range $domain := $d.domains }}
+        {{- if not (scratch.MapValues "backhttp" | contains $domain) }}
+
+backend http-swarm-{{ $domain }}
+    mode http
+    server swarm_service swarm_reverse:80
+            {{- scratch.MapSet "backhttp" $domain $domain }}
+        {{- end }}
+    {{- end }}
+    {{- if not (keyExists (print "maintenance/" $k)) }}
+        {{- range $confname, $conf := $d.haproxy }}
+            {{- if eq $confname "http-in" }}
+                {{- range $backend := $conf.backends }}
+
+backend http-swarm-{{ or (index $backend "name") $backend.ct }}
+    mode http
+    server swarm_service {{ $backend.ct }}:{{ $backend.port }} {{ or (index $backend "server_option") "" }}
+                {{- end }}
+            {{- end }}
+        {{- end }}
+    {{- end }}
+{{- end }}
+
 {{- range $apps }}
     {{- $k := .Key }}
     {{- $d := .Value | parseJSON }}
@@ -139,6 +230,35 @@ frontend front-{{ $confname }}
 backend backend-{{ or (index $backend "name") $backend.ct }}
     mode {{ $conf.frontend.mode }}
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
+                {{- end }}
+            {{- end }}
+        {{- end }}
+    {{- end }}
+{{- end }}
+
+{{- range $swarmapps }}
+    {{- $k := .Key }}
+    {{- $d := .Value | parseJSON }}
+    {{- if not (keyExists (print "maintenance/" $k)) }}
+        {{- range $confname, $conf := $d.haproxy }}
+            {{- if not (or (eq $confname "http-in") (eq $confname "https-in")) }}
+
+frontend front-{{ $confname }}
+    mode {{ $conf.frontend.mode }}
+                {{- range $option := $conf.frontend.options }}
+    {{ $option }}
+                {{- end }}
+                {{- range $bind := $conf.frontend.bind }}
+    bind {{ $bind }}
+                {{- end }}
+                {{- range $backend := $conf.backends }}
+    use_backend backend-{{ or (index $backend "name") $backend.ct }} {{ or (index $backend "use_backend_option") "" }}
+                {{- end }}
+                {{- range $backend := $conf.backends }}
+
+backend backend-{{ or (index $backend "name") $backend.ct }}
+    mode {{ $conf.frontend.mode }}
+    server swarm_service {{ $backend.ct }}:{{ $backend.port }} {{ or (index $backend "server_option") "" }}
                 {{- end }}
             {{- end }}
         {{- end }}
