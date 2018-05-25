@@ -12,11 +12,19 @@ Content-Type: text/html
         <style>
             body { text-align: center; padding: 20px; }
             @media (min-width: 768px){
-            body{ padding-top: 150px; }
+                body{ padding-top: 150px; }
             }
-            h1 { font-size: 50px; }
+            h1 { font-size: 35px; }
+            h2 { font-size: 50px; }
             body { font: 20px Helvetica, sans-serif; color: #333; }
             article { display: block; text-align: left; max-width: 650px; margin: 0 auto; }
+            header {
+                display: block;
+                text-align: left;
+                max-width: 650px;
+                margin: 0 auto;
+                font: 10px Helvetica, sans-serif; color: #aaa;
+            }
             footer {
                 display: block;
                 text-align: right;
@@ -27,8 +35,11 @@ Content-Type: text/html
         </style>
     </head>
     <body>
+        <header>
+            <h1>400</h1>
+        </header>
         <article>
-            <h1>Mauvaise requête</h1>
+            <h2>Mauvaise requête</h2>
             <div>
                 <p>
                     La syntaxe de la requête envoyé par votre navigateur est
@@ -39,7 +50,7 @@ Content-Type: text/html
         </article>
         &mdash;
         <article>
-            <h1>Bad Request</h1>
+            <h2>Bad Request</h2>
             <div>
                 <p>
                      The server cannot or will not process the request due to
@@ -50,8 +61,8 @@ Content-Type: text/html
                 <p>&mdash; The adminsys Team</p>
             </div>
         </article>
+        <footer>
+            Page distribuée par haproxy
+        </footer>
     </body>
-    <footer>
-        Page distribuée par haproxy
-    </footer>
 </html>

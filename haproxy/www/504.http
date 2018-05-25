@@ -12,11 +12,19 @@ Content-Type: text/html
         <style>
             body { text-align: center; padding: 20px; }
             @media (min-width: 768px){
-            body{ padding-top: 150px; }
+                body{ padding-top: 150px; }
             }
-            h1 { font-size: 50px; }
+            h1 { font-size: 35px; }
+            h2 { font-size: 50px; }
             body { font: 20px Helvetica, sans-serif; color: #333; }
             article { display: block; text-align: left; max-width: 650px; margin: 0 auto; }
+            header {
+                display: block;
+                text-align: left;
+                max-width: 650px;
+                margin: 0 auto;
+                font: 10px Helvetica, sans-serif; color: #aaa;
+            }
             footer {
                 display: block;
                 text-align: right;
@@ -27,8 +35,11 @@ Content-Type: text/html
         </style>
     </head>
     <body>
+        <header>
+            <h1>504</h1>
+        </header>
         <article>
-            <h1>Temps d'attente du serveur applicatif écoulé</h1>
+            <h2>Temps d'attente du serveur applicatif écoulé</h2>
             <div>
                 <p>
                     Temps d'attente d'une réponse d'un serveur à un serveur
@@ -39,7 +50,7 @@ Content-Type: text/html
         </article>
         &mdash;
         <article>
-            <h1>Gateway Time-out</h1>
+            <h2>Gateway Time-out</h2>
             <div>
                 <p>
                     The server was acting as a gateway or proxy and did not
@@ -48,8 +59,8 @@ Content-Type: text/html
                 <p>&mdash; The adminsys Team</p>
             </div>
         </article>
+        <footer>
+            Page distribuée par haproxy
+        </footer>
     </body>
-    <footer>
-        Page distribuée par haproxy
-    </footer>
 </html>

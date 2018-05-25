@@ -12,11 +12,19 @@ Content-Type: text/html
         <style>
             body { text-align: center; padding: 20px; }
             @media (min-width: 768px){
-            body{ padding-top: 150px; }
+                body{ padding-top: 150px; }
             }
-            h1 { font-size: 50px; }
+            h1 { font-size: 35px; }
+            h2 { font-size: 50px; }
             body { font: 20px Helvetica, sans-serif; color: #333; }
             article { display: block; text-align: left; max-width: 650px; margin: 0 auto; }
+            header {
+                display: block;
+                text-align: left;
+                max-width: 650px;
+                margin: 0 auto;
+                font: 10px Helvetica, sans-serif; color: #aaa;
+            }
             footer {
                 display: block;
                 text-align: right;
@@ -27,8 +35,11 @@ Content-Type: text/html
         </style>
     </head>
     <body>
+        <header>
+            <h1>403</h1>
+        </header>
         <article>
-            <h1>Accès interdit</h1>
+            <h2>Accès interdit</h2>
             <div>
                 <p>
                     Le serveur a compris la requête, mais refuse de l'exécuter.
@@ -43,7 +54,7 @@ Content-Type: text/html
         </article>
         &mdash;
         <article>
-            <h1>Forbidden</h1>
+            <h2>Forbidden</h2>
             <div>
                 <p>
                      The request was valid, but the server is refusing action.
@@ -53,8 +64,8 @@ Content-Type: text/html
                 <p>&mdash; The adminsys Team</p>
             </div>
         </article>
+        <footer>
+            Page distribuée par le serveur Caddy
+        </footer>
     </body>
-    <footer>
-        Page distribuée par le serveur Caddy
-    </footer>
 </html>

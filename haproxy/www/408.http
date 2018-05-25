@@ -12,11 +12,19 @@ Content-Type: text/html
         <style>
             body { text-align: center; padding: 20px; }
             @media (min-width: 768px){
-            body{ padding-top: 150px; }
+                body{ padding-top: 150px; }
             }
-            h1 { font-size: 50px; }
+            h1 { font-size: 35px; }
+            h2 { font-size: 50px; }
             body { font: 20px Helvetica, sans-serif; color: #333; }
             article { display: block; text-align: left; max-width: 650px; margin: 0 auto; }
+            header {
+                display: block;
+                text-align: left;
+                max-width: 650px;
+                margin: 0 auto;
+                font: 10px Helvetica, sans-serif; color: #aaa;
+            }
             footer {
                 display: block;
                 text-align: right;
@@ -27,8 +35,11 @@ Content-Type: text/html
         </style>
     </head>
     <body>
+        <header>
+            <h1>408</h1>
+        </header>
         <article>
-            <h1>Temps d'attente écoulé</h1>
+            <h2>Temps d'attente écoulé</h2>
             <div>
                 <p>
                     Temps d'attente d'une requête du client, écoulé côté
@@ -42,7 +53,7 @@ Content-Type: text/html
         </article>
         &mdash;
         <article>
-            <h1>Request Time-out</h1>
+            <h2>Request Time-out</h2>
             <div>
                 <p>
                     The server timed out waiting for the request. According
@@ -54,8 +65,8 @@ Content-Type: text/html
                 <p>&mdash; The adminsys Team</p>
             </div>
         </article>
+        <footer>
+            Page distribuée par le serveur Caddy
+        </footer>
     </body>
-    <footer>
-        Page distribuée par le serveur Caddy
-    </footer>
 </html>
