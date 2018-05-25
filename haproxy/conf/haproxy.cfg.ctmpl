@@ -1,6 +1,10 @@
 # This HAProxy should only be used to redirect requests
 # to the correct node of the cluster.
 # It should not contain any http redirections
+resolvers dns
+  nameserver local  127.0.0.11
+  hold valid 2s
+
 global
     daemon
 
@@ -81,7 +85,7 @@ frontend https-in
 backend https-{{ $domain }}
     mode tcp
     option tcp-check
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:443{{ end }} check
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:443{{ end }} resolvers dns check inter 3s
             {{- scratch.MapSet "backhttps" $domain $domain }}
         {{- end }}
     {{- end }}
@@ -93,7 +97,7 @@ backend https-{{ $domain }}
 backend https-{{ or (index $backend "name") $backend.ct }}
     mode tcp
     option tcp-check
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }} check
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }} resolvers dns check inter 3s
                 {{- end }}
             {{- end }}
         {{- end }}
@@ -109,7 +113,7 @@ backend https-{{ or (index $backend "name") $backend.ct }}
 backend https-swarm-{{ $domain }}
     mode tcp
     option tcp-check
-    server swarm_service swarm_reverse:443 check
+    server swarm_service swarm_reverse:443 resolvers dns check inter 3s
             {{- scratch.MapSet "backhttps" $domain $domain }}
         {{- end }}
     {{- end }}
@@ -121,7 +125,7 @@ backend https-swarm-{{ $domain }}
 backend https-swarm-{{ or (index $backend "name") $backend.ct }}
     mode tcp
     option tcp-check
-    server swarm_service {{ $backend.ct }}:{{ $backend.port }} {{ or (index $backend "server_option") "" }} check
+    server swarm_service {{ $backend.ct }}:{{ $backend.port }} {{ or (index $backend "server_option") "" }} resolvers dns check inter 3s
                 {{- end }}
             {{- end }}
         {{- end }}
@@ -180,7 +184,7 @@ frontend http-in
 
 backend http-{{ $domain }}
     mode http
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:80{{ else }}{{ $d.ip }}:80{{ end }} check
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:80{{ else }}{{ $d.ip }}:80{{ end }} resolvers dns check inter 3s
             {{- scratch.MapSet "backhttp" $domain $domain }}
         {{- end }}
     {{- end }}
@@ -191,7 +195,7 @@ backend http-{{ $domain }}
 
 backend http-{{ or (index $backend "name") $backend.ct }}
     mode http
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }} check
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }} resolvers dns check inter 3s
                 {{- end }}
             {{- end }}
         {{- end }}
@@ -206,7 +210,7 @@ backend http-{{ or (index $backend "name") $backend.ct }}
 
 backend http-swarm-{{ $domain }}
     mode http
-    server swarm_service swarm_reverse:80 check
+    server swarm_service swarm_reverse:80 resolvers dns check inter 3s
             {{- scratch.MapSet "backhttp" $domain $domain }}
         {{- end }}
     {{- end }}
@@ -217,7 +221,7 @@ backend http-swarm-{{ $domain }}
 
 backend http-swarm-{{ or (index $backend "name") $backend.ct }}
     mode http
-    server swarm_service {{ $backend.ct }}:{{ $backend.port }} {{ or (index $backend "server_option") "" }} check
+    server swarm_service {{ $backend.ct }}:{{ $backend.port }} {{ or (index $backend "server_option") "" }} resolvers dns check inter 3s
                 {{- end }}
             {{- end }}
         {{- end }}
