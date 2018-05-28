@@ -407,7 +407,7 @@ You can add keys in consul to forward traffic to those services.
 Visit the `Consul web UI <./#Consul web UI>`_ in the Key / Value store tab to
 add a key per service to define traffic to delegate to swarm.
 
-Keys must be under ``/swarm`` root keys.
+Keys must be under ``/swarm`` root key.
 
 The name of the key should be explicit to you, it's not used internally.
 
