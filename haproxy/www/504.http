@@ -1,0 +1,69 @@
+HTTP/1.0 504 Gateway Time-out
+Cache-Control: no-cache
+Connection: close
+Content-Type: text/html
+
+<!doctype html>
+<html>
+    <head>
+
+        <title>Erreur du serveur</title>
+        <meta charset="UTF-8">
+        <style>
+            body { text-align: center; padding: 20px; }
+            @media (min-width: 768px){
+                body{ padding-top: 150px; }
+            }
+            h1 { font-size: 35px; }
+            h2 { font-size: 50px; }
+            body { font: 20px Helvetica, sans-serif; color: #333; }
+            article { display: block; text-align: left; max-width: 650px; margin: 0 auto; }
+            header {
+                display: block;
+                text-align: left;
+                max-width: 650px;
+                margin: 0 auto;
+                font: 10px Helvetica, sans-serif; color: #aaa;
+            }
+            footer {
+                display: block;
+                text-align: right;
+                max-width: 650px;
+                margin: 0 auto;
+                font: 10px Helvetica, sans-serif; color: #aaa;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>504</h1>
+        </header>
+        <article>
+            <h2>Temps d'attente du serveur applicatif écoulé</h2>
+            <div>
+                <p>
+                    Temps d'attente d'une réponse d'un serveur à un serveur
+                    intermédiaire écoulé.
+                </p>
+                <p>&mdash; L'équipe d'administration syst&egraveme</p>
+            </div>
+        </article>
+        &mdash;
+        <article>
+            <h2>Gateway Time-out</h2>
+            <div>
+                <p>
+                    The server was acting as a gateway or proxy and did not
+                    receive a timely response from the upstream server.
+                </p>
+                <p>&mdash; The adminsys Team</p>
+            </div>
+        </article>
+        <footer>
+            Note technique: Page distribuée par le serveur
+            <a href="https://cbonte.github.io/haproxy-dconv/1.8/configuration.html#1.3.1">
+                haproxy
+            </a>.
+        </footer>
+    </body>
+</html>

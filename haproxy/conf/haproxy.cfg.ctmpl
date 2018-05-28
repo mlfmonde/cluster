@@ -1,23 +1,41 @@
 # This HAProxy should only be used to redirect requests
 # to the correct node of the cluster.
 # It should not contain any http redirections
+resolvers dns
+    nameserver local  127.0.0.11:53
+    hold valid 2s
+
 global
     daemon
-    maxconn 256
+    log rsyslog:514 local0 notice
 
 defaults
     mode tcp
-    timeout connect 5000ms
-    timeout client 50000ms
-    timeout server 50000ms
+    # allow to start-up haproxy even some backend are downs
+    default-server init-addr last,libc,none
+    timeout client 15mn
+    timeout server 300s
+    timeout connect 5s
+    log     global
+    option  dontlognull
+    errorfile 400 /var/www/400.http
+    errorfile 403 /var/www/403.http
+    errorfile 408 /var/www/408.http
+    errorfile 500 /var/www/500.http
+    errorfile 502 /var/www/502.http
+    errorfile 503 /var/www/503.http
+    errorfile 504 /var/www/504.http
 
 {{- $apps := tree "app" }}
+{{- $swarmapps := tree "swarm" }}
 
+# HTTPS
 frontend https-in
     mode tcp
     bind *:443
     bind *:1443 accept-proxy
     option socket-stats
+    option tcplog
     tcp-request inspect-delay 5s
     tcp-request content accept if { req_ssl_hello_type 1 }
 {{- range $apps }}
@@ -25,6 +43,7 @@ frontend https-in
     {{- $d := .Value | parseJSON }}
     {{- range $domain := $d.domains }}
         {{- if not (scratch.MapValues "fronthttps" | contains $domain) }}
+    {{/* Cluster service using CADDYFILE */}}
     use_backend https-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }
             {{- scratch.MapSet "fronthttps" $domain $domain }}
         {{- end }}
@@ -33,7 +52,29 @@ frontend https-in
         {{- range $confname, $conf := $d.haproxy }}
             {{- if eq $confname "https-in" }}
                 {{- range $backend := $conf.backends }}
+    {{/* Cluster service using HAPROXY */}}
     use_backend https-{{ or (index $backend "name") $backend.ct }} {{ or (index $backend "use_backend_option") "" }}
+                {{- end }}
+            {{- end }}
+        {{- end }}
+    {{- end }}
+{{- end }}
+{{- range $swarmapps }}
+    {{- $k := .Key }}
+    {{- $d := .Value | parseJSON }}
+    {{- range $domain := $d.domains }}
+        {{- if not (scratch.MapValues "fronthttps" | contains $domain) }}
+    {{/* Swarm service using domains */}}
+    use_backend https-swarm-{{ $domain }} if { req_ssl_sni -i {{ $domain }} }
+            {{- scratch.MapSet "fronthttps" $domain $domain }}
+        {{- end }}
+    {{- end }}
+    {{- if not (keyExists (print "maintenance/" $k)) }}
+        {{- range $confname, $conf := $d.haproxy }}
+            {{- if eq $confname "https-in" }}
+                {{- range $backend := $conf.backends }}
+    {{/* Swarm service using haproxy */}}
+    use_backend https-swarm-{{ or (index $backend "name") $backend.ct }} {{ or (index $backend "use_backend_option") "" }}
                 {{- end }}
             {{- end }}
         {{- end }}
@@ -46,9 +87,11 @@ frontend https-in
     {{- range $domain := $d.domains }}
         {{- if not (scratch.MapValues "backhttps" | contains $domain) }}
 
+{{/* Cluster service using CADDYFILE */}}
 backend https-{{ $domain }}
     mode tcp
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:443{{ end }}
+    option tcp-check
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:443{{ end }} resolvers dns check inter 3s
             {{- scratch.MapSet "backhttps" $domain $domain }}
         {{- end }}
     {{- end }}
@@ -57,24 +100,65 @@ backend https-{{ $domain }}
             {{- if eq $confname "https-in" }}
                 {{- range $backend := $conf.backends }}
 
+{{/* Cluster service using HAPROXY */}}
 backend https-{{ or (index $backend "name") $backend.ct }}
     mode tcp
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
+    option tcp-check
+                    {{- range $option := $backend.options }}
+    {{ $option }}
+                    {{- end }}
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }} resolvers dns check inter 3s
                 {{- end }}
             {{- end }}
         {{- end }}
     {{- end }}
 {{- end }}
 
+{{- range $swarmapps }}
+    {{- $k := .Key }}
+    {{- $d := .Value | parseJSON }}
+    {{- range $domain := $d.domains }}
+        {{- if not (scratch.MapValues "backhttps" | contains $domain) }}
+
+{{/* Swarm service using domains */}}
+backend https-swarm-{{ $domain }}
+    mode tcp
+    option tcp-check
+    server swarm_service swarm_reverse:443 resolvers dns check inter 3s
+            {{- scratch.MapSet "backhttps" $domain $domain }}
+        {{- end }}
+    {{- end }}
+    {{- if not (keyExists (print "maintenance/" $k)) }}
+        {{- range $confname, $conf := $d.haproxy }}
+            {{- if eq $confname "https-in" }}
+                {{- range $backend := $conf.backends }}
+
+{{/* Swarm service using haproxy */}}
+backend https-swarm-{{ or (index $backend "name") $backend.ct }}
+    mode tcp
+    option tcp-check
+                    {{- range $option := $backend.options }}
+    {{ $option }}
+                    {{- end }}
+    server swarm_service {{ $backend.ct }}:{{ $backend.port }} {{ or (index $backend "server_option") "" }} resolvers dns check inter 3s
+                {{- end }}
+            {{- end }}
+        {{- end }}
+    {{- end }}
+{{- end }}
+
+# HTTP
 frontend http-in
     mode http
     bind *:80
+    option httplog
     option socket-stats
 {{- range $apps }}
     {{- $k := .Key }}
     {{- $d := .Value | parseJSON }}
     {{- range $domain := $d.domains }}
         {{- if not (scratch.MapValues "fronthttp" | contains $domain) }}
+    {{/* Cluster service using CADDYFILE */}}
     use_backend http-{{ $domain }} if { hdr(host) -i {{ $domain }} }
             {{- scratch.MapSet "fronthttp" $domain $domain }}
         {{- end }}
@@ -83,7 +167,29 @@ frontend http-in
         {{- range $confname, $conf := $d.haproxy }}
             {{- if eq $confname "http-in" }}
                 {{- range $backend := $conf.backends }}
+    {{/* Cluster service using HAPROXY */}}
     use_backend http-{{ or (index $backend "name") $backend.ct }} {{ or (index $backend "use_backend_option") "" }}
+                {{- end }}
+            {{- end }}
+        {{- end }}
+    {{- end }}
+{{- end }}
+{{- range $swarmapps }}
+    {{- $k := .Key }}
+    {{- $d := .Value | parseJSON }}
+    {{- range $domain := $d.domains }}
+        {{- if not (scratch.MapValues "fronthttp" | contains $domain) }}
+    {{/* Swarm service using domains */}}
+    use_backend http-swarm-{{ $domain }} if { hdr(host) -i {{ $domain }} }
+            {{- scratch.MapSet "fronthttp" $domain $domain }}
+        {{- end }}
+    {{- end }}
+    {{- if not (keyExists (print "maintenance/" $k)) }}
+        {{- range $confname, $conf := $d.haproxy }}
+            {{- if eq $confname "http-in" }}
+                {{- range $backend := $conf.backends }}
+    {{/* Swarm service using haproxy */}}
+    use_backend http-swarm-{{ or (index $backend "name") $backend.ct }} {{ or (index $backend "use_backend_option") "" }}
                 {{- end }}
             {{- end }}
         {{- end }}
@@ -96,9 +202,10 @@ frontend http-in
     {{- range $domain := $d.domains }}
         {{- if not (scratch.MapValues "backhttp" | contains $domain) }}
 
+{{/* Cluster service using CADDYFILE */}}
 backend http-{{ $domain }}
     mode http
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:80{{ else }}{{ $d.ip }}:80{{ end }}
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:80{{ else }}{{ $d.ip }}:80{{ end }} resolvers dns check inter 3s
             {{- scratch.MapSet "backhttp" $domain $domain }}
         {{- end }}
     {{- end }}
@@ -107,15 +214,51 @@ backend http-{{ $domain }}
             {{- if eq $confname "http-in" }}
                 {{- range $backend := $conf.backends }}
 
+{{/* Cluster service using HAPROXY */}}
 backend http-{{ or (index $backend "name") $backend.ct }}
     mode http
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
+                    {{- range $option := $backend.options }}
+    {{ $option }}
+                    {{- end }}
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }} resolvers dns check inter 3s
                 {{- end }}
             {{- end }}
         {{- end }}
     {{- end }}
 {{- end }}
 
+{{- range $swarmapps }}
+    {{- $k := .Key }}
+    {{- $d := .Value | parseJSON }}
+    {{- range $domain := $d.domains }}
+        {{- if not (scratch.MapValues "backhttp" | contains $domain) }}
+
+{{/* Swarm service using domains */}}
+backend http-swarm-{{ $domain }}
+    mode http
+    server swarm_service swarm_reverse:80 resolvers dns check inter 3s
+            {{- scratch.MapSet "backhttp" $domain $domain }}
+        {{- end }}
+    {{- end }}
+    {{- if not (keyExists (print "maintenance/" $k)) }}
+        {{- range $confname, $conf := $d.haproxy }}
+            {{- if eq $confname "http-in" }}
+                {{- range $backend := $conf.backends }}
+
+{{/* Swarm service using haproxy */}}
+backend http-swarm-{{ or (index $backend "name") $backend.ct }}
+    mode http
+                    {{- range $option := $backend.options }}
+    {{ $option }}
+                    {{- end }}
+    server swarm_service {{ $backend.ct }}:{{ $backend.port }} {{ or (index $backend "server_option") "" }} resolvers dns check inter 3s
+                {{- end }}
+            {{- end }}
+        {{- end }}
+    {{- end }}
+{{- end }}
+
+# Other protocols
 {{- range $apps }}
     {{- $k := .Key }}
     {{- $d := .Value | parseJSON }}
@@ -123,6 +266,7 @@ backend http-{{ or (index $backend "name") $backend.ct }}
         {{- range $confname, $conf := $d.haproxy }}
             {{- if not (or (eq $confname "http-in") (eq $confname "https-in")) }}
 
+{{/* Cluster service using HAPROXY */}}
 frontend front-{{ $confname }}
     mode {{ $conf.frontend.mode }}
                 {{- range $option := $conf.frontend.options }}
@@ -136,9 +280,47 @@ frontend front-{{ $confname }}
                 {{- end }}
                 {{- range $backend := $conf.backends }}
 
+{{/* Cluster service using HAPROXY */}}
 backend backend-{{ or (index $backend "name") $backend.ct }}
     mode {{ $conf.frontend.mode }}
+                    {{- range $option := $backend.options }}
+    {{ $option }}
+                    {{- end }}
     server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}{{ $backend.ct }}:{{ $backend.port }}{{ else }}{{ $d.ip }}:{{ $backend.peer_port }}{{ end }} {{ or (index $backend "server_option") "" }}
+                {{- end }}
+            {{- end }}
+        {{- end }}
+    {{- end }}
+{{- end }}
+
+{{- range $swarmapps }}
+    {{- $k := .Key }}
+    {{- $d := .Value | parseJSON }}
+    {{- if not (keyExists (print "maintenance/" $k)) }}
+        {{- range $confname, $conf := $d.haproxy }}
+            {{- if not (or (eq $confname "http-in") (eq $confname "https-in")) }}
+
+{{/* Swarm service using haproxy */}}
+frontend swarm-front-{{ $confname }}
+    mode {{ $conf.frontend.mode }}
+                {{- range $option := $conf.frontend.options }}
+    {{ $option }}
+                {{- end }}
+                {{- range $bind := $conf.frontend.bind }}
+    bind {{ $bind }}
+                {{- end }}
+                {{- range $backend := $conf.backends }}
+    use_backend swarm-backend-{{ or (index $backend "name") $backend.ct }} {{ or (index $backend "use_backend_option") "" }}
+                {{- end }}
+                {{- range $backend := $conf.backends }}
+
+{{/* Swarm service using haproxy */}}
+backend swarm-backend-{{ or (index $backend "name") $backend.ct }}
+    mode {{ $conf.frontend.mode }}
+                    {{- range $option := $backend.options }}
+    {{ $option }}
+                    {{- end }}
+    server swarm_service {{ $backend.ct }}:{{ $backend.port }} {{ or (index $backend "server_option") "" }}
                 {{- end }}
             {{- end }}
         {{- end }}
