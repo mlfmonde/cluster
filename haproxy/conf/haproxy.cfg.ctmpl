@@ -7,12 +7,10 @@ resolvers dns
 
 global
     daemon
+    log rsyslog:514 local0 notice
 
 defaults
     mode tcp
-    log /dev/log    local0
-    log /dev/log    local1 notice
-
     timeout client 15mn
     timeout server 300s
     timeout connect 5s

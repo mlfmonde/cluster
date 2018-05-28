@@ -20,6 +20,15 @@ services:
       - ./haproxy/conf/:/usr/local/etc/haproxy/
       - ./haproxy/www/:/var/www/
 
+  rsyslog:
+    image: rsyslog/syslog_appliance_alpine
+    restart: unless-stopped
+    volumes:
+      - ./rsyslog/rsyslog.conf:/etc/rsyslog.conf
+      - rsyslog_work:/work
+      - ./rsyslog/logs:/logs
+
+
   consul:
     build: consul
     depends_on:
@@ -51,3 +60,5 @@ volumes:
     driver: anybox/buttervolume:latest
   consul_docker_cfg:
     driver: anybox/buttervolume:latest
+  rsyslog_work:
+    driver: local
