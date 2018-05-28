@@ -319,12 +319,68 @@ json) so a more exhaustive config may looks like this::
       documentation <https://cbonte.github.io/haproxy-dconv/1.8/
       configuration.html#4.2-use_backend>`_.
     * ``port`` (required): listening service port
-    * ``peer_port`` (required): listening port by haproxy while forwarding
+    * ``peer_port`` (ingnored in swarm keys, required otherwise): listening
+      port by haproxy while forwarding
       traffic to another host
     * ``server_option``: add options to the server directive which forward
       traffic to the service or other nodes, refer to the haproxy `server
       and default server options <https://cbonte.github.io/haproxy-dconv/1.8/
       configuration.html#5.2>`_.
+    * ``options`` (optional): a list of valid backend options to add to the
+      current backend. one line per item.
+    * ``ct`` (required in swarm keys, ignored otherwise (overwrite by the
+      handler)): the docker container name or swarm service where the
+      application is running (the "proxified" serivce) that should handle
+      traffic.
+
+an other more example assuming ``swarm/test_key`` key with the following values
+setup for a swarm service called ``test`` which
+listen on port 22 that should handle tcp requests publicly exposed on 2222::
+
+    {
+      "haproxy": {
+        "ssh-config-name": {
+          "frontend": {
+            "mode": "tcp",
+            "bind": [
+              "*:2222"
+            ],
+            "options": [
+              "option socket-stats",
+              "option tcplog"
+            ]
+          },
+          "backends": [
+            {
+              "name": "ssh-service",
+              "server_option": "resolvers dns check inter 3s",
+              "port": "22",
+              "peer_port": "2222",
+              "ct": "test",
+              "options": [
+                "option tcp-check"
+              ]
+            }
+          ]
+        }
+      }
+    }
+
+which will render the following HaProxy config::
+
+    frontend swarm-front-ssh-config-name
+        mode tcp
+        option socket-stats
+        option tcplog
+        bind *:2222
+        use_backend swarm-backend-ssh-service
+
+    backend swarm-backend-ssh-service
+        mode tcp
+        option tcp-check"
+        server swarm_service test:22 resolvers dns check inter 3s
+
+
 
 * ``CONSUL_CHECK_URLS``: `Consul can check <https://www.consul.io/docs/agent/
   checks.html>`_ if the service is healthy. By default the handler introspect
@@ -335,6 +391,36 @@ json) so a more exhaustive config may looks like this::
 
     If you provide a ``service.json`` it will overwrite introspected checks
     and checks defined in ``CONSUL_CHECK_URLS``
+
+
+Swarm
+-----
+
+You may want to use both, this cluster to manage services deployed as peer with
+buttervolume replication and swarm for some other services.
+
+Before configure service you should add the haproxy container to a swarm
+network (overlay).
+
+You can add keys in consul to forward traffic to those services.
+
+Visit the `Consul web UI <./#Consul web UI>`_ in the Key / Value store tab to
+add a key per service to define traffic to delegate to swarm.
+
+Keys must be under ``/swarm`` root keys.
+
+The name of the key should be explicit to you, it's not used internally.
+
+Value should be a dict which should can contains following keys:
+
+* **domains**: a list of domains to redirect HTTP / HTTPS traffic to a
+  swarm proxy that redirect traffic to the good container (likes traefik).
+  the proxy service **MUST** be called ``swarm_reverse``.
+and / or:
+* **haproxy** read HAPROXY environment variable from the previous chapter
+  Define a service to know the format. This allow you to directly forward
+  traffics to your swarm services without the needs to use an other proxy to
+  your services.
 
 
 Local development environment
