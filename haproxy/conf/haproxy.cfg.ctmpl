@@ -2,8 +2,8 @@
 # to the correct node of the cluster.
 # It should not contain any http redirections
 resolvers dns
-  nameserver local  127.0.0.11:53
-  hold valid 2s
+    nameserver local  127.0.0.11:53
+    hold valid 2s
 
 global
     daemon
@@ -11,6 +11,8 @@ global
 
 defaults
     mode tcp
+    # allow to start-up haproxy even some backend are downs
+    default-server init-addr last,libc,none
     timeout client 15mn
     timeout server 300s
     timeout connect 5s
