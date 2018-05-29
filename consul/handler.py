@@ -100,11 +100,10 @@ class Application(object):
         self._caddy = {}
         self._previous_deploy_id = None
         self._deploy_id = None
+        self._current_deploy_id = current_deploy_id
         if deploy_id:
             self._previous_deploy_id = self.deploy_id
             self._deploy_id = deploy_id
-        elif current_deploy_id == self.deploy_id:
-            self._deploy_id = self.previous_deploy_id
 
     @property
     def previous_deploy_id(self):
@@ -117,7 +116,11 @@ class Application(object):
     def deploy_id(self):
         """date of the last deployment"""
         if self._deploy_id is None:
-            self._deploy_id = kv(self.name, 'deploy_id')
+            kv_deploy_id = self._deploy_id = kv(self.name, 'deploy_id')
+            if self._current_deploy_id == kv_deploy_id:
+                self._deploy_id = self.previous_deploy_id
+            else:
+                self._deploy_id = kv_deploy_id
         return self._deploy_id
 
     @property
@@ -1323,14 +1326,16 @@ class TestCase(unittest.TestCase):
             app.path.startswith("/tmp/deploy/foobar_master.ddb14@")
         )
         oldapp = Application(self.repo_url, 'master')
-        self.assertEqual(app.path, oldapp.path)
+        self.assertTrue(
+            oldapp.path.startswith("/tmp/deploy/foobar_master.ddb14@")
+        )
         newapp = Application(self.repo_url, 'master', deploy_id='abc')
+        oldapp = Application(self.repo_url, 'master', current_deploy_id='abc')
         self.assertEqual(newapp.path, "/tmp/deploy/foobar_master.ddb14-abc")
         newapp.download()
         newapp.register_kv('node2', 'node1')
-        oldapp = Application(self.repo_url, 'master', current_deploy_id='abc')
-        self.assertEqual(
-            app.path, oldapp.path
+        self.assertTrue(
+            oldapp.path.startswith("/tmp/deploy/foobar_master.ddb14@")
         )
         newapp = Application(self.repo_url, 'master', deploy_id='abc2')
         oldapp = Application(self.repo_url, 'master', current_deploy_id='abc2')
