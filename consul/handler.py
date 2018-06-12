@@ -23,11 +23,11 @@ from uuid import uuid1
 DTFORMAT = "%Y-%m-%dT%H%M%S.%f"
 DEPLOY = '/deploy'
 CADDYLOGS = '/var/log'
-BTRFSDRIVER = os.environ.get('BTRFSDRIVER', 'anybox/buttervolume:latest') 
 TEST = False
 HERE = abspath(dirname(__file__))
 log = logging.getLogger()
 BTRFSDRIVER = os.environ.get('BTRFSDRIVER', 'anybox/buttervolume:latest')
+
 
 def concat(l):
     return reduce(list.__add__, l, [])
@@ -62,7 +62,28 @@ def kv(name, key):
 class Application(object):
     """ represents a docker compose, its proxy conf and deployment path
     """
-    def __init__(self, repo_url, branch, cwd=None):
+    def __init__(
+        self, repo_url, branch, deploy_id=None, current_deploy_id=None
+    ):
+        """Init application object
+
+        :param repo_url: repo where the docker-compose is stored
+        :param branch: the repo branch/tag/ref to use
+        :param deploy_id: the consul event id, only use it if it's a new app
+                          that is going to be deployed and will be stored in kv
+                          store. If it's app alredy deployed you must leave it
+                          to None, it will get information from the k/v store
+        :param current_deploy_id: the current event id which we are handling,
+                                  the intent is to manage weired case where
+                                  an old app object may be instanciate after
+                                  the new master already save values in k/v
+                                  store. This could happen when deploy using
+                                  sames master/slave and slave were busy while
+                                  master handling the event. if deploy_id is
+                                  define this value is ignored. If this value
+                                  is set you should not save in k/v store.
+        """
+
         self.repo_url, self.branch = repo_url.strip(), branch.strip()
         if self.repo_url.endswith('.git'):
             self.repo_url = self.repo_url[:-4]
@@ -72,10 +93,35 @@ class Application(object):
         self.name = repo_name + ('_' + self.branch if self.branch else ''
                                  ) + '.' + md5[:5]  # don't need full md5
         self._services = None
+        self._kv_volumes = None
         self._volumes = None
         self._compose = None
         self._deploy_date = None
         self._caddy = {}
+        self._previous_deploy_id = None
+        self._deploy_id = None
+        self._current_deploy_id = current_deploy_id
+        if deploy_id:
+            self._previous_deploy_id = self.deploy_id
+            self._deploy_id = deploy_id
+
+    @property
+    def previous_deploy_id(self):
+        """date of the last deployment"""
+        if self._previous_deploy_id is None:
+            self._previous_deploy_id = kv(self.name, 'previous_deploy_id')
+        return self._previous_deploy_id
+
+    @property
+    def deploy_id(self):
+        """date of the last deployment"""
+        if self._deploy_id is None:
+            kv_deploy_id = self._deploy_id = kv(self.name, 'deploy_id')
+            if self._current_deploy_id == kv_deploy_id:
+                self._deploy_id = self.previous_deploy_id
+            else:
+                self._deploy_id = kv_deploy_id
+        return self._deploy_id
 
     @property
     def deploy_date(self):
@@ -84,8 +130,11 @@ class Application(object):
             self._deploy_date = kv(self.name, 'deploy_date')
         return self._deploy_date
 
-    def _path(self, deploy_date=None):
+    def _path(self, deploy_date=None, deploy_id=None):
         """path of the deployment checkout"""
+        deploy_id = deploy_id or self.deploy_id
+        if deploy_id:
+            return join(DEPLOY, self.name + '-' + deploy_id)
         deploy_date = deploy_date or self.deploy_date
         if deploy_date:
             return join(DEPLOY, self.name + '@' + deploy_date)
@@ -196,17 +245,17 @@ class Application(object):
     def volumes_from_kv(self):
         """volumes defined in the kv
         """
-        if self._volumes is None:
+        if self._kv_volumes is None:
             try:
-                self._volumes = [
+                self._kv_volumes = [
                     Volume(v) for v in kv(self.name, 'volumes')]
             except:
                 log.info("No volumes found in the kv")
                 # if kv is not present in the store, get a chance to get info
                 # from compose
-                self._volumes = self.volumes
-            self._volumes = self._volumes or []
-        return self._volumes
+                self._kv_volumes = self.volumes
+            self._kv_volumes = self._kv_volumes or []
+        return self._kv_volumes
 
     @property
     def volumes(self):
@@ -237,7 +286,7 @@ class Application(object):
         try:
             self.clean()
             deploy_date = datetime.now().strftime(DTFORMAT)
-            path = self._path(deploy_date)
+            path = self._path(deploy_date=deploy_date)
             do('git clone --depth 1 {} "{}" "{}"'
                .format('-b "%s"' % self.branch if self.branch else '',
                        self.repo_url, path),
@@ -276,7 +325,7 @@ class Application(object):
                .format(self.project, ignore),
                cwd=self.path)
         else:
-            log.info("No deployment, cannot pull %s", self.name)
+            log.warning("No deployment, cannot pull %s", self.name)
 
     def build(self, pull=True, nocache=False, forecerm=False):
         """Build images declare in docker-compose.yml file
@@ -294,7 +343,7 @@ class Application(object):
                .format(self.project, pull, cache, rm),
                cwd=self.path)
         else:
-            log.info("No deployment, cannot build %s", self.name)
+            log.warning("No deployment, cannot build %s", self.name)
 
     def up(self):
         if self.path and exists(self.path):
@@ -303,7 +352,7 @@ class Application(object):
                .format(self.project),
                cwd=self.path)
         else:
-            log.info("No deployment, cannot start %s", self.name)
+            log.warning("No deployment, cannot start %s", self.name)
 
     def down(self, deletevolumes=False):
         if self.path and exists(self.path):
@@ -312,7 +361,7 @@ class Application(object):
             do('docker-compose -p "{}" down {}'.format(self.project, v),
                cwd=self.path)
         else:
-            log.info("No deployment, cannot stop %s", self.name)
+            log.warning("Cannot stop %s", self.name)
 
     @property
     def members(self):
@@ -500,6 +549,8 @@ class Application(object):
             'repo_url': self.repo_url,
             'branch': self.branch,
             'deploy_date': self._deploy_date,
+            'deploy_id': self.deploy_id,
+            'previous_deploy_id': self.previous_deploy_id,
             'domains': list({urlparse(u).netloc for u in urls}),
             'urls': ', '.join(urls),
             'ip': self.members[master]['ip'],
@@ -553,20 +604,23 @@ class Application(object):
             raise RuntimeError(msg)
         log.info("Deregistered %s in consul", self.name)
 
-    def enable_snapshot(self, enable):
+    def enable_snapshot(self, enable, from_compose=False):
         """enable or disable scheduled snapshots
         """
-        for volume in self.volumes_from_kv:
+        volumes = self.volumes if from_compose else self.volumes_from_kv
+        for volume in volumes:
             volume.schedule_snapshots(60 if enable else 0)
 
-    def enable_replicate(self, enable, ip):
+    def enable_replicate(self, enable, ip, from_compose=False):
         """enable or disable scheduled replication
         """
-        for volume in self.volumes_from_kv:
+        volumes = self.volumes if from_compose else self.volumes_from_kv
+        for volume in volumes:
             volume.schedule_replicate(60 if enable else 0, ip)
 
-    def enable_purge(self, enable):
-        for volume in self.volumes_from_kv:
+    def enable_purge(self, enable, from_compose=False):
+        volumes = self.volumes if from_compose else self.volumes_from_kv
+        for volume in volumes:
             volume.schedule_purge(1440 if enable else 0, '1h:1d:1w:4w:1y')
 
 
@@ -651,7 +705,7 @@ def handle(events, myself):
             raise
 
         if event_name == 'deploy':
-            deploy(payload, myself)
+            deploy(payload, myself, event_id)
         elif event_name == 'destroy':
             destroy(payload, myself)
         elif event_name == 'migrate':
@@ -660,7 +714,7 @@ def handle(events, myself):
             log.error('Unknown event name: {}'.format(event_name))
 
 
-def deploy(payload, myself):
+def deploy(payload, myself, deploy_id):
     """Keep in mind this is executed in the consul container
     Deployments are done in the DEPLOY folder. Needs:
     {"repo"': <url>, "branch": <branch>, "master": <host>, "slave": <host>}
@@ -678,10 +732,10 @@ def deploy(payload, myself):
         log.error(msg)
         raise AssertionError(msg)
 
-    oldapp = Application(repo_url, branch=branch)
+    oldapp = Application(repo_url, branch=branch, current_deploy_id=deploy_id)
     oldmaster = kv(oldapp.name, 'master')
     oldslave = kv(oldapp.name, 'slave')
-    newapp = Application(repo_url, branch=branch)
+    newapp = Application(repo_url, branch=branch, deploy_id=deploy_id)
     members = newapp.members
     log.info('oldapp={}, oldmaster={}, oldslave={}, '
              'newapp={}, newmaster={}, newslave={}'
@@ -691,7 +745,7 @@ def deploy(payload, myself):
     if oldmaster == myself:  # master ->
         log.info('** I was the master of %s', oldapp.name)
         if newmaster != myself:
-            for volume in newapp.volumes_from_kv:
+            for volume in oldapp.volumes_from_kv:
                 volume.send(volume.snapshot(), members[newmaster]['ip'])
         oldapp.maintenance(enable=True)
         oldapp.down()
@@ -711,10 +765,12 @@ def deploy(payload, myself):
             newapp.build()
             newapp.up()
             if newslave:
-                newapp.enable_replicate(True, members[newslave]['ip'])
+                newapp.enable_replicate(
+                    True, members[newslave]['ip'], from_compose=True
+                )
             else:
-                newapp.enable_snapshot(True)
-            newapp.enable_purge(True)
+                newapp.enable_snapshot(True, from_compose=True)
+            newapp.enable_purge(True, from_compose=True)
             newapp.register_kv(newmaster, newslave)  # for consul-template
             newapp.register_consul()  # for consul check
             newapp.maintenance(enable=False)
@@ -725,11 +781,12 @@ def deploy(payload, myself):
                     volume.send(volume.snapshot(), members[newmaster]['ip'])
             oldapp.unregister_consul()
             oldapp.down(deletevolumes=True)
-            newapp.enable_purge(True)
+            newapp.download()
+            newapp.enable_purge(True, from_compose=True)
         else:  # master -> nothing
             log.info("** I'm nothing now for %s", newapp.name)
             with newapp.notify_transfer():
-                for volume in newapp.volumes_from_kv:
+                for volume in oldapp.volumes_from_kv:
                     volume.send(volume.snapshot(), members[newmaster]['ip'])
             oldapp.unregister_consul()
             oldapp.down(deletevolumes=True)
@@ -745,22 +802,30 @@ def deploy(payload, myself):
             newapp.pull()
             newapp.build()
             newapp.wait_transfer()  # wait for master notification
-            for volume in newapp.volumes_from_kv:
+            oldvolumes = set([v.name for v in oldapp.volumes_from_kv])
+            common_volumes = [
+                v for v in newapp.volumes if v.name in oldvolumes
+            ]
+            for volume in common_volumes:
                 volume.restore()
             newapp.up()
             if newslave:
-                newapp.enable_replicate(True, members[newslave]['ip'])
+                newapp.enable_replicate(
+                    True, members[newslave]['ip'], from_compose=True
+                )
             else:
-                newapp.enable_snapshot(True)
-            newapp.enable_purge(True)
+                newapp.enable_snapshot(True, from_compose=True)
+            newapp.enable_purge(True, from_compose=True)
             newapp.register_kv(newmaster, newslave)  # for consul-template
             newapp.register_consul()  # for consul check
             newapp.maintenance(enable=False)
         elif newslave == myself:  # slave -> slave
             log.info("** I'm still the slave of %s", newapp.name)
-            newapp.enable_purge(True)
+            newapp.download()
+            newapp.enable_purge(True, from_compose=True)
         else:  # slave -> nothing
             log.info("** I'm nothing now for %s", newapp.name)
+        oldapp.clean()
 
     else:  # nothing ->
         log.info("** I was nothing for %s", oldapp.name)
@@ -772,21 +837,27 @@ def deploy(payload, myself):
             newapp.build()
             if oldmaster:
                 newapp.wait_transfer()  # wait for master notification
-                for volume in newapp.volumes_from_kv:
+                oldvolumes = set([v.name for v in oldapp.volumes_from_kv])
+                common_volumes = [
+                    v for v in newapp.volumes if v.name in oldvolumes
+                ]
+                for volume in common_volumes:
                     volume.restore()
             newapp.up()
             if newslave:
-                newapp.enable_replicate(True, members[newslave]['ip'])
+                newapp.enable_replicate(
+                    True, members[newslave]['ip'], from_compose=True
+                )
             else:
-                newapp.enable_snapshot(True)
-            newapp.enable_purge(True)
+                newapp.enable_snapshot(True, from_compose=True)
+            newapp.enable_purge(True, from_compose=True)
             newapp.register_kv(newmaster, newslave)  # for consul-template
             newapp.register_consul()  # for consul check
             newapp.maintenance(enable=False)
         elif newslave == myself:  # nothing -> slave
             log.info("** I'm now the slave of %s", newapp.name)
             newapp.download()
-            newapp.enable_purge(True)
+            newapp.enable_purge(True, from_compose=True)
         else:  # nothing -> nothing
             log.info("** I'm still nothing for %s", newapp.name)
 
@@ -825,6 +896,7 @@ def destroy(payload, myself):
     elif oldslave == myself:  # slave ->
         log.info("I was the slave of %s", oldapp.name)
         oldapp.enable_purge(False)
+        oldapp.clean()
     else:  # nothing ->
         log.info("I was nothing for %s", oldapp.name)
     log.info("Successfully destroyed")
@@ -1245,6 +1317,43 @@ class TestCase(unittest.TestCase):
         app = Application(self.repo_url, 'master')
         app.download()
         self.assertEqual(None, app.register_kv('node1', 'node2'))
+
+    def test_path(self):
+        app = Application(self.repo_url, 'master')
+        app.download()
+        app.register_kv('node1', 'node2')
+        self.assertTrue(
+            app.path.startswith("/tmp/deploy/foobar_master.ddb14@")
+        )
+        oldapp = Application(self.repo_url, 'master')
+        self.assertTrue(
+            oldapp.path.startswith("/tmp/deploy/foobar_master.ddb14@")
+        )
+        newapp = Application(self.repo_url, 'master', deploy_id='abc')
+        oldapp = Application(self.repo_url, 'master', current_deploy_id='abc')
+        self.assertEqual(newapp.path, "/tmp/deploy/foobar_master.ddb14-abc")
+        newapp.download()
+        newapp.register_kv('node2', 'node1')
+        self.assertTrue(
+            oldapp.path.startswith("/tmp/deploy/foobar_master.ddb14@")
+        )
+        newapp = Application(self.repo_url, 'master', deploy_id='abc2')
+        oldapp = Application(self.repo_url, 'master', current_deploy_id='abc2')
+        self.assertEqual(newapp.path, "/tmp/deploy/foobar_master.ddb14-abc2")
+        self.assertEqual(oldapp.path, "/tmp/deploy/foobar_master.ddb14-abc")
+
+    def test_deploy_ids(self):
+        app = Application(self.repo_url, 'master', deploy_id='abc1')
+        app.download()
+        app.register_kv('node1', 'node2')
+        app = Application(self.repo_url, 'master', deploy_id='abc2')
+        app.download()
+        self.assertEqual(app.previous_deploy_id, 'abc1')
+        self.assertEqual(app.deploy_id, 'abc2')
+        app.register_kv('node1', 'node2')
+        app = Application(self.repo_url, 'master')
+        self.assertEqual(app.previous_deploy_id, 'abc1')
+        self.assertEqual(app.deploy_id, 'abc2')
 
     def test_register_consul(self):
         app = Application(self.repo_url, 'master')
