@@ -91,7 +91,7 @@ frontend https-in
 backend https-{{ $domain }}
     mode tcp
     option tcp-check
-    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:443{{ end }} resolvers dns check inter 3s
+    server {{ $d.master }} {{ if eq $d.master (env "HOSTNAME") }}caddy:443{{ else }}{{ $d.ip }}:1443{{ end }} send-proxy resolvers dns check inter 3s
             {{- scratch.MapSet "backhttps" $domain $domain }}
         {{- end }}
     {{- end }}
