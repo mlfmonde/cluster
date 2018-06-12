@@ -16,6 +16,7 @@ addgroup -g $DOCKER_GID docker
 adduser -S -u $DOCKER_GID -G $DOCKER_GID docker
 adduser consul docker
 adduser gw docker
+chown -R consul: /home/consul/.ssh
 PLUGINS=/run/docker/plugins
 if [ -e $PLUGINS ]; then
     chmod -R g+rx $PLUGINS
