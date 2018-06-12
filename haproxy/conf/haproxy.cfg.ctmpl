@@ -3,11 +3,13 @@
 # It should not contain any http redirections
 resolvers dns
     nameserver local  127.0.0.11:53
-    hold valid 2s
+    hold valid 6s
 
 global
     daemon
     log rsyslog:514 local0 notice
+    maxcompcpuusage 75
+    maxconn 512
 
 defaults
     mode tcp
