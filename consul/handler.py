@@ -345,6 +345,19 @@ class Application(object):
         else:
             log.warning("No deployment, cannot build %s", self.name)
 
+    def run_post_migrate(self, from_app):
+        script_path = join(self.path, 'post_migrate.sh')
+        if script_path and exists(script_path):
+            do(
+                'post_migrate.sh -R {} -B {} -r {} -b {}'.format(
+                    from_app.repo_url,
+                    from_app.branch,
+                    self.repo_url,
+                    self.branch
+                ),
+                cwd=self.path
+            )
+
     def up(self):
         if self.path and exists(self.path):
             log.info("Starting %s", self.name)
@@ -952,6 +965,7 @@ def migrate(payload, myself):
         targetapp.down()
         for source_vol, target_vol in zip(source_volumes, target_volumes):
             source_vol.restore(target=target_vol.name)
+        targetapp.run_post_migrate(sourceapp)
         targetapp.up()
         targetapp.maintenance(enable=False)
     log.info('Restored %s to %s', sourceapp.name, targetapp.name)
