@@ -941,9 +941,9 @@ def migrate(payload, myself):
     source_volumes = []
     target_volumes = []
     # find common volumes
-    for source_volume in sourceapp.volumes:
+    for source_volume in sourceapp.volumes_from_kv:
         source_name = source_volume.name.split('_', 1)[1]
-        for target_volume in targetapp.volumes:
+        for target_volume in targetapp.volumes_from_kv:
             target_name = target_volume.name.split('_', 1)[1]
             if source_name == target_name:
                 source_volumes.append(source_volume)
