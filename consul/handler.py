@@ -27,6 +27,7 @@ TEST = False
 HERE = abspath(dirname(__file__))
 log = logging.getLogger()
 BTRFSDRIVER = os.environ.get('BTRFSDRIVER', 'anybox/buttervolume:latest')
+POST_MIGRATE_SCRIPT_NAME = 'post_migrate.sh'
 
 
 def concat(l):
@@ -346,10 +347,11 @@ class Application(object):
             log.warning("No deployment, cannot build %s", self.name)
 
     def run_post_migrate(self, from_app):
-        script_path = join(self.path, 'post_migrate.sh')
+        script_path = join(self.path, POST_MIGRATE_SCRIPT_NAME)
         if script_path and exists(script_path):
             do(
-                'post_migrate.sh -R {} -B {} -r {} -b {}'.format(
+                '{} -R {} -B {} -r {} -b {}'.format(
+                    script_path,
                     from_app.repo_url,
                     from_app.branch,
                     self.repo_url,
