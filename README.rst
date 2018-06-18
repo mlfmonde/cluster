@@ -422,6 +422,66 @@ and / or:
   traffics to your swarm services without the needs to use an other proxy to
   your services.
 
+Post migrate script
+-------------------
+
+While using migrate you are able to move data between apps using same volume
+names. In some cases you may want change the state before restart the app
+using restored data (likes disable emails, change domains, change password...).
+
+The ``post_migrate.sh`` will be called if present after restoring data using
+`migrate event <consul/README.rst>`_ and before restart the service (
+``docker-compose up -d``)
+
+``post_migrate.sh`` will receive following argument to give you more
+controls about where come from restored data, here a basic template::
+
+    #!/bin/sh
+
+    # exit on error
+    set -e
+    # -x debug mode to display line before its execution
+    set +x
+
+
+    USAGE="
+    Usage: $0
+        -R SOURCE REPO -B SOURCE BRANCH
+        -r TARGET REPO -b TARGET BRANCH [-h]
+    Post migrage while migrating volume from SOURCE to TARGET
+
+    Options:
+        -R SOURCE REPO   Service repo source url from where volumes came from
+        -B SOURCE BRANCH Service source branch from where volumes come from
+        -r TARGET REPO   Service repo target url should be the current repo
+                         where data are restored
+        -b TARGET BRANCH Service target branch should be the current branch
+                         where data are restored
+        -h               Show this help.
+    "
+
+
+    while getopts "R:B:r:b:h" OPTION
+    do
+        case $OPTION in
+            R) SOURCE_REPO=$OPTARG;;
+            B) SOURCE_BRANCH=$OPTARG;;
+            r) REPO=$OPTARG;;
+            b) BRANCH=$OPTARG;;
+            h) echo "$USAGE";
+               exit;;
+            *) echo "Unknown parameter... ";
+               echo "$USAGE";
+               exit 1;;
+        esac
+    done
+
+    echo "migrate data from $SOURCE_REPO branch: $SOURCE_BRANCH to $REPO branch: $BRANCH"
+
+Keep in mind this will be run in the consul container which is allowed to
+communicate with the docker daemon. The current working directory of this
+script will be the project where data are restored (the TARGET).
+
 
 Local development environment
 -----------------------------

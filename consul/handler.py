@@ -27,6 +27,7 @@ TEST = False
 HERE = abspath(dirname(__file__))
 log = logging.getLogger()
 BTRFSDRIVER = os.environ.get('BTRFSDRIVER', 'anybox/buttervolume:latest')
+POST_MIGRATE_SCRIPT_NAME = 'post_migrate.sh'
 
 
 def concat(l):
@@ -344,6 +345,20 @@ class Application(object):
                cwd=self.path)
         else:
             log.warning("No deployment, cannot build %s", self.name)
+
+    def run_post_migrate(self, from_app):
+        script_path = join(self.path, POST_MIGRATE_SCRIPT_NAME)
+        if exists(script_path):
+            do(
+                '{} -R {} -B {} -r {} -b {}'.format(
+                    script_path,
+                    from_app.repo_url,
+                    from_app.branch,
+                    self.repo_url,
+                    self.branch
+                ),
+                cwd=self.path
+            )
 
     def up(self):
         if self.path and exists(self.path):
@@ -925,9 +940,9 @@ def migrate(payload, myself):
     source_volumes = []
     target_volumes = []
     # find common volumes
-    for source_volume in sourceapp.volumes:
+    for source_volume in sourceapp.volumes_from_kv:
         source_name = source_volume.name.split('_', 1)[1]
-        for target_volume in targetapp.volumes:
+        for target_volume in targetapp.volumes_from_kv:
             target_name = target_volume.name.split('_', 1)[1]
             if source_name == target_name:
                 source_volumes.append(source_volume)
@@ -951,6 +966,7 @@ def migrate(payload, myself):
         targetapp.down()
         for source_vol, target_vol in zip(source_volumes, target_volumes):
             source_vol.restore(target=target_vol.name)
+        targetapp.run_post_migrate(sourceapp)
         targetapp.up()
         targetapp.maintenance(enable=False)
     log.info('Restored %s to %s', sourceapp.name, targetapp.name)
