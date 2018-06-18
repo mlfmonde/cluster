@@ -348,7 +348,7 @@ class Application(object):
 
     def run_post_migrate(self, from_app):
         script_path = join(self.path, POST_MIGRATE_SCRIPT_NAME)
-        if script_path and exists(script_path):
+        if exists(script_path):
             do(
                 '{} -R {} -B {} -r {} -b {}'.format(
                     script_path,
