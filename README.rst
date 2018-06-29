@@ -422,6 +422,35 @@ and / or:
   traffics to your swarm services without the needs to use an other proxy to
   your services.
 
+Non migrable volumes
+--------------------
+
+You may wan't to manage volumes that are entierly related to one environement
+so those data are not restored while using migrate to move data between apps.
+
+In order to define a volume "non migrable" you have to add a label on your
+target application:
+
+```bash
+[...]
+volumes:
+  config:
+    driver: anybox/buttervolume:latest
+    labels:
+      - com.github.mlfmonde.cluster.nonmigrable=True
+  dbdata:
+    driver: anybox/buttervolume:latest
+  socket:
+```
+
+> **Note**: You needs to move the target app from nodes to take that parameter
+> in consideration.
+
+> **Note**: You could do the same by using different name to your dedicated
+> volume environment as only commons volume name are restored to the target
+> app.
+
+
 Post migrate script
 -------------------
 

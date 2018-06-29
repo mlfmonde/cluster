@@ -22,6 +22,7 @@ RUN apk add --no-cache \
     && pip install docker-compose==${DOCKERCOMPOSE} \
     && pip3 install pyyaml==3.12 \
     && pip3 install urllib3==1.22 \
+    && pip3 install docker \
     && git clone https://github.com/anybox/buttervolume \
     && cd buttervolume \
     && git checkout $BUTTERVOLUME \

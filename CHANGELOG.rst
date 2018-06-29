@@ -1,6 +1,8 @@
 Change log
 ==========
 
+* Add support to non migrable volumes
+
 * Add support to ``CONSUL_CHECK_URLS`` to add extra consul checks
 
 * Allow ``HAPROXY`` environment to add backends in ``http-in`` and ``https-in``

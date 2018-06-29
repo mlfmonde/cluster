@@ -13,6 +13,7 @@ import yaml
 from base64 import b64decode, b64encode
 from contextlib import contextmanager
 from datetime import datetime
+from docker import DockerClient
 from functools import reduce
 from os.path import basename, join, exists, dirname, abspath
 from shutil import copy, rmtree
@@ -23,6 +24,8 @@ from uuid import uuid1
 DTFORMAT = "%Y-%m-%dT%H%M%S.%f"
 DEPLOY = '/deploy'
 CADDYLOGS = '/var/log'
+DOCKER_BASE_URL = "unix:////run/docker.sock"
+LABEL_NON_MIGRABLE_VOLUME = 'com.github.mlfmonde.cluster.nonmigrable'
 TEST = False
 HERE = abspath(dirname(__file__))
 log = logging.getLogger()
@@ -695,6 +698,14 @@ class Volume(object):
         log.info(u'Sending snapshot: {}'.format(snapshot))
         do("buttervolume send {} {}".format(target, snapshot))
 
+    @property
+    def migrable_volume(self):
+        dc = DockerClient(base_url=DOCKER_BASE_URL)
+        non_migrable = dc.volumes.get(self.name).attrs.get('Labelse', {}).get(
+            LABEL_NON_MIGRABLE_VOLUME, 'false'
+        )
+        return not non_migrable.lower() in ['true', '1']
+
 
 def handle(events, myself):
     HANDLED = join(DEPLOY, 'events.log')
@@ -965,7 +976,8 @@ def migrate(payload, myself):
         targetapp.maintenance(enable=True)
         targetapp.down()
         for source_vol, target_vol in zip(source_volumes, target_volumes):
-            source_vol.restore(target=target_vol.name)
+            if target_vol.migrable_volume:
+                source_vol.restore(target=target_vol.name)
         targetapp.run_post_migrate(sourceapp)
         targetapp.up()
         targetapp.maintenance(enable=False)
