@@ -12,9 +12,6 @@ RUN apk add --no-cache \
       python3 \
     && pip install --upgrade pip \
     && pip install docker-compose==${DOCKERCOMPOSE} \
-    && pip3 install pyyaml==3.12 \
-    && pip3 install urllib3==1.22 \
-    && pip3 install docker \
     && git clone https://github.com/anybox/buttervolume \
     && cd buttervolume \
     && git checkout $BUTTERVOLUME \
@@ -27,7 +24,9 @@ RUN apk add --no-cache \
 
 USER consul
 USER root
-RUN chown -R consul: /home/consul \
+COPY . /
+RUN python3 setup.py develop \
+    && chown -R consul: /home/consul \
     && mkdir -p /run/docker/plugins/ \
     && chmod g+rx /run/docker/plugins/ \
     && adduser consul root \
@@ -35,10 +34,5 @@ RUN chown -R consul: /home/consul \
     && passwd -d gw \
     && sed -i 's/.*su-exec consul:consul .*/    set -- su-exec consul:docker "$@"/' /usr/local/bin/docker-entrypoint.sh
 
-COPY authorizedkeys.py /sbin/
-COPY handler.py /
-COPY reload_caddy.sh /
-COPY reload_haproxy.sh /
-COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["agent", "-dev", "-ui"]
