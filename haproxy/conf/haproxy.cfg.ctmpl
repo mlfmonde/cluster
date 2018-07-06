@@ -16,7 +16,7 @@ defaults
     # allow to start-up haproxy even some backend are downs
     default-server init-addr last,libc,none
     timeout client 15mn
-    timeout server 300s
+    timeout server 600s
     timeout connect 5s
     log     global
     option  dontlognull
