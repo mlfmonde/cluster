@@ -35,5 +35,5 @@ before_script:
 script:
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml pull
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml build --pull
-  - sudo docker run -it --rm --entrypoint python3 -v $(pwd)/testapp:/testapp cluster_consul /handler.py test
+  - sudo docker run -it --rm --entrypoint "" -v $(pwd)/testapp:/testapp cluster_consul bash -c "pip3 install -r requirements.tests.txt && nosetests -v"
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml up -d
