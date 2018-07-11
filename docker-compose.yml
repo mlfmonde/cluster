@@ -10,7 +10,7 @@ services:
       - ./caddy/www/:/srv
 
   haproxy:
-    image: haproxy:1.8.8
+    image: haproxy:1.8.12
     restart: unless-stopped
     ports:
       - "80:80"
