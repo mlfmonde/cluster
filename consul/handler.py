@@ -701,7 +701,7 @@ class Volume(object):
     @property
     def migrable_volume(self):
         dc = DockerClient(base_url=DOCKER_BASE_URL)
-        non_migrable = dc.volumes.get(self.name).attrs.get('Labelse', {}).get(
+        non_migrable = dc.volumes.get(self.name).attrs.get('Labels', {}).get(
             LABEL_NON_MIGRABLE_VOLUME, 'false'
         )
         return not non_migrable.lower() in ['true', '1']
