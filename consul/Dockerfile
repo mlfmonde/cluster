@@ -8,9 +8,8 @@ RUN apk add --no-cache \
       bash \
       docker \
       git \
-      py-pip \
       python3 \
-    && pip install --upgrade pip \
+    && pip3 install --upgrade pip \
     && pip install docker-compose==${DOCKERCOMPOSE} \
     && git clone https://github.com/anybox/buttervolume \
     && cd buttervolume \
