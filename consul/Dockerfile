@@ -7,6 +7,7 @@ ARG DOCKERCOMPOSE=1.20.1
 RUN apk add --no-cache \
       bash \
       docker \
+      openssh-client \
       git \
       python3 \
     && pip3 install --upgrade pip \
