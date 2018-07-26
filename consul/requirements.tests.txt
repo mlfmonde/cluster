@@ -1,0 +1,4 @@
+nose
+testfixtures
+coverage
+mock

@@ -43,7 +43,7 @@ services:
             "watches": [{
                 "type": "event",
                 "handler_type": "script",
-                "args": ["/handler.py"]}]
+                "args": ["handler"]}]
             }'
     volumes:
       - consul_docker_cfg:/home/consul/.docker

@@ -13,23 +13,18 @@ Test
 Run the handler tests with, this require python>3.4 (maybe more??)::
 
     $ python3 -m venv venv
-    $ ./venv/bin/pip install PyYAML requests
     $ source ./venv/bin/activate
-    $ ./handler.py test
+    $ python setup develop
+    $ pip install -r requirements.tests.txt
+    $ nosetests -v
 
 If you can't get python>3.4, you can test within the consul image
 wich get python3.6, in consul directory::
 
     $ docker build -t consul .
-    $ sudo docker run -it --rm --entrypoint python3 \
-        -v $(pwd)/handler.py:/handler.py \  # If you want to add pdb use your developed file
-        -v $(pwd)/../testapp:/testapp \     # test directory required for unittest
-        consul /handler.py test
+    $ sudo docker run -it --rm --entrypoint "" \
+        consul  bash -c "pip3 install -r requirements.tests.txt && nosetests -v"
 
-.. note::
-
-    The mocking system in unitest is managed by calling handler.py itself
-    and track it in the ``__main__`` method entry point.
 
 Normal mode
 ***********
