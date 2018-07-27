@@ -688,10 +688,16 @@ class Volume(object):
         log.info(u'Sending snapshot: {}'.format(snapshot))
         do("buttervolume send {} {}".format(target, snapshot))
 
+    def get_docker_client(self):
+        return DockerClient(base_url=DOCKER_BASE_URL)
+
     @property
     def migrable_volume(self):
-        dc = DockerClient(base_url=DOCKER_BASE_URL)
-        non_migrable = dc.volumes.get(self.name).attrs.get('Labels', {}).get(
+        dc = self.get_docker_client()
+        labels = dc.volumes.get(self.name).attrs.get('Labels', {})
+        if not labels:
+            labels = {}
+        non_migrable = labels.get(
             LABEL_NON_MIGRABLE_VOLUME, 'false'
         )
         return not non_migrable.lower() in ['true', '1']
