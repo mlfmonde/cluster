@@ -1,5 +1,6 @@
 sudo: required
 
+dist: xenial
 
 env:
   DOCKER_COMPOSE_VERSION: 1.20.1
@@ -7,6 +8,10 @@ env:
 services:
   - docker
 
+addons:
+  apt:
+    packages:
+      - docker-ce
 
 before_install:
   - sudo apt-get update
@@ -20,20 +25,42 @@ install:
   - sudo apt-get update -q
   - sudo apt-get install -y qemu-utils btrfs-tools
 
-before_script:
-  - sudo qemu-img create /var/lib/buttervolume.img 10G
-  - sudo mkfs.btrfs /var/lib/buttervolume.img
-  - sudo mkdir -p /var/lib/buttervolume
-  - sudo mount -o loop /var/lib/buttervolume.img /var/lib/buttervolume
-  - sudo mkdir -p /var/lib/buttervolume/config
-  - sudo mkdir -p /var/lib/buttervolume/ssh
-  - sudo btrfs subvolume create /var/lib/buttervolume/snapshots
-  - sudo btrfs subvolume create /var/lib/buttervolume/volumes
-  - docker plugin install --grant-all-permissions anybox/buttervolume
-  - docker plugin ls
-
-script:
-  - docker-compose -f docker-compose.yml -f docker-compose.travis.yml pull
-  - docker-compose -f docker-compose.yml -f docker-compose.travis.yml build --pull
-  - sudo docker run -it --rm --entrypoint "" -v $(pwd)/testapp:/testapp cluster_consul bash -c "pip3 install -r requirements.tests.txt && nosetests -v"
-  - docker-compose -f docker-compose.yml -f docker-compose.travis.yml up -d
+jobs:
+  include:
+    - stage: "Tests"
+      name: "Unit Tests"
+      before_script:
+        - sudo qemu-img create /var/lib/buttervolume.img 10G
+        - sudo mkfs.btrfs /var/lib/buttervolume.img
+        - sudo mkdir -p /var/lib/buttervolume
+        - sudo mount -o loop /var/lib/buttervolume.img /var/lib/buttervolume
+        - sudo mkdir -p /var/lib/buttervolume/config
+        - sudo mkdir -p /var/lib/buttervolume/ssh
+        - sudo btrfs subvolume create /var/lib/buttervolume/snapshots
+        - sudo btrfs subvolume create /var/lib/buttervolume/volumes
+        - docker plugin install --grant-all-permissions anybox/buttervolume
+        - docker plugin ls
+      script:
+        - docker-compose -f docker-compose.yml -f docker-compose.travis.yml pull
+        - docker-compose -f docker-compose.yml -f docker-compose.travis.yml build --pull
+        - sudo docker run -it --rm --entrypoint "" -v $(pwd)/testapp:/testapp cluster_consul bash -c "pip3 install -r requirements.tests.txt && nosetests -v"
+        - docker-compose -f docker-compose.yml -f docker-compose.travis.yml up -d
+    - name: "Integration Tests"
+      before_script:
+        # CI: cd ding for adhoc docker-compose context
+        - cd dind
+        # CI: bootstrap dind
+        - bash bootstrap.bash
+      script:
+        # CI: run tests
+        # diags to stdout
+        - docker-compose exec -T node1 docker-compose ps
+        - docker-compose exec -T node2 docker-compose ps
+        - docker-compose exec -T node3 docker-compose ps
+        - docker-compose exec -T node4 docker-compose ps
+        - docker-compose exec -T node1 tail -f /deploy/handler.log &
+        - docker-compose exec -T node2 tail -f /deploy/handler.log &
+        - docker-compose exec -T node3 tail -f /deploy/handler.log &
+        - docker-compose exec -T node4 tail -f /deploy/handler.log &
+        # run tests
+        - docker-compose exec -T ci run-contexts /tests/test_new_service.py

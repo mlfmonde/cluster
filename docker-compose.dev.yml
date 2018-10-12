@@ -6,6 +6,7 @@ services:
       - "880:80"
     volumes:
       - ./caddy/index:/srv
+      - caddy_conf:/etc/caddy:ro
 
   consul:
     environment:
@@ -16,8 +17,8 @@ services:
       - /run/docker.sock:/run/docker.sock
       - /run/docker/plugins:/run/docker/plugins
       - ./deploy:/deploy
-      - ./caddy/conf/:/consul/template/caddy/
-      - ./haproxy/conf/:/consul/template/haproxy/
+      - caddy_conf:/consul/template/caddy/:rw
+      - haproxy_conf/:/consul/template/haproxy/:rw
       - consul_ssh:/home/consul/.ssh
 
 volumes:
@@ -26,3 +27,5 @@ volumes:
   caddy_srv:
   consul_docker_cfg:
   consul_ssh:
+  caddy_conf:
+  haproxy_conf:
