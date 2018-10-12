@@ -2,14 +2,14 @@
 echo 'hit key to continue'
 read a
 
-btrfsImgPath='/var/lib/docker'
+btrfsImgPrefix='/var/lib/docker/btrfs'
 
 # small dind dev/testing size
 btrfsImgSize='1G'
 # dev host size
 #btrfsImgSize='10G'
 
-mountPointPrefix='/mnt/cluster'
+mountPointPrefix='/mnt/btrfs'
 
 clusters=("1")
 #clusters=("1" "2" "3" "4")
@@ -17,7 +17,7 @@ clusters=("1")
 
 # arg1: image index 1..N
 function prepareBtrfs() {
-    img="${btrfsImgPath}/btrfs$1.img"
+    img="${btrfsImgPrefix}$1.img"
     echo "prepare btrfs ${img} image"
 
     if sudo true; then
@@ -37,7 +37,7 @@ function prepareBtrfs() {
 
 # arg1: image index 1..N
 function mountUp() {
-    img="${btrfsImgPath}/btrfs$1.img"
+    img="${btrfsImgPrefix}$1.img"
     mountDir="${mountPointPrefix}$1"
     echo "mount ${img} to ${mountDir}"
 
@@ -60,8 +60,7 @@ do
     mountUp "${index}"
 done
 
-#docker build -t anybox/clusterdind -f ./dind/Dockerfile ./dind
-#docker run --privileged --name "${name}" -d anybox/clusterdind
+docker build -t anybox/clusterdind -f ./dind/Dockerfile ./dind
 
-echo 'finished. hit key to continue'
+echo 'prepare done. hit key to continue'
 read a

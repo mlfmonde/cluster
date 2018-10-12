@@ -1,0 +1,13 @@
+version: '3'
+services:
+
+    cluster1:
+        image: anybox/clusterdind
+        #restart: unless-stopped
+        ports:
+            - "3501:3500"
+        volumes:
+            - /mnt/cluster1:/var/lib/buttervolume
+            - ./..:/cluster
+        privileged: true
+        tty: true
