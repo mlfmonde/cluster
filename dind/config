@@ -1,15 +1,23 @@
+# btrfs image prefix for /var/lib/docker/btrfs[1-N].img files
 btrfsImgPrefix='/var/lib/docker/btrfs'
 export btrfsImgPrefix
 
+# btrfs image size
 # small dind dev/testing size
 btrfsImgSize='1G'
 # dev host size
 #btrfsImgSize='10G'
 export btrfsImgSize
 
+# btrfs mount point prefix for /mnt/btrfs[1-N] mount points
 mountPointPrefix='/mnt/btrfs'
 export mountPointPrefix
 
+# clusters
 clusters=("1")
 #clusters=("1" "2" "3" "4")
 export clusters
+
+# dind cluster service prefix
+clusterServicePrefix='cluster'
+export clusterServicePrefix

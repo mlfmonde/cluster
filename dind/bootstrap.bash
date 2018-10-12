@@ -35,5 +35,5 @@ do
     mountUp "${index}"
 done
 
-docker build -t anybox/clusterdind -f ./dind/Dockerfile ./dind
+docker build -t anybox/clusterdind .
 docker-compose up -d

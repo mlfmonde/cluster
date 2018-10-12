@@ -11,3 +11,4 @@ services:
             - ./..:/cluster
         privileged: true
         tty: true
+        working_dir: /cluster

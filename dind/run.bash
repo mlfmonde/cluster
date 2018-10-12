@@ -12,3 +12,7 @@ do
 done
 
 docker-compose start
+
+for index in ${clusters[*]}
+    docker-compose exec "${clusterServicePrefix}${index}" docker-compose up -d
+done
