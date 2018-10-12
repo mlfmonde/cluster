@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
-thisDir=$(dirname "$0")
-. "${thisDir}/config"
-. "${thisDir}/lib.bash"
-
 echo 'hit key to continue'
 read a
+
+btrfsImgPrefix='/var/lib/docker/btrfs'
+
+# small dind dev/testing size
+btrfsImgSize='1G'
+# dev host size
+#btrfsImgSize='10G'
+
+mountPointPrefix='/mnt/btrfs'
+
+clusters=("1")
+#clusters=("1" "2" "3" "4")
+
 
 # arg1: image index 1..N
 function prepareBtrfs() {
@@ -26,6 +35,22 @@ function prepareBtrfs() {
     fi
 }
 
+# arg1: image index 1..N
+function mountUp() {
+    img="${btrfsImgPrefix}$1.img"
+    mountDir="${mountPointPrefix}$1"
+    echo "mount ${img} to ${mountDir}"
+
+    sudo mkdir -p "${mountDir}"
+    sudo mount -o loop "${img}" "${mountDir}"
+}
+
+# arg1: image index 1..N
+function mountDown() {
+    mountDir="${mountPointPrefix}$1"
+    sudo umount "${mountDir}"
+}
+
 sudo apt-get install -y qemu-utils btrfs-tools
 
 # prepare btrfs images for each cluster: create image if required + mount
@@ -36,4 +61,6 @@ do
 done
 
 docker build -t anybox/clusterdind -f ./dind/Dockerfile ./dind
-docker-compose up -d
+
+echo 'prepare done. hit key to continue'
+read a

@@ -1,0 +1,15 @@
+btrfsImgPrefix='/var/lib/docker/btrfs'
+export btrfsImgPrefix
+
+# small dind dev/testing size
+btrfsImgSize='1G'
+# dev host size
+#btrfsImgSize='10G'
+export btrfsImgSize
+
+mountPointPrefix='/mnt/btrfs'
+export mountPointPrefix
+
+clusters=("1")
+#clusters=("1" "2" "3" "4")
+export clusters
