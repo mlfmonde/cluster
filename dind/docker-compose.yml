@@ -7,7 +7,7 @@ services:
         ports:
             - "3501:3500"
         volumes:
-            - /mnt/cluster1:/var/lib/buttervolume
+            - /mnt/btrfs1:/var/lib/buttervolume
             - ./..:/cluster
         privileged: true
         tty: true

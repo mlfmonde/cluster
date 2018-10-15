@@ -30,7 +30,14 @@ for index in ${clusters[*]}
 do
     prepareBtrfs "${index}"
     mountUp "${index}"
+    sudo mkdir "${mountPointPrefix}${index}/config"
+    sudo mkdir "${mountPointPrefix}${index}/ssh"
 done
 
 docker build -t anybox/clusterdind .
 docker-compose up -d
+
+for index in ${clusters[*]}
+do
+    docker-compose exec "${clusterServicePrefix}${index}" docker plugin install --grant-all-permissions anybox/buttervolume
+done
