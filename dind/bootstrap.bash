@@ -3,9 +3,6 @@ thisDir=$(dirname "$0")
 . "${thisDir}/config"
 . "${thisDir}/lib.bash"
 
-echo 'hit key to continue'
-read a
-
 # arg1: image index 1..N
 function prepareBtrfs() {
     img="${btrfsImgPrefix}$1.img"
