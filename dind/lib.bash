@@ -1,3 +1,27 @@
+#!/usr/bin/env bash
+
+# create dir
+function createDirSudo() {
+    echo "create dir $1"
+    if sudo bash -c "[[ -d $1 ]]"; then
+        echo "$1 already exist"
+    else
+        sudo mkdir -p "$1"
+    fi
+}
+export -f createDirSudo
+
+function createDir() {
+    echo "create dir $1"
+    if "[[ -d $1 ]]"; then
+        echo "$1 already exist"
+    else
+        mkdir -p "$1"
+    fi
+}
+export -f createDir
+
+# mount directory
 # arg1: image index 1..N
 function mountUp() {
     img="${btrfsImgPrefix}$1.img"
@@ -9,6 +33,7 @@ function mountUp() {
 }
 export -f mountUp
 
+# unmount directory
 # arg1: image index 1..N
 function mountDown() {
     mountDir="${mountPointPrefix}$1"
