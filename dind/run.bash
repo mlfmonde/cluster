@@ -11,5 +11,6 @@ done
 docker-compose start
 
 for index in ${nodes[*]}
-    docker-compose exec "${nodeServicePrefix}${index}" docker-compose up -d
+    # we use specific compose override file for consul config
+    docker-compose exec "${nodeServicePrefix}${index}" docker-compose -f docker-compose.yml -f docker-compose.dind.yml start
 done

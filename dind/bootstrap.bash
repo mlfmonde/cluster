@@ -3,6 +3,10 @@ thisDir=$(dirname "$0")
 . "${thisDir}/config"
 . "${thisDir}/lib.bash"
 
+#
+# FUNCTIONS
+#
+
 # arg1: image index 1..N
 function prepareBtrfs() {
     img="${btrfsImgPrefix}$1.img"
@@ -23,24 +27,40 @@ function prepareBtrfs() {
     fi
 }
 
+# up a node
+# arg1: image index 1..N
+function upNode() {
+    # install buttervolume docker plugin
+    docker-compose exec "${nodeServicePrefix}${index}" docker plugin install --grant-all-permissions anybox/buttervolume
+
+    # we use specific compose override file for consul config
+    # running consul in 'bootstrap' mode to elect leader node
+    docker-compose exec "${nodeServicePrefix}${index}" docker-compose -f docker-compose.yml -f docker-compose.dind.consul.bootstrap.yml up --force-recreate -d
+}
+
+
+#
+# BODY
+#
 sudo apt-get install -y qemu-utils btrfs-tools
 
 # prepare btrfs images for each node: create image if required + mount
 for index in ${nodes[*]}
 do
     prepareBtrfs "${index}"
+
     mountUp "${index}"
-    sudo mkdir "${mountPointPrefix}${index}/config"
-    sudo mkdir "${mountPointPrefix}${index}/ssh"
+    createDirSudo "${mountPointPrefix}${index}/config"
+    createDirSudo "${mountPointPrefix}${index}/ssh"
 done
 
 # set network overlay: will force each dind node ip for convenient consul config
 #docker network create -d overlay clusterlab
 
 docker build -t anybox/cluster_node_dind .
-docker-compose up -d
+docker-compose up --force-recreate -d
 
 for index in ${nodes[*]}
 do
-    docker-compose exec "${nodeServicePrefix}${index}" docker plugin install --grant-all-permissions anybox/buttervolume
+    upNode "${index}"
 done

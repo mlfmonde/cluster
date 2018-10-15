@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # btrfs image prefix for /var/lib/docker/btrfs[1-N].img files
 btrfsImgPrefix='/var/lib/docker/btrfs'
 export btrfsImgPrefix
