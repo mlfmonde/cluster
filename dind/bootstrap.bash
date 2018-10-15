@@ -34,8 +34,7 @@ function upNode() {
     docker-compose exec "${nodeServicePrefix}${index}" docker plugin install --grant-all-permissions anybox/buttervolume
 
     # we use specific compose override file for consul config
-    # running consul in 'bootstrap' mode to elect leader node
-    docker-compose exec "${nodeServicePrefix}${index}" docker-compose -f docker-compose.yml -f docker-compose.dind.consul.bootstrap.yml up --force-recreate -d
+    docker-compose exec "${nodeServicePrefix}${index}" docker-compose -f docker-compose.yml -f docker-compose.dind.yml up --force-recreate -d
 }
 
 
@@ -53,9 +52,6 @@ do
     createDirSudo "${mountPointPrefix}${index}/config"
     createDirSudo "${mountPointPrefix}${index}/ssh"
 done
-
-# set network overlay: will force each dind node ip for convenient consul config
-#docker network create -d overlay clusterlab
 
 docker build -t anybox/cluster_node_dind .
 docker-compose up --force-recreate -d
