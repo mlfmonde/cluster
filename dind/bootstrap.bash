@@ -25,8 +25,8 @@ function prepareBtrfs() {
 
 sudo apt-get install -y qemu-utils btrfs-tools
 
-# prepare btrfs images for each cluster: create image if required + mount
-for index in ${clusters[*]}
+# prepare btrfs images for each node: create image if required + mount
+for index in ${nodes[*]}
 do
     prepareBtrfs "${index}"
     mountUp "${index}"
@@ -34,10 +34,13 @@ do
     sudo mkdir "${mountPointPrefix}${index}/ssh"
 done
 
-docker build -t anybox/clusterdind .
+# set network overlay: will force each dind node ip for convenient consul config
+#docker network create -d overlay clusterlab
+
+docker build -t anybox/cluster_node_dind .
 docker-compose up -d
 
-for index in ${clusters[*]}
+for index in ${nodes[*]}
 do
-    docker-compose exec "${clusterServicePrefix}${index}" docker plugin install --grant-all-permissions anybox/buttervolume
+    docker-compose exec "${nodeServicePrefix}${index}" docker plugin install --grant-all-permissions anybox/buttervolume
 done

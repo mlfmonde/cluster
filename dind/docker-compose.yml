@@ -1,14 +1,14 @@
 version: '3'
 services:
 
-    cluster1:
-        image: anybox/clusterdind
+    node1:
+        image: anybox/cluster_node_dind
         #restart: unless-stopped
         ports:
-            - "3501:3500"
+            - "8501:8500"
         volumes:
             - /mnt/btrfs1:/var/lib/buttervolume
-            - ./..:/cluster
+            - ./..:/node
         privileged: true
         tty: true
-        working_dir: /cluster
+        working_dir: /node

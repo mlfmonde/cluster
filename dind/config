@@ -13,11 +13,11 @@ export btrfsImgSize
 mountPointPrefix='/mnt/btrfs'
 export mountPointPrefix
 
-# clusters
-clusters=("1")
-#clusters=("1" "2" "3" "4")
-export clusters
+# nodes
+nodes=("1")
+#nodes=("1" "2" "3" "4")
+export nodes
 
-# dind cluster service prefix
-clusterServicePrefix='cluster'
-export clusterServicePrefix
+# dind node service prefix
+nodeServicePrefix='node'
+export nodeServicePrefix

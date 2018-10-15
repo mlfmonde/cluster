@@ -5,10 +5,10 @@ Docker in Docker
 ****************
 
 For devs and CI, this Docker in docker (dind) setup is targetted for sandboxes and CI.
-It aims to replace cluster_lab with Salt environnements
+It aims to replace cluster_lab with Salt envs.
 
-* one dind instance holds one cluster
-* total of 4 dind instances: 4 clusters
+* one dind instance represents 1 node, where this repo 'cluster' is installed on each node
+* 1 sandbox/CI cluster is a total of 4 nodes: 4 dind instances
 
 Bootstrap
 ---------
@@ -16,9 +16,9 @@ Bootstrap
     $ cd dind
     $ bash bootstrap.bash
 
-* prepare btrfs images (4 images for 4 clusters)
-* build dind docker image (dind env holds 1 cluster)
-* up compose services (4 dind services for 4 clusters)
+* prepare btrfs images (4 images for 4 nodes)
+* build dind docker image (dind env holds 1 node)
+* up compose services (1 cluster of 4 dind nodes)
 
 Run
 ---
