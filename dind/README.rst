@@ -12,7 +12,7 @@ It aims to replace cluster_lab with Salt environnements
 
 Bootstrap
 ---------
-
+::
     $ cd dind
     $ bash bootstrap.bash
 
@@ -22,7 +22,7 @@ Bootstrap
 
 Run
 ---
-
+::
     $ (cd dind)
     $ bash run.bash
 
@@ -31,6 +31,6 @@ Run
 
 Build dind image
 ----------------
-
+::
     $ cd dind
     $ docker build -t anybox/clusterdind .
