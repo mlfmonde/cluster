@@ -38,9 +38,8 @@ before_script:
   - sudo btrfs subvolume create /var/lib/buttervolume/volumes
   - docker plugin install --grant-all-permissions anybox/buttervolume
   - docker plugin ls
-  - sudo cd /usr/bin
-  - sudo rm python3
-  - sudo ln -s python3.5 python3 # [CI] python 3.5, link it as usr/bin/python3 instead of 3.4
+  - sudo rm /usr/bin/python3
+  - sudo ln -s /usr/bin/python3.5 /usr/bin/python3 # [CI] python 3.5, link it as usr/bin/python3 instead of 3.4
 
 script:
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml pull
