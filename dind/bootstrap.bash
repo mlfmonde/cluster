@@ -34,7 +34,7 @@ function upNode() {
     docker-compose exec "${nodeServicePrefix}${index}" docker plugin install --grant-all-permissions anybox/buttervolume
 
     # we use specific compose override file for consul config
-    docker-compose exec "${nodeServicePrefix}${index}" docker-compose -f docker-compose.yml -f docker-compose.dind.yml up --force-recreate -d
+    docker-compose exec "${nodeServicePrefix}${index}" docker-compose -f docker-compose.yml -f docker-compose.dind.yml up --force-recreate --build -d
 }
 
 
