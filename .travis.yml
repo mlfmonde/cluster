@@ -7,6 +7,13 @@ env:
 services:
   - docker
 
+# [CI] python 3.5 for travis ubuntu 14.04 env: deadsnakes ppa
+addons:
+  apt:
+    sources:
+      - deadsnakes
+    packages:
+      - python3.5
 
 before_install:
   - sudo apt-get update
@@ -31,9 +38,14 @@ before_script:
   - sudo btrfs subvolume create /var/lib/buttervolume/volumes
   - docker plugin install --grant-all-permissions anybox/buttervolume
   - docker plugin ls
+# [CI] python 3.5, link it as usr/bin/python3 instead of 3.4
+  - sudo cd /usr/bin
+  - sudo rm python3
+  - sudo ln -s python3.5 python3
 
 script:
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml pull
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml build --pull
   - sudo docker run -it --rm --entrypoint "" -v $(pwd)/testapp:/testapp cluster_consul bash -c "pip3 install -r requirements.tests.txt && nosetests -v"
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml up -d
+ 
