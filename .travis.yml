@@ -1,19 +1,21 @@
 sudo: required
 
-
 env:
   DOCKER_COMPOSE_VERSION: 1.20.1
 
 services:
   - docker
 
-# [CI] python 3.5 for travis ubuntu 14.04 env: deadsnakes ppa
 addons:
   apt:
-    sources:
-      - deadsnakes
     packages:
-      - python3.5
+      - docker-ce
+
+language: python
+python:
+  - "3.5"
+install:
+  - pip install -r dind/ci/requirements.txt
 
 before_install:
   - sudo apt-get update
@@ -38,8 +40,6 @@ before_script:
   - sudo btrfs subvolume create /var/lib/buttervolume/volumes
   - docker plugin install --grant-all-permissions anybox/buttervolume
   - docker plugin ls
-  - sudo rm /usr/bin/python3
-  - sudo ln -s /usr/bin/python3.5 /usr/bin/python3 # [CI] python 3.5, link it as usr/bin/python3 instead of 3.4
 
 script:
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml pull
