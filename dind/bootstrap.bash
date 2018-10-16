@@ -30,11 +30,13 @@ function prepareBtrfs() {
 # up a node
 # arg1: image index 1..N
 function upNode() {
+    echo "bootstrapping node $1..."
+
     # install buttervolume docker plugin
-    docker-compose exec "${nodeServicePrefix}${index}" docker plugin install --grant-all-permissions anybox/buttervolume
+    docker-compose exec "${nodeServicePrefix}$1" docker plugin install --grant-all-permissions anybox/buttervolume
 
     # we use specific compose override file for consul config
-    docker-compose exec "${nodeServicePrefix}${index}" docker-compose -f docker-compose.yml -f docker-compose.dind.yml up --force-recreate --build -d
+    docker-compose exec "${nodeServicePrefix}$1" docker-compose -f docker-compose.yml -f docker-compose.dind.yml up --force-recreate --build -d
 }
 
 

@@ -1,12 +1,12 @@
-# first consul run (bootstrap) to elect a leader
+# static ips v4 from 'cluster' network of dind/compose-file.yml
+# bootstrap-expect = N-1 nodes
 version: '3'
 
 services:
   consul:
-# important: -client 0.0.0.0 to use public loop, for host access
-    command: ["agent", "-server", "-retry-join=10.10.77.61", "-ui", "-dev", "-client", "0.0.0.0"]
-# TODO activate 4 nodes
-#   command: ["agent", "-server", "-retry-join=10.10.77.61", "-retry-join=10.10.77.62", "-retry-join=10.10.77.63", "-retry-join=10.10.77.64", "-client", "0.0.0.0", "-ui", "-bootstrap-expect=3"]
+# TODO active 4 nodes
+#    command: ["agent", "-server", "-retry-join=10.10.77.61", "-retry-join=10.10.77.62", "-retry-join=10.10.77.63", "-retry-join=10.10.77.64", "-client", "0.0.0.0", "-ui", "-bootstrap-expect=3"]
+    command: ["agent", "-server", "-retry-join=10.10.77.61","-client", "0.0.0.0", "-ui", "-dev"]
     environment:
         # important: use eth0
         CONSUL_BIND_INTERFACE: eth0

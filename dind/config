@@ -5,10 +5,7 @@ btrfsImgPrefix='/var/lib/docker/btrfs'
 export btrfsImgPrefix
 
 # btrfs image size
-# small dind dev/testing size
-btrfsImgSize='1G'
-# dev host size
-#btrfsImgSize='10G'
+btrfsImgSize='5G'
 export btrfsImgSize
 
 # btrfs mount point prefix for /mnt/btrfs[1-N] mount points
@@ -16,8 +13,9 @@ mountPointPrefix='/mnt/btrfs'
 export mountPointPrefix
 
 # nodes
-nodes=("1")
+# TODO active 4 nodes
 #nodes=("1" "2" "3" "4")
+nodes=("1")
 export nodes
 
 # dind node service prefix
