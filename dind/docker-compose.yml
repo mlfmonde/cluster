@@ -3,7 +3,7 @@ version: '3'
 services:
 
     node1:
-        image: anybox/cluster_node_dind
+        build: .
         #restart: unless-stopped
         ports:
             - "8501:8500"
