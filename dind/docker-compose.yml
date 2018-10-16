@@ -10,6 +10,8 @@ services:
         volumes:
             - /mnt/btrfs1:/var/lib/buttervolume
             - ./..:/node
+# allow each node docker client to communicate with parent daemon
+            - /var/run/docker.sock:/var/run/docker.sock
         privileged: true
         tty: true
         working_dir: /node
