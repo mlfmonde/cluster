@@ -48,4 +48,5 @@ script:
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml up -d
  # CI, cd ding for adhoc docker-compose context
   - cd dind
+ # FIXME: on 14.04 WARNING! - Btrfs v3.12 IS EXPERIMENTAL
   - bash bootstrap.bash

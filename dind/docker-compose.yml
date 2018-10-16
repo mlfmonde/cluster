@@ -9,6 +9,7 @@ services:
         volumes:
             - /mnt/btrfs1:/var/lib/buttervolume
             - ./..:/node
+            - /tmp/docker.sock1:/var/run/docker.sock
         privileged: true
         tty: true
         working_dir: /node
@@ -17,22 +18,22 @@ services:
                 # eth0
                 ipv4_address: 10.10.77.61
 
-# TODO activate 4 nodes
-    # node2:
-    #     build: .
-    #     ports:
-    #         - "8502:8500"
-    #     volumes:
-    #         - /mnt/btrfs2:/var/lib/buttervolume
-    #         - ./..:/node
-    #     privileged: true
-    #     tty: true
-    #     working_dir: /node
-    #     networks:
-    #         cluster:
-    #             # eth0
-    #             ipv4_address: 10.10.77.62
-    #
+    node2:
+        build: .
+        ports:
+            - "8502:8500"
+        volumes:
+            - /mnt/btrfs2:/var/lib/buttervolume
+            - ./..:/node
+        privileged: true
+        tty: true
+        working_dir: /node
+        networks:
+            cluster:
+                # eth0
+                ipv4_address: 10.10.77.62
+
+# TODO activate 4 nodes    
     # node3:
     #     build: .
     #     ports:
