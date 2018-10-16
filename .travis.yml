@@ -46,6 +46,6 @@ script:
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml build --pull
   - sudo docker run -it --rm --entrypoint "" -v $(pwd)/testapp:/testapp cluster_consul bash -c "pip3 install -r requirements.tests.txt && nosetests -v"
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml up -d
- # CI
+ # CI, cd ding for adhoc docker-compose context
   - cd dind
-  - bash dind/bootstrap.bash
+  - bash bootstrap.bash
