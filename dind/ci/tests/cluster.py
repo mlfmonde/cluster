@@ -27,7 +27,7 @@ class Cluster:
     client_default_kwargs = dict(version='auto')
 
     def __init__(self):
-        self.consul = consulate.Consul()
+        self.consul = consulate.Consul(host=const.host, port=const.consul_port)
         self.nodes = dict(
             node1=dict(
                 docker_cli=docker.DockerClient(
