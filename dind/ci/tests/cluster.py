@@ -12,6 +12,8 @@ from datetime import datetime
 from os import path
 from urllib import parse
 
+from . import const
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 DEFAULT_TIMEOUT = 600
@@ -19,7 +21,8 @@ DEPLOY_ROOT_DIR = '/deploy'
 
 
 class Cluster:
-    base_url_pattern = "tcp://10.10.77.6{index}:500{index}"  # static IPs from dind/docker-compose.yml
+    # static IPs and ports bindings from dind/docker-compose.yml
+    base_url_pattern = "tcp://10.10.77.6{index}:500{index}"
     client_default_kwargs = dict(version='auto')
 
     def __init__(self):
@@ -189,8 +192,9 @@ class Cluster:
     def get_app_from_kv(self, key):
         return json2obj(self.consul.kv.get(key))
 
-    def wait_http_code(self, uri, http_code=200, timeout=DEFAULT_TIMEOUT):
+    def wait_http_code(self, uri='', http_code=200, timeout=DEFAULT_TIMEOUT):
         """Loop until expected http code in the timeout allowed time"""
+        uri = uri or const.url
 
         start_date = datetime.now()
         carry_on = True

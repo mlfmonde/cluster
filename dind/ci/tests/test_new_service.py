@@ -2,6 +2,7 @@ import os
 import requests
 import subprocess
 
+from . import const
 from . import base_case
 from . import cluster
 
@@ -28,7 +29,7 @@ class WhenDeployingANewServiceMasterSlave(base_case.ClusterTestCase):
         self.cluster.wait_logs(
             self.master, self.app.ct.anyblok, '--wsgi-host 0.0.0.0', timeout=30
         )
-        self.cluster.wait_http_code('http://service.cluster.lab', timeout=10)
+        self.cluster.wait_http_code(timeout=10)
 
     def a_key_must_be_in_the_kv_store(self):
         self.assert_key_exists(self.application.app_key)
@@ -70,14 +71,14 @@ class WhenDeployingANewServiceMasterSlave(base_case.ClusterTestCase):
     def service_should_return_HTTP_code_200(self):
         '''we may add a dns server (bind9?) at some point to manage DNS'''
         session = requests.Session()
-        response = session.get('http://service.cluster.lab')
+        response = session.get(const.url)
         assert 200 == response.status_code
         session.close()
 
     def anyblok_ssh_should_be_accessible(self):
         assert subprocess.check_output([
             'ssh',
-            'root@{}'.format("service.cluster.lab"),
+            'root@{}'.format(const.host),
             '-p',
             '2244',
             '-i',

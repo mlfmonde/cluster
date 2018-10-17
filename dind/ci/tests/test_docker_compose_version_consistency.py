@@ -9,6 +9,7 @@ be fine
 """
 import requests
 
+from . import const
 from . import base_case
 from . import cluster
 
@@ -35,7 +36,7 @@ class WhenDeployingAServiceThatCopySymlinkWhileBuildingImage(
         self.cluster.wait_logs(
             self.master, self.app.ct.anyblok, '--wsgi-host 0.0.0.0', timeout=30
         )
-        self.cluster.wait_http_code('http://service.cluster.lab', timeout=10)
+        self.cluster.wait_http_code(timeout=10)
 
     def service_should_be_clone_in_the_expected_directory(self):
         self.assert_project_cloned(
@@ -47,7 +48,7 @@ class WhenDeployingAServiceThatCopySymlinkWhileBuildingImage(
     def service_should_return_HTTP_code_200(self):
         '''we may add a dns server (bind9?) at some point to manage DNS'''
         session = requests.Session()
-        response = session.get('http://service.cluster.lab')
+        response = session.get(const.url)
         assert 200 == response.status_code
         session.close()
 

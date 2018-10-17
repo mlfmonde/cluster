@@ -1,6 +1,7 @@
 import os
 import requests
 
+from . import const
 from . import base_case
 from . import cluster
 
@@ -35,7 +36,7 @@ class WhenMigrateDataBetweenServices(
         self.cluster.wait_logs(
             prod.master, prod.ct.anyblok, '--wsgi-host 0.0.0.0', timeout=30
         )
-        self.cluster.wait_http_code('http://service.cluster.lab', timeout=10)
+        self.cluster.wait_http_code(timeout=10)
         qualif = self.cluster.get_app_from_kv(self.qualif.app_key)
         self.cluster.wait_logs(
             qualif.master, qualif.ct.anyblok, '--wsgi-host 0.0.0.0', timeout=30
@@ -69,7 +70,7 @@ class WhenMigrateDataBetweenServices(
     def prod_service_should_return_created_prod_db_record(self):
         session = requests.Session()
         response = session.get(
-            'http://service.cluster.lab/example/{}'.format(self.prod_rec_id)
+            '{url}/example/{id}'.format(url=const.url, id=self.prod_rec_id)
         )
         assert self.prod_rec_name == response.text
         session.close()
@@ -87,7 +88,7 @@ class WhenMigrateDataBetweenServices(
     def prod_service_should_not_return_qualif_db_record(self):
         session = requests.Session()
         response = session.get(
-            'http://service.cluster.lab/example/{}'.format(self.qualif_rec_id)
+            '{url}/example/{}'.format(url=const.url, id=self.qualif_rec_id)
         )
         assert response.text != self.qualif_rec_name
         session.close()

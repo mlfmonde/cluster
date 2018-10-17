@@ -13,6 +13,7 @@ At some point we use to get 2 issues while deploying this kind of services:
 """
 import requests
 
+from . import const
 from . import base_case
 from . import cluster
 
@@ -38,12 +39,12 @@ class WhenDeployingAServiceThatBindARelativePath(
         self.cluster.wait_logs(
             self.master, self.app.ct.anyblok, '--wsgi-host 0.0.0.0', timeout=30
         )
-        self.cluster.wait_http_code('http://service.cluster.lab', timeout=10)
+        self.cluster.wait_http_code(timeout=10)
 
     def service_should_return_HTTP_code_200(self):
         '''we may add a dns server (bind9?) at some point to manage DNS'''
         session = requests.Session()
-        response = session.get('http://service.cluster.lab')
+        response = session.get(const.url)
         assert 200 == response.status_code
         session.close()
 

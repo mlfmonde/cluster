@@ -2,6 +2,7 @@ import os
 import requests
 import subprocess
 
+from . import const
 from . import base_case
 from . import cluster
 
@@ -26,7 +27,7 @@ class WhenDeployingServiceMasterSlaveBecomesSlaveMaster(
         self.cluster.wait_logs(
             app.master, app.ct.anyblok, '--wsgi-host 0.0.0.0', timeout=30
         )
-        self.cluster.wait_http_code('http://service.cluster.lab', timeout=10)
+        self.cluster.wait_http_code(timeout=10)
         (
             self.record_id,
             self.record_location,
@@ -47,7 +48,7 @@ class WhenDeployingServiceMasterSlaveBecomesSlaveMaster(
         self.cluster.wait_logs(
             self.master, self.app.ct.anyblok, '--wsgi-host 0.0.0.0', timeout=30
         )
-        self.cluster.wait_http_code('http://service.cluster.lab', timeout=10)
+        self.cluster.wait_http_code(timeout=10)
 
     def a_key_must_be_in_the_kv_store(self):
         self.assert_key_exists(self.application.app_key)
@@ -89,7 +90,7 @@ class WhenDeployingServiceMasterSlaveBecomesSlaveMaster(
     def service_should_return_freshly_created_db_record(self):
         session = requests.Session()
         response = session.get(
-            'http://service.cluster.lab/example/{}'.format(self.record_id)
+            '{url}/example/{id}'.format(url=const.url, id=self.record_id)
         )
         assert self.record_name == response.text
         session.close()
@@ -105,7 +106,7 @@ class WhenDeployingServiceMasterSlaveBecomesSlaveMaster(
     def anyblok_ssh_should_be_accessible(self):
         assert subprocess.check_output([
             'ssh',
-            'root@{}'.format("service.cluster.lab"),
+            'root@{}'.format(const.host),
             '-p',
             '2244',
             '-i',
