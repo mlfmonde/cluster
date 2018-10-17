@@ -19,28 +19,29 @@ DEPLOY_ROOT_DIR = '/deploy'
 
 
 class Cluster:
+    base_url_pattern = "tcp://10.10.77.6{index}:500{index}"  # static IPs from dind/docker-compose.yml
 
     def __init__(self):
         self.consul = consulate.Consul()
         self.nodes = dict(
             core1=dict(
                 docker_cli=docker.DockerClient(
-                    base_url="unix:///tmp/docker_core1.sock"
+                    base_url=self.__class__.base_url_pattern.format(index=1)
                 ),
             ),
             core2=dict(
                 docker_cli=docker.DockerClient(
-                    base_url="unix:///tmp/docker_core2.sock"
+                    base_url=self.__class__.base_url_pattern.format(index=2)
                 ),
             ),
             core3=dict(
                 docker_cli=docker.DockerClient(
-                    base_url="unix:///tmp/docker_core3.sock"
+                    base_url=self.__class__.base_url_pattern.format(index=3)
                 ),
             ),
             core4=dict(
                 docker_cli=docker.DockerClient(
-                    base_url="unix:///tmp/docker_core4.sock"
+                    base_url=self.__class__.base_url_pattern.format(index=4)
                 ),
             ),
         )
