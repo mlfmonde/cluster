@@ -28,8 +28,8 @@ class WhenDeployingServiceWithANewMaster(
         )
         self.cluster.cleanup_application(self.application)
         self.cluster.deploy_and_wait(
-            master='core4',
-            slave='core2',
+            master='node4',
+            slave='node2',
             application=self.application,
         )
 
@@ -45,8 +45,8 @@ class WhenDeployingServiceWithANewMaster(
             self.record_content
         ) = self.cluster.create_service_data()
 
-        self.master = 'core1'
-        self.slave = 'core2'
+        self.master = 'node1'
+        self.slave = 'node2'
 
     def becauseWeDeployServiceOnANewMasterUsingSameSlave(self):
         git_utils.Git.tag_and_push(

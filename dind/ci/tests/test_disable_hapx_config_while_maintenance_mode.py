@@ -16,8 +16,8 @@ class WhenSwitchToMaintenanceHapxConfigIsDisabled(base_case.ClusterTestCase):
         )
         self.cluster.cleanup_application(self.application)
         self.cluster.deploy_and_wait(
-            master='core2',
-            slave='core1',
+            master='node2',
+            slave='node1',
             application=self.application,
         )
         app = self.cluster.get_app_from_kv(self.application.app_key)

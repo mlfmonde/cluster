@@ -17,8 +17,8 @@ class WhenDeployingServiceMasterSlaveBecomesSlaveMaster(
         )
         self.cluster.cleanup_application(self.application)
         self.cluster.deploy_and_wait(
-            master='core3',
-            slave='core4',
+            master='node3',
+            slave='node4',
             application=self.application,
         )
 
@@ -34,8 +34,8 @@ class WhenDeployingServiceMasterSlaveBecomesSlaveMaster(
             self.record_content
         ) = self.cluster.create_service_data()
 
-        self.master = 'core4'
-        self.slave = 'core3'
+        self.master = 'node4'
+        self.slave = 'node3'
 
     def becauseWeDeployTheService(self):
         self.cluster.deploy_and_wait(

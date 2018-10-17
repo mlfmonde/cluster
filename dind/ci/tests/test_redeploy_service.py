@@ -17,8 +17,8 @@ class WhenDeployingServiceWithSameSlaveMaster(
         )
         self.cluster.cleanup_application(self.application)
         self.cluster.deploy_and_wait(
-            master='core2',
-            slave='core3',
+            master='node2',
+            slave='node3',
             application=self.application,
         )
         app = self.cluster.get_app_from_kv(self.application.app_key)
@@ -33,8 +33,8 @@ class WhenDeployingServiceWithSameSlaveMaster(
             self.record_content
         ) = self.cluster.create_service_data()
 
-        self.master = 'core2'
-        self.slave = 'core3'
+        self.master = 'node2'
+        self.slave = 'node3'
 
     def becauseWeDeployTheService(self):
         self.cluster.deploy_and_wait(

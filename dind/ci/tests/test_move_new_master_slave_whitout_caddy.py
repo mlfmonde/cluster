@@ -17,8 +17,8 @@ class WhenDeployingServiceMasterSlaveUsingNewNodesAsSlaveMasterUsingHaproxy(
         )
         self.cluster.cleanup_application(self.application)
         self.cluster.deploy_and_wait(
-            master='core1',
-            slave='core4',
+            master='node1',
+            slave='node4',
             application=self.application,
         )
 
@@ -34,8 +34,8 @@ class WhenDeployingServiceMasterSlaveUsingNewNodesAsSlaveMasterUsingHaproxy(
             self.record_content
         ) = self.cluster.create_service_data()
 
-        self.master = 'core3'
-        self.slave = 'core2'
+        self.master = 'node3'
+        self.slave = 'node2'
 
     def becauseWeDeployTheService(self):
         self.cluster.deploy_and_wait(

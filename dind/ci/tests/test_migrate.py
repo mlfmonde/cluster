@@ -21,13 +21,13 @@ class WhenMigrateDataBetweenServices(
         self.cluster.cleanup_application(self.prod)
         self.cluster.cleanup_application(self.qualif)
         self.cluster.deploy_and_wait(
-            master='core3',
-            slave='core4',
+            master='node3',
+            slave='node4',
             application=self.prod,
         )
         self.cluster.deploy_and_wait(
-            master='core1',
-            slave='core2',
+            master='node1',
+            slave='node2',
             application=self.qualif,
         )
 
@@ -104,7 +104,7 @@ class WhenMigrateDataBetweenServices(
 
     def prod_fsdata_should_return_prod_content(self):
         self.assert_file(
-            'core3',
+            'node3',
             self.kvprod.ct.anyblok,
             os.path.join("/var/test_service/", self.prod_rec_name),
             self.prod_rec_content
@@ -113,7 +113,7 @@ class WhenMigrateDataBetweenServices(
     def prod_fsdata_should_not_return_qualif_content(self):
         file_path = os.path.join("/var/test_service/", self.qualif_rec_name)
         self.assert_file(
-            'core3',
+            'node3',
             self.kvprod.ct.anyblok,
             file_path,
             'cat: {}: No such file or directory\n'.format(file_path)
@@ -124,7 +124,7 @@ class WhenMigrateDataBetweenServices(
     ):
         file_path = os.path.join("/var/test_service/", self.qualif_rec_name)
         self.assert_file(
-            'core1',
+            'node1',
             self.kvqualif.ct.anyblok,
             file_path,
             self.qualif_rec_content
@@ -133,7 +133,7 @@ class WhenMigrateDataBetweenServices(
     def qualif_fsdata_should_not_return_prod_content(self):
         file_path = os.path.join("/var/test_service/", self.prod_rec_name)
         self.assert_file(
-            'core1',
+            'node1',
             self.kvqualif.ct.anyblok,
             file_path,
             'cat: {}: No such file or directory\n'.format(file_path)
@@ -141,7 +141,7 @@ class WhenMigrateDataBetweenServices(
 
     def qualif_fsdata_should_return_migrate_content(self):
         self.assert_file(
-            'core1',
+            'node1',
             self.kvqualif.ct.anyblok,
             os.path.join("/var/test_service/", "migrate"),
             "migrate data from "
@@ -154,7 +154,7 @@ class WhenMigrateDataBetweenServices(
     def prod_fsdata_should_not_return_migrate_content(self):
         file_path = os.path.join("/var/test_service/", "migrate")
         self.assert_file(
-            'core3',
+            'node3',
             self.kvprod.ct.anyblok,
             file_path,
             'cat: {}: No such file or directory\n'.format(file_path)
@@ -163,7 +163,7 @@ class WhenMigrateDataBetweenServices(
     def prod_cache_directory_should_not_return_qualif_content(self):
         file_path = os.path.join("/var/cache/", self.qualif_rec_name)
         self.assert_file(
-            'core3',
+            'node3',
             self.kvprod.ct.anyblok,
             file_path,
             'cat: {}: No such file or directory\n'.format(file_path)
@@ -172,7 +172,7 @@ class WhenMigrateDataBetweenServices(
     def prod_cache_directory_should_return_prod_content(self):
         file_path = os.path.join("/var/cache/", self.prod_rec_name)
         self.assert_file(
-            'core3',
+            'node3',
             self.kvprod.ct.anyblok,
             file_path,
             self.prod_rec_content
@@ -181,7 +181,7 @@ class WhenMigrateDataBetweenServices(
     def qualif_cache_directory_should_return_qualif_content(self):
         file_path = os.path.join("/var/cache/", self.qualif_rec_name)
         self.assert_file(
-            'core1',
+            'node1',
             self.kvqualif.ct.anyblok,
             file_path,
             self.qualif_rec_content
@@ -191,7 +191,7 @@ class WhenMigrateDataBetweenServices(
     def qualif_cache_directory_should_not_return_prod_content(self):
         file_path = os.path.join("/var/cache/", self.prod_rec_name)
         self.assert_file(
-            'core1',
+            'node1',
             self.kvqualif.ct.anyblok,
             file_path,
             'cat: {}: No such file or directory\n'.format(file_path),
@@ -200,7 +200,7 @@ class WhenMigrateDataBetweenServices(
     def test_qualif_containers_should_run(self):
         self.assert_container_running_on(
             [self.kvqualif.ct.anyblok, self.kvqualif.ct.dbserver, ],
-            ['core1', ]
+            ['node1', ]
         )
 
     def cleanup_destroy_service(self):

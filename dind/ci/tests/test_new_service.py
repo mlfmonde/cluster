@@ -14,8 +14,8 @@ class WhenDeployingANewServiceMasterSlave(base_case.ClusterTestCase):
             'master'
         )
         self.cluster.cleanup_application(self.application)
-        self.master = 'core1'
-        self.slave = 'core2'
+        self.master = 'node1'
+        self.slave = 'node2'
 
     def becauseWeDeployTheService(self):
         self.cluster.deploy_and_wait(

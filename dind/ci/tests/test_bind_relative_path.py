@@ -27,7 +27,7 @@ class WhenDeployingAServiceThatBindARelativePath(
             'bind_relative_path'
         )
         self.cluster.cleanup_application(self.application)
-        self.master = 'core1'
+        self.master = 'node1'
 
     def becauseWeDeployTheService(self):
         self.cluster.deploy_and_wait(

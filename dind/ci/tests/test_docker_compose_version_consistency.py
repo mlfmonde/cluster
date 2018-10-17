@@ -23,7 +23,7 @@ class WhenDeployingAServiceThatCopySymlinkWhileBuildingImage(
             'build_copy_symlink'
         )
         self.cluster.cleanup_application(self.application)
-        self.master = 'core1'
+        self.master = 'node1'
 
     def becauseWeDeployTheService(self):
         self.cluster.deploy_and_wait(

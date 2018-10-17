@@ -25,25 +25,25 @@ class Cluster:
     def __init__(self):
         self.consul = consulate.Consul()
         self.nodes = dict(
-            core1=dict(
+            node1=dict(
                 docker_cli=docker.DockerClient(
                     base_url=self.__class__.base_url_pattern.format(index=1),
                     **self.__class__.client_default_kwargs
                 ),
             ),
-            core2=dict(
+            node2=dict(
                 docker_cli=docker.DockerClient(
                     base_url=self.__class__.base_url_pattern.format(index=2),
                     **self.__class__.client_default_kwargs
                 ),
             ),
-            core3=dict(
+            node3=dict(
                 docker_cli=docker.DockerClient(
                     base_url=self.__class__.base_url_pattern.format(index=3),
                     **self.__class__.client_default_kwargs
                 ),
             ),
-            core4=dict(
+            node4=dict(
                 docker_cli=docker.DockerClient(
                     base_url=self.__class__.base_url_pattern.format(index=4),
                     **self.__class__.client_default_kwargs
