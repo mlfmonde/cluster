@@ -4,9 +4,7 @@ version: '3'
 
 services:
   consul:
-# TODO active 4 nodes
-#    command: ["agent", "-server", "-retry-join=10.10.77.61", "-retry-join=10.10.77.62", "-retry-join=10.10.77.63", "-retry-join=10.10.77.64", "-client", "0.0.0.0", "-ui", "-bootstrap-expect=3"]
-    command: ["agent", "-server", "-retry-join=10.10.77.61", "-retry-join=10.10.77.62", "-client", "0.0.0.0", "-ui", "-bootstrap-expect=1"]
+    command: ["agent", "-server", "-retry-join=10.10.77.61", "-retry-join=10.10.77.62", "-retry-join=10.10.77.63", "-retry-join=10.10.77.64", "-client", "0.0.0.0", "-ui", "-bootstrap-expect=3"]
     environment:
         # important: use eth0
         CONSUL_BIND_INTERFACE: eth0

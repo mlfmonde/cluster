@@ -22,7 +22,8 @@ DEPLOY_ROOT_DIR = '/deploy'
 
 class Cluster:
     # static IPs and ports bindings from dind/docker-compose.yml
-    base_url_pattern = "tcp://10.10.77.6{index}:500{index}"
+    base_url_pattern = "tcp://10.10.77.6{index}:2375"  # through network ip
+    #base_url_pattern = "tcp://127.0.0.1:500{index}"  # through port forwarding
     client_default_kwargs = dict(version='auto')
 
     def __init__(self):

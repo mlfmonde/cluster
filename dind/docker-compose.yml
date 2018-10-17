@@ -9,7 +9,7 @@ services:
                 # from env
                 - DOCKER_GROUP_ID
         ports:
-            - "5001:2375"
+            #- "5001:2375"
             - "8501:8500"
             - "81:80"
         volumes:
@@ -30,7 +30,7 @@ services:
                 # from env
                 - DOCKER_GROUP_ID
         ports:
-            - "5002:2375"
+            #- "5002:2375"
             - "8502:8500"
             - "82:80"
         volumes:
@@ -44,50 +44,47 @@ services:
                 # eth0
                 ipv4_address: 10.10.77.62
 
-# TODO activate 4 nodes
-    # node3:
-    #     build:
-    #         context: .
-    #         args:
-    #             # from env
-    #             - DOCKER_GROUP_ID
-    #     ports:
-    #         - "5003:2375"
-    #         - "8503:8500"
-    #         - "83:80"
-    #     volumes:
-    #         - /mnt/btrfs3:/var/lib/buttervolume
-    #         - ./..:/node
-    #         - /tmp/docker.node3.sock:/var/run/docker.sock
-    #     privileged: true
-    #     tty: true
-    #     working_dir: /node
-    #     networks:
-    #         cluster:
-    #             # eth0
-    #             ipv4_address: 10.10.77.63
-    #
-    # node4:
-    #     build:
-    #         context: .
-    #         args:
-    #             # from env
-    #             - DOCKER_GROUP_ID
-    #     ports:
-    #         - "5004:2375"
-    #         - "8504:8500"
-    #         - "84:80"
-    #     volumes:
-    #         - /mnt/btrfs4:/var/lib/buttervolume
-    #         - ./..:/node
-    #         - /tmp/docker.node4.sock:/var/run/docker.sock
-    #     privileged: true
-    #     tty: true
-    #     working_dir: /node
-    #     networks:
-    #         cluster:
-    #             # eth0
-    #             ipv4_address: 10.10.77.64
+    node3:
+        build:
+            context: .
+            args:
+                # from env
+                - DOCKER_GROUP_ID
+        ports:
+            #- "5003:2375"
+            - "8503:8500"
+            - "83:80"
+        volumes:
+            - /mnt/btrfs3:/var/lib/buttervolume
+            - ./..:/node
+        privileged: true
+        tty: true
+        working_dir: /node
+        networks:
+            cluster:
+                # eth0
+                ipv4_address: 10.10.77.63
+
+    node4:
+        build:
+            context: .
+            args:
+                # from env
+                - DOCKER_GROUP_ID
+        ports:
+            #- "5004:2375"
+            - "8504:8500"
+            - "84:80"
+        volumes:
+            - /mnt/btrfs4:/var/lib/buttervolume
+            - ./..:/node
+        privileged: true
+        tty: true
+        working_dir: /node
+        networks:
+            cluster:
+                # eth0
+                ipv4_address: 10.10.77.64
 
 networks:
     cluster:

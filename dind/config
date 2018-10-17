@@ -14,8 +14,7 @@ export mountPointPrefix
 
 # nodes
 # TODO active 4 nodes
-#nodes=("1" "2" "3" "4")
-nodes=("2")
+nodes=("1" "2" "3" "4")
 export nodes
 
 # dind node service prefix
