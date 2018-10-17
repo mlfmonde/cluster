@@ -14,5 +14,9 @@ RUN apk update && apk add btrfs-progs py-pip
 # docker-compose: for alpine we install it via pip (KO if you follow docker-compose install documentation)
 RUN pip install --upgrade pip && pip install docker-compose
 
-# consul port
+# docker tcp
+EXPOSE 2375
+# consul
 EXPOSE 8500
+# others
+EXPOSE 80

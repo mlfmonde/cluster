@@ -9,11 +9,12 @@ services:
                 # from env
                 - DOCKER_GROUP_ID
         ports:
+            - "5001:2375"
             - "8501:8500"
+            - "81:80"
         volumes:
             - /mnt/btrfs1:/var/lib/buttervolume
             - ./..:/node
-            - /tmp/docker.node1.sock:/var/run/docker.sock
         privileged: true
         tty: true
         working_dir: /node
@@ -29,11 +30,12 @@ services:
                 # from env
                 - DOCKER_GROUP_ID
         ports:
+            - "5002:2375"
             - "8502:8500"
+            - "82:80"
         volumes:
             - /mnt/btrfs2:/var/lib/buttervolume
             - ./..:/node
-            # - /tmp/docker.node2.sock:/var/run/docker.sock
         privileged: true
         tty: true
         working_dir: /node
@@ -50,7 +52,9 @@ services:
     #             # from env
     #             - DOCKER_GROUP_ID
     #     ports:
+    #         - "5003:2375"
     #         - "8503:8500"
+    #         - "83:80"
     #     volumes:
     #         - /mnt/btrfs3:/var/lib/buttervolume
     #         - ./..:/node
@@ -70,7 +74,9 @@ services:
     #             # from env
     #             - DOCKER_GROUP_ID
     #     ports:
+    #         - "5004:2375"
     #         - "8504:8500"
+    #         - "84:80"
     #     volumes:
     #         - /mnt/btrfs4:/var/lib/buttervolume
     #         - ./..:/node
