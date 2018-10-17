@@ -7,6 +7,12 @@ thisDir=$(dirname "$0")
 # FUNCTIONS
 #
 
+function setEnv() {
+    echo 'set env'
+    export DOCKER_GROUP_ID=`getent group docker | cut -d: -f3`
+    echo "docker group id: ${DOCKER_GROUP_ID}"
+}
+
 # arg1: image index 1..N
 function prepareBtrfs() {
     img="${btrfsImgPrefix}$1.img"
@@ -43,6 +49,7 @@ function upNode() {
 #
 # BODY
 #
+setEnv
 sudo apt-get install -y qemu-utils btrfs-tools
 
 # prepare btrfs images for each node: create image if required + mount
@@ -55,8 +62,7 @@ do
     createDirSudo "${mountPointPrefix}${index}/ssh"
 done
 
-docker build -t anybox/cluster_node_dind .
-docker-compose up --force-recreate -d
+docker-compose up --force-recreate --build -d
 
 for index in ${nodes[*]}
 do

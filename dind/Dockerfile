@@ -2,7 +2,12 @@
 FROM docker:stable-dind
 LABEL maintainer "Vincent GREINER <vgreiner@anybox.fr>"
 
+ARG DOCKER_GROUP_ID
+
 USER root
+
+# same docker group id as host one
+RUN echo "docker group id is: $DOCKER_GROUP_ID" && addgroup -g $DOCKER_GROUP_ID docker
 
 RUN apk update && apk add btrfs-progs py-pip
 

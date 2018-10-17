@@ -49,4 +49,5 @@ script:
  # CI, cd ding for adhoc docker-compose context
   - cd dind
  # FIXME: on 14.04 WARNING! - Btrfs v3.12 IS EXPERIMENTAL
-  - bash bootstrap.bash
+ # TODO: reactivate ci env bootstrap (disabled for faster builds)
+ # - bash bootstrap.bash

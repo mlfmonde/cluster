@@ -11,6 +11,7 @@ done
 docker-compose start
 
 for index in ${nodes[*]}
+do
     echo "running node ${index}..."
 
     # we use specific compose override file for consul config

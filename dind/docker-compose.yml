@@ -3,13 +3,17 @@ version: '3'
 services:
 
     node1:
-        build: .
+        build:
+            context: .
+            args:
+                # from env
+                - DOCKER_GROUP_ID
         ports:
             - "8501:8500"
         volumes:
             - /mnt/btrfs1:/var/lib/buttervolume
             - ./..:/node
-            - /tmp/docker.sock1:/var/run/docker.sock
+            - /tmp/docker.node1.sock:/var/run/docker.sock
         privileged: true
         tty: true
         working_dir: /node
@@ -19,12 +23,17 @@ services:
                 ipv4_address: 10.10.77.61
 
     node2:
-        build: .
+        build:
+            context: .
+            args:
+                # from env
+                - DOCKER_GROUP_ID
         ports:
             - "8502:8500"
         volumes:
             - /mnt/btrfs2:/var/lib/buttervolume
             - ./..:/node
+            # - /tmp/docker.node2.sock:/var/run/docker.sock
         privileged: true
         tty: true
         working_dir: /node
@@ -33,14 +42,19 @@ services:
                 # eth0
                 ipv4_address: 10.10.77.62
 
-# TODO activate 4 nodes    
+# TODO activate 4 nodes
     # node3:
-    #     build: .
+    #     build:
+    #         context: .
+    #         args:
+    #             # from env
+    #             - DOCKER_GROUP_ID
     #     ports:
     #         - "8503:8500"
     #     volumes:
     #         - /mnt/btrfs3:/var/lib/buttervolume
     #         - ./..:/node
+    #         - /tmp/docker.node3.sock:/var/run/docker.sock
     #     privileged: true
     #     tty: true
     #     working_dir: /node
@@ -50,12 +64,17 @@ services:
     #             ipv4_address: 10.10.77.63
     #
     # node4:
-    #     build: .
+    #     build:
+    #         context: .
+    #         args:
+    #             # from env
+    #             - DOCKER_GROUP_ID
     #     ports:
     #         - "8504:8500"
     #     volumes:
     #         - /mnt/btrfs4:/var/lib/buttervolume
     #         - ./..:/node
+    #         - /tmp/docker.node4.sock:/var/run/docker.sock
     #     privileged: true
     #     tty: true
     #     working_dir: /node
