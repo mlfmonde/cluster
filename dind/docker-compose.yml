@@ -1,6 +1,17 @@
 version: '3'
 
 services:
+    ci:
+        build: ./ci
+        volumes:
+            - ./ci/tests:/tests
+        tty: true
+        working_dir: /tests
+        hostname: ci
+        networks:
+            cluster:
+                # eth0
+                ipv4_address: 10.10.77.60
 
     node1:
         build:

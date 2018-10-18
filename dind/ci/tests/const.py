@@ -30,4 +30,5 @@ consul = dict(
 # misc
 #
 # default timeout
-timeout=5
+timeout=30
+#timeout=600
