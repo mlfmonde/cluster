@@ -10,8 +10,6 @@ services:
         hostname: ci
         networks:
             cluster:
-                # eth0
-                ipv4_address: 10.10.77.60
 
     node1:
         build:
