@@ -8,6 +8,10 @@ services:
         tty: true
         working_dir: /tests
         hostname: ci
+        extra_hosts:
+            # haproxy bindings
+            - "service.cluster.lab:10.10.77.64"
+            - "service.qualif.cluster:10.10.77.64"
         networks:
             cluster:
 
@@ -28,6 +32,10 @@ services:
         tty: true
         working_dir: /node
         hostname: node1
+        extra_hosts:
+            # haproxy bindings
+            - "service.cluster.lab:10.10.77.64"
+            - "service.qualif.cluster:10.10.77.64"
         networks:
             cluster:
                 # eth0
@@ -50,6 +58,10 @@ services:
         tty: true
         working_dir: /node
         hostname: node2
+        extra_hosts:
+            # haproxy bindings
+            - "service.cluster.lab:10.10.77.64"
+            - "service.qualif.cluster:10.10.77.64"
         networks:
             cluster:
                 # eth0
@@ -72,6 +84,10 @@ services:
         tty: true
         working_dir: /node
         hostname: node3
+        extra_hosts:
+            # haproxy bindings
+            - "service.cluster.lab:10.10.77.64"
+            - "service.qualif.cluster:10.10.77.64"
         networks:
             cluster:
                 # eth0
@@ -94,6 +110,10 @@ services:
         tty: true
         working_dir: /node
         hostname: node4
+        extra_hosts:
+            # haproxy bindings (this)
+            - "service.cluster.lab:10.10.77.64"
+            - "service.qualif.cluster:10.10.77.64"
         networks:
             cluster:
                 # eth0
