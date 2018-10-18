@@ -11,4 +11,4 @@ url = 'http://' + host
 #
 # consul port
 #
-consul_port = 8004  # 4th node
+consul_port = 8500
