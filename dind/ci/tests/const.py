@@ -5,6 +5,8 @@
 # use directly node 4 static ip to skip cluster_lab 'service.cluster.lab' entry /etc/hosts process
 host = '10.10.77.64'  # 4th node, static IP from dind/docker-compose.yml
 #host = 'service.cluster.lab'
+#host_prefix = 'service.'
+#host = 'cluster.lab'
 
 url = 'http://' + host
 
@@ -28,4 +30,4 @@ consul = dict(
 # misc
 #
 # default timeout
-timeout=600
+timeout=5

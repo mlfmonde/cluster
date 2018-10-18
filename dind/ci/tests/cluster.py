@@ -166,6 +166,7 @@ class Cluster:
             "Emit %s event for ref/branch: %s with following payload: %r",
             event_name, application.branch, payload
         )
+        import pdb; pdb.set_trace()
         event_id = self.consul.event.fire(
             event_name, payload
         )
