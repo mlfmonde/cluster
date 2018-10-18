@@ -24,10 +24,12 @@ class Cluster:
     # static IPs and ports bindings from dind/docker-compose.yml
     base_url_pattern = "tcp://10.10.77.6{index}:2375"  # through network ip
     #base_url_pattern = "tcp://127.0.0.1:500{index}"  # through port forwarding
-    client_default_kwargs = dict(version='auto')
+    client_default_kwargs = dict()
+    if const.docker['version']:
+        client_default_kwargs['version'] = const.docker['version']
 
     def __init__(self):
-        self.consul = consulate.Consul(host=const.host, port=const.consul_port)
+        self.consul = consulate.Consul(host=const.host, port=const.consul['port'])
         self.nodes = dict(
             node1=dict(
                 docker_cli=docker.DockerClient(
@@ -298,9 +300,7 @@ class Cluster:
             for volume in volumes:
                 volume.remove(force=True)
 
-            container = node['docker_cli'].containers.get(
-                'cluster_consul_1'
-            )
+            container = node['docker_cli'].containers.get(const.consul['container'])
 
             def filter_schedule(schedule):
                 if schedule.volume.startswith("clusterlabtestservice"):

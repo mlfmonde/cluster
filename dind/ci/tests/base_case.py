@@ -3,6 +3,7 @@ facilities to make test easy to read.
 """
 import os
 
+from . import const
 from . import cluster
 from docker import errors
 
@@ -60,12 +61,12 @@ class ClusterTestCase:
         for name, _ in self.cluster.nodes.items():
             if name in nodes:
                 self.assert_file(
-                    name, "cluster_consul_1", path, expected_content
+                    name, const.consul['container'], path, expected_content
                 )
             else:
                 self.assert_file(
                     name,
-                    "cluster_consul_1",
+                    const.consul['container'],
                     path,
                     "cat: can't open '{}': No such file or "
                     "directory\n".format(path),
@@ -80,9 +81,7 @@ class ClusterTestCase:
                 return True
 
         for name, node in self.cluster.nodes.items():
-            container = node['docker_cli'].containers.get(
-                'cluster_consul_1'
-            )
+            container = node['docker_cli'].containers.get(const.consul['container'])
             scheduled = self.cluster.get_scheduled(
                 container, filter_schedule, kind, volume
             )
