@@ -44,6 +44,9 @@ function btrfsUp() {
     user_dir=`pwd`
     echo "deploying ssh keys"
     sudo cp ${user_dir}/file/ssh/* "${mountPointPrefix}$1/ssh/"
+    # copy ssh config
+    echo "deploying ssh config"
+    sudo cp ${user_dir}/file/ssh/config "${mountPointPrefix}$1/ssh/"
 }
 
 # up a node

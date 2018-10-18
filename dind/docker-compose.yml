@@ -3,6 +3,11 @@ version: '3'
 services:
     ci:
         build: ./ci
+        depends_on:
+            - node1
+            - node2
+            - node3
+            - node4
         volumes:
             - ./ci/tests:/tests
         tty: true
