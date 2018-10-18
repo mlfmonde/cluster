@@ -23,3 +23,9 @@ consul = dict(
     port=8500,
     container='node_consul_1',
 )
+
+#
+# misc
+#
+# default timeout
+timeout=600

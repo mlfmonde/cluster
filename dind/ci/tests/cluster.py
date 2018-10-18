@@ -16,7 +16,7 @@ from . import const
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
-DEFAULT_TIMEOUT = 600
+DEFAULT_TIMEOUT = const.timeout
 DEPLOY_ROOT_DIR = '/deploy'
 
 
