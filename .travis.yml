@@ -11,12 +11,6 @@ addons:
     packages:
       - docker-ce
 
-language: python
-python:
-  - "3.5"
-install:
-  - pip install -r dind/ci/requirements.txt
-
 before_install:
   - sudo apt-get update
   - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
