@@ -17,7 +17,7 @@ docker = dict(
 #
 consul = dict(
     port=8500,
-    container='node_consul_1',
+    container='cluster_consul_1',
 )
 
 #

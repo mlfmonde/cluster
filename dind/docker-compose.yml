@@ -18,7 +18,7 @@ services:
             - "service.cluster.lab:10.10.77.64"
             - "service.qualif.cluster:10.10.77.64"
         networks:
-            cluster_default:
+            cluster_nodes:
 
     node1:
         build:
@@ -32,17 +32,17 @@ services:
             - "81:80"
         volumes:
             - /mnt/btrfs1:/var/lib/buttervolume
-            - ./..:/node
+            - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
         privileged: true
         tty: true
-        working_dir: /node
+        working_dir: /cluster
         hostname: node1
         extra_hosts:
             # haproxy bindings
             - "service.cluster.lab:10.10.77.64"
             - "service.qualif.cluster:10.10.77.64"
         networks:
-            cluster_default:
+            cluster_nodes:
                 # eth0
                 ipv4_address: 10.10.77.61
 
@@ -58,17 +58,17 @@ services:
             - "82:80"
         volumes:
             - /mnt/btrfs2:/var/lib/buttervolume
-            - ./..:/node
+            - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
         privileged: true
         tty: true
-        working_dir: /node
+        working_dir: /cluster
         hostname: node2
         extra_hosts:
             # haproxy bindings
             - "service.cluster.lab:10.10.77.64"
             - "service.qualif.cluster:10.10.77.64"
         networks:
-            cluster_default:
+            cluster_nodes:
                 # eth0
                 ipv4_address: 10.10.77.62
 
@@ -84,17 +84,17 @@ services:
             - "83:80"
         volumes:
             - /mnt/btrfs3:/var/lib/buttervolume
-            - ./..:/node
+            - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
         privileged: true
         tty: true
-        working_dir: /node
+        working_dir: /cluster
         hostname: node3
         extra_hosts:
             # haproxy bindings
             - "service.cluster.lab:10.10.77.64"
             - "service.qualif.cluster:10.10.77.64"
         networks:
-            cluster_default:
+            cluster_nodes:
                 # eth0
                 ipv4_address: 10.10.77.63
 
@@ -110,22 +110,22 @@ services:
             - "84:80"
         volumes:
             - /mnt/btrfs4:/var/lib/buttervolume
-            - ./..:/node
+            - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
         privileged: true
         tty: true
-        working_dir: /node
+        working_dir: /cluster
         hostname: node4
         extra_hosts:
             # haproxy bindings (this)
             - "service.cluster.lab:10.10.77.64"
             - "service.qualif.cluster:10.10.77.64"
         networks:
-            cluster_default:
+            cluster_nodes:
                 # eth0
                 ipv4_address: 10.10.77.64
 
 networks:
-    cluster_default:
+    cluster_nodes:
         ipam:
             config:
                 - subnet: 10.10.77.0/24
