@@ -18,7 +18,7 @@ services:
             - "service.cluster.lab:10.10.77.64"
             - "service.qualif.cluster:10.10.77.64"
         networks:
-            cluster:
+            cluster_default:
 
     node1:
         build:
@@ -42,7 +42,7 @@ services:
             - "service.cluster.lab:10.10.77.64"
             - "service.qualif.cluster:10.10.77.64"
         networks:
-            cluster:
+            cluster_default:
                 # eth0
                 ipv4_address: 10.10.77.61
 
@@ -68,7 +68,7 @@ services:
             - "service.cluster.lab:10.10.77.64"
             - "service.qualif.cluster:10.10.77.64"
         networks:
-            cluster:
+            cluster_default:
                 # eth0
                 ipv4_address: 10.10.77.62
 
@@ -94,7 +94,7 @@ services:
             - "service.cluster.lab:10.10.77.64"
             - "service.qualif.cluster:10.10.77.64"
         networks:
-            cluster:
+            cluster_default:
                 # eth0
                 ipv4_address: 10.10.77.63
 
@@ -120,12 +120,12 @@ services:
             - "service.cluster.lab:10.10.77.64"
             - "service.qualif.cluster:10.10.77.64"
         networks:
-            cluster:
+            cluster_default:
                 # eth0
                 ipv4_address: 10.10.77.64
 
 networks:
-    cluster:
+    cluster_default:
         ipam:
             config:
                 - subnet: 10.10.77.0/24
