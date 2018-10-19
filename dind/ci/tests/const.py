@@ -21,8 +21,14 @@ consul = dict(
 )
 
 #
+# git
+#
+git = dict(
+    force_https=True,  # use case of no ssh credentials
+)
+
+#
 # misc
 #
 # default timeout
-timeout=60
-#timeout=600
+timeout = 600

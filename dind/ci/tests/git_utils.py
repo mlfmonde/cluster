@@ -1,6 +1,7 @@
 import subprocess
 import tempfile
 
+from . import const
 
 class Git:
 
@@ -11,6 +12,10 @@ class Git:
         ref=None,
         tagname=None
     ):
+        if const.git['force_https']:
+            # use case of no ssh credentials
+            repo = repo.replace('git@github.com:', 'https://github.com/').replace('.git', '')
+
         with tempfile.TemporaryDirectory() as tmpDir:
             subprocess.check_output(
                 [
