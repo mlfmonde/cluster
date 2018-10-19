@@ -20,13 +20,15 @@ Bootstrap
 * build dind docker image (dind env holds 1 node)
 * up compose services (1 cluster of 4 dind nodes)
 
-Run
----
+to note that bootstrap start too nodes
+
+Start
+-----
 ::
     $ (cd dind)
-    $ bash run.bash
+    $ bash start.bash
 
-* start dind services
+* start already bootstraped dind services
 * start cluster services in each dind service
 
 Build dind image
