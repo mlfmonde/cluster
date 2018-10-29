@@ -9,7 +9,6 @@ services:
     environment:
         # important: use eth0
         CONSUL_BIND_INTERFACE: eth0
-        CONSUL_UI_BETA: "1"
 
   haproxy:
     restart: ""
