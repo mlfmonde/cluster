@@ -40,8 +40,10 @@ script:
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml build --pull
   - sudo docker run -it --rm --entrypoint "" -v $(pwd)/testapp:/testapp cluster_consul bash -c "pip3 install -r requirements.tests.txt && nosetests -v"
   - docker-compose -f docker-compose.yml -f docker-compose.travis.yml up -d
- # CI, cd ding for adhoc docker-compose context
+ # CI: cd ding for adhoc docker-compose context
   - cd dind
+ # CI: bootstrap dind
  # FIXME: on 14.04 WARNING! - Btrfs v3.12 IS EXPERIMENTAL
- # TODO: reactivate ci env bootstrap (disabled for faster build)
- # - bash bootstrap.bash
+  - bash bootstrap.bash
+ # CI: run tests
+  - bash ci/run_tests.bash
