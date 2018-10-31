@@ -13,7 +13,6 @@ mountPointPrefix='/mnt/btrfs'
 export mountPointPrefix
 
 # nodes
-# TODO active 4 nodes
 nodes=("1" "2" "3" "4")
 export nodes
 
