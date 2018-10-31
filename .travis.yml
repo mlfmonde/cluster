@@ -47,8 +47,14 @@ script:
   - bash bootstrap.bash
  # CI: run tests
  # - bash ci/run_tests.bash
+  - docker-compose exec -T node1 tail -f /deploy/handler.log &
   - docker-compose exec -T ci run-contexts /tests/test_new_service.py
+
+after_success:
+  - docker-compose exec node1 cat /deploy/handler.log
 
 after_failure:
   - docker-compose exec node1 cat /deploy/handler.log
 
+after_script:
+  - docker-compose exec node1 cat /deploy/handler.log
