@@ -46,4 +46,4 @@ script:
  # FIXME: on 14.04 WARNING! - Btrfs v3.12 IS EXPERIMENTAL
   - bash bootstrap.bash
  # CI: run tests
-  - travis_wait bash ci/run_tests.bash
+  - bash ci/run_tests.bash
