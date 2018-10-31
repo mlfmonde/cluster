@@ -6,13 +6,17 @@ ARG DOCKER_GROUP_ID
 
 USER root
 
-# same docker group id as host one
-RUN echo "docker group id is: $DOCKER_GROUP_ID" && addgroup -g $DOCKER_GROUP_ID docker
+# - move ping 999 to 900 (free it for docker potentially 998/999)
+# - same docker group id as host one
+RUN apk update && apk --no-cache add shadow \
+    && groupmod -g 900 ping \
+    && echo "docker group id is: $DOCKER_GROUP_ID" \
+    && addgroup -g $DOCKER_GROUP_ID docker
 
-RUN apk update && apk add btrfs-progs py-pip
-
-# docker-compose: for alpine we install it via pip (KO if you follow docker-compose install documentation)
-RUN pip install --upgrade pip && pip install docker-compose
+# - btrfs
+# - docker-compose
+RUN apk update && apk --no-cache add btrfs-progs py-pip \
+    && pip install --upgrade pip && pip install docker-compose
 
 # docker tcp
 EXPOSE 2375
