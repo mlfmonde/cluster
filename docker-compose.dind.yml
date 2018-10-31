@@ -4,6 +4,7 @@ version: '3'
 
 services:
   consul:
+    container_name: cluster_consul_1
     restart: ""
     command: ["agent", "-server", "-retry-join=10.10.77.61", "-retry-join=10.10.77.62", "-retry-join=10.10.77.63", "-retry-join=10.10.77.64", "-client", "0.0.0.0", "-ui", "-bootstrap-expect=3"]
     environment:
@@ -11,6 +12,7 @@ services:
         CONSUL_BIND_INTERFACE: eth0
 
   haproxy:
+    container_name: cluster_haproxy_1
     restart: ""
     ports:
       - "80:80"
@@ -19,4 +21,8 @@ services:
       - "2244:2244"
 
   caddy:
+    container_name: cluster_caddy_1
     restart: ""
+
+  rsyslog:
+    container_name: cluster_rsyslog_1
