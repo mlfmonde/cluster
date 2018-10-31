@@ -46,4 +46,5 @@ script:
  # FIXME: on 14.04 WARNING! - Btrfs v3.12 IS EXPERIMENTAL
   - bash bootstrap.bash
  # CI: run tests
-  - bash ci/run_tests.bash
+ # - bash ci/run_tests.bash
+  - docker-compose exec -T ci run-contexts /tests/test_new_service.py -v
