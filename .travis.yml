@@ -46,9 +46,20 @@ script:
  # FIXME: on 14.04 WARNING! - Btrfs v3.12 IS EXPERIMENTAL
   - bash bootstrap.bash
  # CI: run tests
-  # run again (workaround node1 Couldn't connect to Docker daemon at http+docker://localhost - is it running?)
-  - bash start.bash
+  # TEMPORARY DEBUG DIAGS
+  - docker-compose exec -T node1 docker ps
+  - docker-compose exec -T node1 docker-compose ps
+  - docker-compose exec -T node2 docker ps
+  - docker-compose exec -T node2 docker-compose ps
+  - docker-compose exec -T node3 docker ps
+  - docker-compose exec -T node3 docker-compose ps
+  - docker-compose exec -T node4 docker ps
+  - docker-compose exec -T node4 docker-compose ps
+
   # background handler log
   - docker-compose exec -T node1 tail -f /deploy/handler.log &
+  - docker-compose exec -T node2 tail -f /deploy/handler.log &
+  - docker-compose exec -T node3 tail -f /deploy/handler.log &
+  - docker-compose exec -T node4 tail -f /deploy/handler.log &
   # run tests
   - docker-compose exec -T ci run-contexts /tests/test_new_service.py
