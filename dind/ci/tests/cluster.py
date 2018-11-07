@@ -21,9 +21,6 @@ DEPLOY_ROOT_DIR = '/deploy'
 
 
 class Cluster:
-    # static IPs and ports bindings from dind/docker-compose.yml
-    base_url_pattern = "tcp://10.10.77.6{index}:2375"  # through network ip
-    #base_url_pattern = "tcp://127.0.0.1:500{index}"  # through port forwarding
     client_default_kwargs = dict()
     if const.docker['version']:
         client_default_kwargs['version'] = const.docker['version']
@@ -33,25 +30,33 @@ class Cluster:
         self.nodes = dict(
             node1=dict(
                 docker_cli=docker.DockerClient(
-                    base_url=self.__class__.base_url_pattern.format(index=1),
+                    # if further need of socket bind versus tcp
+                    #base_url='unix:///node1/var/run/docker.sock',
+                    base_url="tcp://10.10.77.61:2375",
                     **self.__class__.client_default_kwargs
                 ),
             ),
             node2=dict(
                 docker_cli=docker.DockerClient(
-                    base_url=self.__class__.base_url_pattern.format(index=2),
+                    # if further need of socket bind versus tcp
+                    #base_url='unix:///node2/var/run/docker.sock',
+                    base_url="tcp://10.10.77.62:2375",
                     **self.__class__.client_default_kwargs
                 ),
             ),
             node3=dict(
                 docker_cli=docker.DockerClient(
-                    base_url=self.__class__.base_url_pattern.format(index=3),
+                    # if further need of socket bind versus tcp
+                    #base_url='unix:///node3/var/run/docker.sock',
+                    base_url="tcp://10.10.77.63:2375",
                     **self.__class__.client_default_kwargs
                 ),
             ),
             node4=dict(
                 docker_cli=docker.DockerClient(
-                    base_url=self.__class__.base_url_pattern.format(index=4),
+                    # if further need of socket bind versus tcp
+                    #base_url='unix:///node4/var/run/docker.sock',
+                    base_url="tcp://10.10.77.64:2375",
                     **self.__class__.client_default_kwargs
                 ),
             ),

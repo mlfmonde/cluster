@@ -10,6 +10,11 @@ services:
             - node4
         volumes:
             - ./ci/tests:/tests
+            # if further need of socket bind versus tcp
+            #- node1_var_run:/node1/var/run
+            #- node2_var_run:/node2/var/run
+            #- node3_var_run:/node3/var/run
+            #- node3_var_run:/node4/var/run
         tty: true
         working_dir: /tests
         hostname: ci
@@ -32,6 +37,8 @@ services:
         volumes:
             - /mnt/btrfs1:/var/lib/buttervolume
             - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
+            # if further need of socket bind versus tcp
+            #- node1_var_run:/var/run
         privileged: true
         tty: true
         working_dir: /cluster
@@ -56,6 +63,8 @@ services:
         volumes:
             - /mnt/btrfs2:/var/lib/buttervolume
             - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
+            # if further need of socket bind versus tcp
+            #- node2_var_run:/var/run
         privileged: true
         tty: true
         working_dir: /cluster
@@ -80,6 +89,8 @@ services:
         volumes:
             - /mnt/btrfs3:/var/lib/buttervolume
             - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
+            # if further need of socket bind versus tcp
+            #- node3_var_run:/var/run
         privileged: true
         tty: true
         working_dir: /cluster
@@ -104,6 +115,8 @@ services:
         volumes:
             - /mnt/btrfs4:/var/lib/buttervolume
             - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
+            # if further need of socket bind versus tcp
+            #- node4_var_run:/var/run
         privileged: true
         tty: true
         working_dir: /cluster
@@ -122,3 +135,10 @@ networks:
         ipam:
             config:
                 - subnet: 10.10.77.0/24
+
+# if further need of socket bind versus tcp
+#volumes:
+#  node1_var_run:
+#  node2_var_run:
+#  node3_var_run:
+#  node4_var_run:
