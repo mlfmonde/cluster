@@ -41,12 +41,12 @@ function btrfsUp() {
     createDirSudo "${mountPointPrefix}$1/ssh"
 
     # copy ssh keys
-    user_dir=`pwd`
+    userDir=`pwd`
     echo "deploying ssh keys"
-    sudo cp ${user_dir}/file/ssh/* "${mountPointPrefix}$1/ssh/"
+    sudo cp ${userDir}/file/ssh/* "${mountPointPrefix}$1/ssh/"
     # copy ssh config
     echo "deploying ssh config"
-    sudo cp ${user_dir}/file/ssh/config "${mountPointPrefix}$1/ssh/"
+    sudo cp ${userDir}/file/ssh/config "${mountPointPrefix}$1/ssh/"
 }
 
 # up a node
@@ -58,7 +58,17 @@ function nodeUp() {
     docker-compose exec "${nodeServicePrefix}$1" docker plugin install --grant-all-permissions anybox/buttervolume
 
     # we use specific compose override file for consul config
-    docker-compose exec "${nodeServicePrefix}$1" docker-compose -f docker-compose.yml -f docker-compose.dind.yml up --force-recreate --build -d
+    # based on a template generated for each node
+    composeFile="$(pwd)/../docker-compose.dind.yml"
+    composeFileGenerated="docker-compose.dind.node$1.generated.yml"
+    composeFileGeneratedPath="$(pwd)/../${composeFileGeneratedPath}"
+    nodeDockerHost="10.10.77.6$1:2375"
+    cp -f "${composeFile}" "${composeFileGenerated}"
+    sed -i -e "s/{NODE_DOCKER_HOST}/${nodeDockerHost}/g" "${composeFileGenerated}"
+    docker-compose exec "${nodeServicePrefix}$1" docker-compose -f docker-compose.yml -f "${composeFileGenerated}" up --force-recreate --build -d
+
+    # display env
+    docker-compose exec "${nodeServicePrefix}$1" docker-compose exec consul sh -c "env"
 }
 
 
