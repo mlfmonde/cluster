@@ -56,6 +56,7 @@ function nodeUp() {
 
     # install buttervolume docker plugin
     docker-compose exec "${nodeServicePrefix}$1" docker plugin install --grant-all-permissions anybox/buttervolume
+    docker-compose exec "${nodeServicePrefix}$1" docker plugin ls
 
     # we use specific compose override file for consul config
     # based on a template generated for each node
