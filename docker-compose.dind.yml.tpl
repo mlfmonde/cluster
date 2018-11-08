@@ -11,6 +11,13 @@ services:
         # important: use eth0
         CONSUL_BIND_INTERFACE: eth0
         DOCKER_HOST: {NODE_DOCKER_HOST}
+    volumes:
+      - consul_docker_cfg:/home/consul/.docker
+      - /run/docker.sock:/run/docker.sock
+      - /run/docker/plugins:/run/docker/plugins
+      - /deploy:/deploy
+      - caddy_conf:/consul/template/caddy/:rw
+      - haproxy_conf:/consul/template/haproxy/:rw
 
   haproxy:
     container_name: cluster_haproxy_1
