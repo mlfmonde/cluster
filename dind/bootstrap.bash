@@ -68,6 +68,8 @@ function nodeUp() {
     sed -i -e "s/{NODE_DOCKER_HOST}/${nodeDockerHost}/g" "${composeFileGeneratedPath}"
     docker-compose exec "${nodeServicePrefix}$1" docker-compose -f docker-compose.yml -f "${composeFileGenerated}" up --force-recreate --build -d
 
+    docker-compose exec "${nodeServicePrefix}$1" docker-compose exec consul buttervolume run&
+
     # display env
     docker-compose exec "${nodeServicePrefix}$1" docker-compose exec consul sh -c "env"
 }

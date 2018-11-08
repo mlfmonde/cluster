@@ -37,6 +37,7 @@ services:
         volumes:
             - /mnt/btrfs1:/var/lib/buttervolume
             - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
+            - docker_plugins:/run/docker/plugins
             # if further need of socket bind versus tcp
             #- node1_var_run:/var/run
         privileged: true
@@ -63,6 +64,7 @@ services:
         volumes:
             - /mnt/btrfs2:/var/lib/buttervolume
             - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
+            - docker_plugins:/run/docker/plugins
             # if further need of socket bind versus tcp
             #- node2_var_run:/var/run
         privileged: true
@@ -89,6 +91,7 @@ services:
         volumes:
             - /mnt/btrfs3:/var/lib/buttervolume
             - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
+            - docker_plugins:/run/docker/plugins
             # if further need of socket bind versus tcp
             #- node3_var_run:/var/run
         privileged: true
@@ -115,6 +118,7 @@ services:
         volumes:
             - /mnt/btrfs4:/var/lib/buttervolume
             - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
+            - docker_plugins:/run/docker/plugins
             # if further need of socket bind versus tcp
             #- node4_var_run:/var/run
         privileged: true
@@ -136,8 +140,9 @@ networks:
             config:
                 - subnet: 10.10.77.0/24
 
+volumes:
+  docker_plugins:
 # if further need of socket bind versus tcp
-#volumes:
 #  node1_var_run:
 #  node2_var_run:
 #  node3_var_run:
