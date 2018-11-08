@@ -54,6 +54,10 @@ script:
   - docker-compose exec -T node2 docker-compose ps
   - docker-compose exec -T node3 docker-compose ps
   - docker-compose exec -T node4 docker-compose ps
+  - docker-compose exec node1 docker-compose exec consul buttervolume run&
+  - docker-compose exec node2 docker-compose exec consul buttervolume run&
+  - docker-compose exec node3 docker-compose exec consul buttervolume run&
+  - docker-compose exec node4 docker-compose exec consul buttervolume run&
   - docker-compose exec -T node1 tail -f /deploy/handler.log &
   - docker-compose exec -T node2 tail -f /deploy/handler.log &
   - docker-compose exec -T node3 tail -f /deploy/handler.log &
