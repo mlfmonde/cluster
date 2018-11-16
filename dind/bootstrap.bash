@@ -60,15 +60,12 @@ function nodeUp() {
 
     # we use specific compose override file for consul config
     # based on a template generated for each node
-    composeFileTemplatePath="$(pwd)/../docker-compose.dind.yml.tpl"
+    composeFileTemplatePath="$(pwd)/docker-compose.dind.yml.tpl"
     composeFileGenerated="docker-compose.dind.node$1.generated.yml"
     composeFileGeneratedPath="$(pwd)/../${composeFileGenerated}"
     nodeDockerHost="10.10.77.6$1:2375"
     cp -f "${composeFileTemplatePath}" "${composeFileGeneratedPath}"
-    sed -i -e "s/{NODE_DOCKER_HOST}/${nodeDockerHost}/g" "${composeFileGeneratedPath}"
     docker-compose exec "${nodeServicePrefix}$1" docker-compose -f docker-compose.yml -f "${composeFileGenerated}" up --force-recreate --build -d
-
-    #docker-compose exec "${nodeServicePrefix}$1" docker-compose exec consul buttervolume run&
 
     # display env
     docker-compose exec "${nodeServicePrefix}$1" docker-compose exec consul sh -c "env"

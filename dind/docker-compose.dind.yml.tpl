@@ -10,7 +10,6 @@ services:
     environment:
         # important: use eth0
         CONSUL_BIND_INTERFACE: eth0
-        DOCKER_HOST: {NODE_DOCKER_HOST}
     volumes:
       - consul_docker_cfg:/home/consul/.docker
       - /run/docker.sock:/run/docker.sock

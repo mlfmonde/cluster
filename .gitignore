@@ -3,3 +3,4 @@ haproxy/conf/haproxy.cfg
 deploy/
 .idea/
 docker-compose.dind.node*.generated.yml
+dind/*.img

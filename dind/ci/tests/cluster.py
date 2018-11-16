@@ -26,37 +26,35 @@ class Cluster:
         client_default_kwargs['version'] = const.docker['version']
 
     def __init__(self):
-        self.consul = consulate.Consul(host=const.host, port=const.consul['port'])
+        self.consul = consulate.Consul(
+            host=const.host, port=const.consul['port']
+        )
         self.nodes = dict(
             node1=dict(
                 docker_cli=docker.DockerClient(
                     # if further need of socket bind versus tcp
-                    #base_url='unix:///node1/var/run/docker.sock',
-                    base_url="tcp://10.10.77.61:2375",
+                    base_url='unix:///node1/var/run/docker.sock',
                     **self.__class__.client_default_kwargs
                 ),
             ),
             node2=dict(
                 docker_cli=docker.DockerClient(
                     # if further need of socket bind versus tcp
-                    #base_url='unix:///node2/var/run/docker.sock',
-                    base_url="tcp://10.10.77.62:2375",
+                    base_url='unix:///node2/var/run/docker.sock',
                     **self.__class__.client_default_kwargs
                 ),
             ),
             node3=dict(
                 docker_cli=docker.DockerClient(
                     # if further need of socket bind versus tcp
-                    #base_url='unix:///node3/var/run/docker.sock',
-                    base_url="tcp://10.10.77.63:2375",
+                    base_url='unix:///node3/var/run/docker.sock',
                     **self.__class__.client_default_kwargs
                 ),
             ),
             node4=dict(
                 docker_cli=docker.DockerClient(
                     # if further need of socket bind versus tcp
-                    #base_url='unix:///node4/var/run/docker.sock',
-                    base_url="tcp://10.10.77.64:2375",
+                    base_url='unix:///node4/var/run/docker.sock',
                     **self.__class__.client_default_kwargs
                 ),
             ),
@@ -305,7 +303,9 @@ class Cluster:
             for volume in volumes:
                 volume.remove(force=True)
 
-            container = node['docker_cli'].containers.get(const.consul['container'])
+            container = node['docker_cli'].containers.get(
+                const.consul['container']
+            )
 
             def filter_schedule(schedule):
                 if schedule.volume.startswith("clusterlabtestservice"):
