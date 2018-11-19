@@ -60,6 +60,17 @@ stop a running cluster::
 * stop each nodes and ci container
 * unmount btrfs volumes of 4 nodes
 
+Clean Up
+--------
+
+Remove volumes and containers btrfs images... to leave env as we found it::
+
+    $ (cd dind)
+    $ bash cleanup.bash
+
+* remove nodes and attached volumes
+* unmount btrfs volumes
+* remove btrfs images disk
 
 TODO
 ----

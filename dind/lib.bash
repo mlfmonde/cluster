@@ -40,3 +40,16 @@ function mountDown() {
     sudo umount "${mountDir}"
 }
 export -f mountDown
+
+# remove image
+# arg1: image index 1..N
+function removeImg() {
+    img="${btrfsImgPrefix}$1.img"
+    echo "Removing btrfs ${img} image"
+
+    if sudo true; then
+        sudo rm -f ${img}
+    else
+        echo "ERROR: sudo required"
+    fi
+}
