@@ -403,7 +403,7 @@ class Cluster:
 
     def create_service_data(self, domain=None):
         if not domain:
-            domain = 'service.cluster.lab'
+            domain = const.host
         session = requests.Session()
         name = str(uuid.uuid4())
         content = str(uuid.uuid4())

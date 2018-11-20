@@ -2,10 +2,13 @@
 facilities to make test easy to read.
 """
 import os
+import string
+
+from docker import errors
+from random import choice, randint
 
 from . import const
 from . import cluster
-from docker import errors
 
 
 class ClusterTestCase:
@@ -81,7 +84,9 @@ class ClusterTestCase:
                 return True
 
         for name, node in self.cluster.nodes.items():
-            container = node['docker_cli'].containers.get(const.consul['container'])
+            container = node['docker_cli'].containers.get(
+                const.consul['container']
+            )
             scheduled = self.cluster.get_scheduled(
                 container, filter_schedule, kind, volume
             )
@@ -133,3 +138,10 @@ class ClusterTestCase:
             "Content not matched, expected: {} - got {}".format(
                 expected_content, content
             )
+
+    def generate_run_id(self):
+        allowedchars = string.ascii_lowercase + string.digits
+        # do not use uuid to avoid length exceeded limitation
+        return "".join(
+            choice(allowedchars) for x in range(randint(3, 5))
+        )

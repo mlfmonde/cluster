@@ -34,6 +34,17 @@ run tests::
     $ (cd dind)
     $ bash ci/run_tests.bash
 
+.. note::
+
+    This command won't launch test that require push access to
+    [mlfmonde/cluster_lab_test_service repo](https://github.com/mlfmonde/cluster_lab_test_service)
+    located in ``ci/tests/auth_required`` to do so you may run the following
+    command::
+
+        docker-compose exec ci sh
+        export GITHUB_API_TOKEN="petrus-v:YOUR_GITHUB_API_TOKEN" && \
+            run-contexts /tests/auth_required/ -s -v
+
 
 Start
 -----
@@ -75,6 +86,5 @@ Remove volumes and containers btrfs images... to leave env as we found it::
 TODO
 ----
 
-* travis: resolve node1 consul to buttervolume connection: Failed to connect to Buttervolume
-* travis: .travis.yml: reactive all commented install/before_script/script entries (commented for faster travis deploy during travis dev)
-* run all tests, actually ci/run_tests.bash runs only test_new_service.py during dev process
+* cache consul build in the local docker registry to avoid doing it on each nodes
+* allow running auth required test using dev ssh keys

@@ -7,10 +7,10 @@ import os
 import requests
 import subprocess
 
-from . import const
-from . import base_case
-from . import cluster
-from . import git_utils
+from .. import const
+from .. import base_case
+from .. import cluster
+from .. import git_utils
 
 
 class WhenDeployingServiceWithANewMaster(
@@ -18,15 +18,17 @@ class WhenDeployingServiceWithANewMaster(
 ):
 
     def given_a_cluster_with_running_service(self):
+        self.run_id = self.generate_run_id()
         self.application = cluster.Application(
             'https://github.com/mlfmonde/cluster_lab_test_service',
-            "test_remove_volume"
+            "test_rm_volume_{}".format(self.run_id)
         )
         git_utils.Git.tag_and_push(
             repo='git@github.com:mlfmonde/cluster_lab_test_service',
             ref='without_caddyfile',
-            tagname="test_remove_volume"
+            tagname="test_rm_volume_{}".format(self.run_id)
         )
+
         self.cluster.cleanup_application(self.application)
         self.cluster.deploy_and_wait(
             master='node4',
@@ -53,7 +55,7 @@ class WhenDeployingServiceWithANewMaster(
         git_utils.Git.tag_and_push(
             repo='git@github.com:mlfmonde/cluster_lab_test_service',
             ref="missing_volume",
-            tagname="test_remove_volume"
+            tagname="test_rm_volume_{}".format(self.run_id)
         )
         self.cluster.deploy_and_wait(
             master=self.master,
@@ -195,4 +197,8 @@ class WhenDeployingServiceWithANewMaster(
         )
 
     def cleanup_destroy_service(self):
+        git_utils.Git.remove_remote_tag(
+            repo='git@github.com:mlfmonde/cluster_lab_test_service',
+            tagname="test_rm_volume_{}".format(self.run_id)
+        )
         self.cluster.cleanup_application(self.application)

@@ -88,7 +88,7 @@ class WhenMigrateDataBetweenServices(
     def prod_service_should_not_return_qualif_db_record(self):
         session = requests.Session()
         response = session.get(
-            '{url}/example/{}'.format(url=const.url, id=self.qualif_rec_id)
+            '{url}/example/{id}'.format(url=const.url, id=self.qualif_rec_id)
         )
         assert response.text != self.qualif_rec_name
         session.close()
