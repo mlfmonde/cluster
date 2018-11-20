@@ -44,7 +44,8 @@ function btrfsUp() {
     userDir=`pwd`
     echo "deploying ssh keys / config"
     sudo cp -r ${userDir}/file/buttervolume_ssh/* "${mountPointPrefix}$1/ssh/"
-    sudo chmod 600 "${mountPointPrefix}$1/ssh/id_rsa*"
+    sudo chmod 600 "${mountPointPrefix}$1/ssh/id_rsa"
+    sudo chmod 600 "${mountPointPrefix}$1/ssh/id_rsa.pub"
     sudo chmod 644 "${mountPointPrefix}$1/ssh/authorized_keys"
 }
 
