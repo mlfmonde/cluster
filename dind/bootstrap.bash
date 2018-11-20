@@ -69,6 +69,10 @@ function nodeUp() {
 
     # display env
     docker-compose exec "${nodeServicePrefix}$1" docker-compose exec consul sh -c "env"
+
+    # chauffer les images locales
+    docker-compose exec "${nodeServicePrefix}$1" docker pull mlfmonde/lab-test-service
+
 }
 
 
