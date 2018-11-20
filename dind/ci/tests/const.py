@@ -2,13 +2,16 @@
 # node host/url
 #
 host = 'service.cluster.lab'  # dind/docker-compose.yml extra_hosts
+host_qualif = 'service.qualif.cluster.lab'
 url = 'http://' + host
+url_qualif = 'http://' + host_qualif
 
 #
 # docker
 #
 docker = dict(
-    # version: str, False default, 'auto': auto, 'docker version' to identify matching
+    # version: str, False default, 'auto': auto, 'docker version' to
+    # identify matching
     version='1.38',  # server version of consul node, dind node, ...
 )
 

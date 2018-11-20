@@ -42,7 +42,7 @@ class WhenMigrateDataBetweenServices(
             qualif.master, qualif.ct.anyblok, '--wsgi-host 0.0.0.0', timeout=30
         )
         self.cluster.wait_http_code(
-            'http://service.qualif.cluster.lab', timeout=10
+            const.url_qualif, timeout=10
         )
         (
             self.prod_rec_id,
@@ -56,7 +56,7 @@ class WhenMigrateDataBetweenServices(
             self.qualif_rec_name,
             self.qualif_rec_content
         ) = self.cluster.create_service_data(
-            domain='service.qualif.cluster.lab'
+            domain=const.host_qualif
         )
 
     def becauseWeMigrate(self):
@@ -64,7 +64,7 @@ class WhenMigrateDataBetweenServices(
         self.kvqualif = self.cluster.get_app_from_kv(self.qualif.app_key)
         self.kvprod = self.cluster.get_app_from_kv(self.prod.app_key)
         self.cluster.wait_http_code(
-            'http://service.qualif.cluster.lab', timeout=60
+            const.url_qualif, timeout=60
         )
 
     def prod_service_should_return_created_prod_db_record(self):
@@ -78,8 +78,8 @@ class WhenMigrateDataBetweenServices(
     def qualif_service_should_return_created_prod_db_record(self):
         session = requests.Session()
         response = session.get(
-            'http://service.qualif.cluster.lab/example/{}'.format(
-                self.prod_rec_id
+            '{}/example/{}'.format(
+                const.url_qualif, self.prod_rec_id
             )
         )
         assert self.prod_rec_name == response.text
@@ -96,8 +96,8 @@ class WhenMigrateDataBetweenServices(
     def qualif_service_should_not_return_qualif_db_record(self):
         session = requests.Session()
         response = session.get(
-            'http://service.qualif.cluster.lab/example/{}'.format(
-                self.qualif_rec_id
+            '{}/example/{}'.format(
+                const.url_qualif, self.qualif_rec_id
             )
         )
         assert response.text != self.qualif_rec_name

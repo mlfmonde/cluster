@@ -42,11 +42,10 @@ function btrfsUp() {
 
     # copy ssh keys
     userDir=`pwd`
-    echo "deploying ssh keys"
-    sudo cp ${userDir}/file/ssh/* "${mountPointPrefix}$1/ssh/"
-    # copy ssh config
-    echo "deploying ssh config"
-    sudo cp ${userDir}/file/ssh/config "${mountPointPrefix}$1/ssh/"
+    echo "deploying ssh keys / config"
+    sudo cp -r ${userDir}/file/buttervolume_ssh/* "${mountPointPrefix}$1/ssh/"
+    sudo chmod 600 "${mountPointPrefix}$1/ssh/id_rsa*"
+    sudo chmod 644 "${mountPointPrefix}$1/ssh/authorized_keys"
 }
 
 # up a node
