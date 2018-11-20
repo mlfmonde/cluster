@@ -4,6 +4,7 @@ import subprocess
 
 from . import base_case
 from . import cluster
+from . import const
 
 
 class WhenDeployingServiceWithSameSlaveMaster(
