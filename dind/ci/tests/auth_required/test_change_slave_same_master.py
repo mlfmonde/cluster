@@ -129,7 +129,10 @@ class WhenDeployingServiceWithANewMaster(
             '-p',
             '2244',
             '-i',
-            os.path.join(os.path.dirname(__file__), 'id_rsa_anyblok_ssh'),
+            os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                'id_rsa_anyblok_ssh'
+            ),
             '-o',
             'StrictHostKeyChecking=no',
             '-o',
