@@ -1,0 +1,170 @@
+version: '3'
+
+services:
+    ci:
+        build: ./ci
+        depends_on:
+            - node1
+            - node2
+            - node3
+            - node4
+        volumes:
+            - ./ci/tests:/tests
+            # if further need of socket bind versus tcp
+            - node1_var_run:/node1/var/run
+            - node2_var_run:/node2/var/run
+            - node3_var_run:/node3/var/run
+            - node4_var_run:/node4/var/run
+        tty: true
+        working_dir: /tests
+        hostname: ci
+        extra_hosts:
+            # haproxy bindings
+            - "service.cluster.lab:10.10.77.64"
+            - "service.qualif.cluster.lab:10.10.77.64"
+        networks:
+            cluster_nodes:
+
+    cache:
+        image: registry:2
+        volumes:
+            - ./cache_registry.yml:/etc/docker/registry/config.yml
+            - cache_registry:/var/lib/registry
+        networks:
+            cluster_nodes:
+                ipv4_address: 10.10.77.60
+
+    node1:
+        build:
+            context: .
+            args:
+                # from env
+                - DOCKER_GROUP_ID
+        ports:
+            - "8501:8500"
+            - "81:80"
+        volumes:
+            - ./daemon.json:/etc/docker/daemon.json
+            - /mnt/btrfs1:/var/lib/buttervolume
+            - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
+            # if further need of socket bind versus tcp
+            - node1_var_run:/var/run
+        depends_on:
+            - cache
+        privileged: true
+        tty: true
+        working_dir: /cluster
+        hostname: node1
+        extra_hosts:
+            # haproxy bindings
+            - "service.cluster.lab:10.10.77.64"
+            - "service.qualif.cluster.lab:10.10.77.64"
+            - "cache.docker-registry.lab:10.10.77.60"
+        networks:
+            cluster_nodes:
+                # eth0
+                ipv4_address: 10.10.77.61
+
+    node2:
+        build:
+            context: .
+            args:
+                # from env
+                - DOCKER_GROUP_ID
+        ports:
+            - "82:80"
+        volumes:
+            - ./daemon.json:/etc/docker/daemon.json
+            - /mnt/btrfs2:/var/lib/buttervolume
+            - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
+            # if further need of socket bind versus tcp
+            - node2_var_run:/var/run
+        depends_on:
+            - cache
+        privileged: true
+        tty: true
+        working_dir: /cluster
+        hostname: node2
+        extra_hosts:
+            # haproxy bindings
+            - "service.cluster.lab:10.10.77.64"
+            - "service.qualif.cluster.lab:10.10.77.64"
+            - "cache.docker-registry.lab:10.10.77.60"
+        networks:
+            cluster_nodes:
+                # eth0
+                ipv4_address: 10.10.77.62
+
+    node3:
+        build:
+            context: .
+            args:
+                # from env
+                - DOCKER_GROUP_ID
+        ports:
+            - "83:80"
+        volumes:
+            - ./daemon.json:/etc/docker/daemon.json
+            - /mnt/btrfs3:/var/lib/buttervolume
+            - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
+            # if further need of socket bind versus tcp
+            - node3_var_run:/var/run
+        depends_on:
+            - cache
+        privileged: true
+        tty: true
+        working_dir: /cluster
+        hostname: node3
+        extra_hosts:
+            # haproxy bindings
+            - "service.cluster.lab:10.10.77.64"
+            - "service.qualif.cluster.lab:10.10.77.64"
+            - "cache.docker-registry.lab:10.10.77.60"
+        networks:
+            cluster_nodes:
+                # eth0
+                ipv4_address: 10.10.77.63
+
+    node4:
+        build:
+            context: .
+            args:
+                # from env
+                - DOCKER_GROUP_ID
+        ports:
+            - "84:80"
+        volumes:
+            - ./daemon.json:/etc/docker/daemon.json
+            - /mnt/btrfs4:/var/lib/buttervolume
+            - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
+            # if further need of socket bind versus tcp
+            - node4_var_run:/var/run
+        depends_on:
+            - cache
+        privileged: true
+        tty: true
+        working_dir: /cluster
+        hostname: node4
+        extra_hosts:
+            # haproxy bindings (this)
+            - "service.cluster.lab:10.10.77.64"
+            - "service.qualif.cluster.lab:10.10.77.64"
+            - "cache.docker-registry.lab:10.10.77.60"
+        networks:
+            cluster_nodes:
+                # eth0
+                ipv4_address: 10.10.77.64
+
+networks:
+    cluster_nodes:
+        ipam:
+            config:
+                - subnet: 10.10.77.0/24
+
+volumes:
+# if further need of socket bind versus tcp
+  node1_var_run:
+  node2_var_run:
+  node3_var_run:
+  node4_var_run:
+  cache_registry:

@@ -1,0 +1,3 @@
+contexts
+-e git+https://github.com/gmr/consulate@master#egg=consulate
+docker

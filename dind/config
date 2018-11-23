@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+# btrfs image prefix for /var/lib/docker/btrfs[1-N].img files
+btrfsImgPrefix='/var/lib/docker/btrfs'
+export btrfsImgPrefix
+
+# btrfs image size
+btrfsImgSize='5G'
+export btrfsImgSize
+
+# btrfs mount point prefix for /mnt/btrfs[1-N] mount points
+mountPointPrefix='/mnt/btrfs'
+export mountPointPrefix
+
+# nodes
+nodes=("1" "2" "3" "4")
+export nodes
+
+# dind node service prefix
+nodeServicePrefix='node'
+export nodeServicePrefix

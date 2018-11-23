@@ -2,22 +2,22 @@ version: '3'
 services:
 
   caddy:
-    image: anybox/caddy:0.11.0
+    build: ./caddy
     restart: unless-stopped
     volumes:
       - caddy_ssl:/root/.caddy
-      - ./caddy/conf/:/etc/caddy
+      - caddy_conf:/etc/caddy:ro
       - ./caddy/www/:/srv
 
   haproxy:
-    image: haproxy:1.8.12
+    build: ./haproxy
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
       - "1443:1443"
     volumes:
-      - ./haproxy/conf/:/usr/local/etc/haproxy/
+      - haproxy_conf:/usr/local/etc/haproxy/:ro
       - ./haproxy/www/:/var/www/
 
   rsyslog:
@@ -50,8 +50,8 @@ services:
       - /run/docker.sock:/run/docker.sock
       - /run/docker/plugins:/run/docker/plugins
       - /deploy:/deploy
-      - ./caddy/conf/:/consul/template/caddy/
-      - ./haproxy/conf/:/consul/template/haproxy/
+      - caddy_conf:/consul/template/caddy/:rw
+      - haproxy_conf:/consul/template/haproxy/:rw
 
 volumes:
   caddy_ssl:
@@ -61,4 +61,8 @@ volumes:
   consul_docker_cfg:
     driver: anybox/buttervolume:latest
   rsyslog_work:
+    driver: local
+  caddy_conf:
+    driver: local
+  haproxy_conf:
     driver: local
