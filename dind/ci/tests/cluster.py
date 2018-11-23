@@ -32,28 +32,24 @@ class Cluster:
         self.nodes = dict(
             node1=dict(
                 docker_cli=docker.DockerClient(
-                    # if further need of socket bind versus tcp
                     base_url='unix:///node1/var/run/docker.sock',
                     **self.__class__.client_default_kwargs
                 ),
             ),
             node2=dict(
                 docker_cli=docker.DockerClient(
-                    # if further need of socket bind versus tcp
                     base_url='unix:///node2/var/run/docker.sock',
                     **self.__class__.client_default_kwargs
                 ),
             ),
             node3=dict(
                 docker_cli=docker.DockerClient(
-                    # if further need of socket bind versus tcp
                     base_url='unix:///node3/var/run/docker.sock',
                     **self.__class__.client_default_kwargs
                 ),
             ),
             node4=dict(
                 docker_cli=docker.DockerClient(
-                    # if further need of socket bind versus tcp
                     base_url='unix:///node4/var/run/docker.sock',
                     **self.__class__.client_default_kwargs
                 ),

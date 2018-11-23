@@ -10,7 +10,7 @@ services:
             - node4
         volumes:
             - ./ci/tests:/tests
-            # if further need of socket bind versus tcp
+            # docker/plugins socket bind
             - node1_var_run:/node1/var/run
             - node2_var_run:/node2/var/run
             - node3_var_run:/node3/var/run
@@ -47,7 +47,7 @@ services:
             - ./daemon.json:/etc/docker/daemon.json
             - /mnt/btrfs1:/var/lib/buttervolume
             - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
-            # if further need of socket bind versus tcp
+            # docker/plugins socket bind
             - node1_var_run:/var/run
         depends_on:
             - cache
@@ -77,7 +77,7 @@ services:
             - ./daemon.json:/etc/docker/daemon.json
             - /mnt/btrfs2:/var/lib/buttervolume
             - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
-            # if further need of socket bind versus tcp
+            # docker/plugins socket bind
             - node2_var_run:/var/run
         depends_on:
             - cache
@@ -107,7 +107,7 @@ services:
             - ./daemon.json:/etc/docker/daemon.json
             - /mnt/btrfs3:/var/lib/buttervolume
             - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
-            # if further need of socket bind versus tcp
+            # docker/plugins socket bind
             - node3_var_run:/var/run
         depends_on:
             - cache
@@ -137,7 +137,7 @@ services:
             - ./daemon.json:/etc/docker/daemon.json
             - /mnt/btrfs4:/var/lib/buttervolume
             - ./..:/cluster  # important: /cluster directory to have project name prefix as 'cluster'
-            # if further need of socket bind versus tcp
+            # docker/plugins socket bind
             - node4_var_run:/var/run
         depends_on:
             - cache
