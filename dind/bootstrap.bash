@@ -59,20 +59,13 @@ function nodeUp() {
     docker-compose exec "${nodeServicePrefix}$1" docker plugin ls
 
     # we use specific compose override file for consul config
-    # based on a template generated for each node
-    composeFileTemplatePath="$(pwd)/docker-compose.dind.yml.tpl"
-    composeFileGenerated="docker-compose.dind.node$1.generated.yml"
-    composeFileGeneratedPath="$(pwd)/../${composeFileGenerated}"
-    nodeDockerHost="10.10.77.6$1:2375"
-    cp -f "${composeFileTemplatePath}" "${composeFileGeneratedPath}"
-    docker-compose exec "${nodeServicePrefix}$1" docker-compose -f docker-compose.yml -f "${composeFileGenerated}" up --force-recreate --build -d
+    docker-compose exec "${nodeServicePrefix}$1" docker-compose -f docker-compose.yml -f docker-compose.dind.yml up --force-recreate --build -d
 
     # display env
     docker-compose exec "${nodeServicePrefix}$1" docker-compose exec consul sh -c "env"
 
-    # chauffer les images locales
+    # pre pull local images
     docker-compose exec "${nodeServicePrefix}$1" docker pull mlfmonde/lab-test-service
-
 }
 
 

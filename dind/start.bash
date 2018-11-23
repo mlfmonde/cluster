@@ -15,6 +15,5 @@ do
     echo "running node ${index}..."
 
     # we use specific compose override file for consul config
-    docker-compose exec "${nodeServicePrefix}${index}" docker-compose -f docker-compose.yml -f "docker-compose.dind.node${index}.generated.yml" start
-    #docker-compose exec "${nodeServicePrefix}${index}" docker-compose exec consul buttervolume run&
+    docker-compose exec "${nodeServicePrefix}${index}" docker-compose -f docker-compose.yml -f docker-compose.dind.yml start
 done
