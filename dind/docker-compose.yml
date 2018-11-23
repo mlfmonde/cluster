@@ -8,6 +8,8 @@ services:
             - node2
             - node3
             - node4
+        environment:
+            GITHUB_API_TOKEN: ${GITHUB_API_TOKEN}
         volumes:
             - ./ci/tests:/tests
             # if further need of socket bind versus tcp
