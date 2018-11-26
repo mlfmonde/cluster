@@ -28,6 +28,7 @@ TEST = False
 log = logging.getLogger()
 BTRFSDRIVER = os.environ.get('BTRFSDRIVER', 'anybox/buttervolume:latest')
 POST_MIGRATE_SCRIPT_NAME = 'post_migrate.sh'
+UPDATE_SCRIPT_NAME = 'update.sh'
 
 
 def concat(l):
@@ -358,6 +359,20 @@ class Application(object):
                     self.branch
                 ),
                 cwd=self.path
+            )
+
+    def deploy_pre_up(self):
+        # TODO: operate update script only if asked for in payload
+        script_path = join(self.path, UPDATE_SCRIPT_NAME)
+        if exists(script_path):
+            # TODO: a snapshot to prevent any loss of data since last one
+            do(
+                'sh {} -r {} -b {}'.format(
+                    script_path,
+                    self.repo_url,
+                    self.branch
+                ),
+                cwd = self.path
             )
 
     def up(self):
@@ -785,6 +800,7 @@ def deploy(payload, myself, deploy_id):
             newapp.check(newmaster)
             newapp.pull()
             newapp.build()
+            newapp.deploy_pre_up()
             newapp.up()
             if newslave:
                 newapp.enable_replicate(
@@ -830,6 +846,7 @@ def deploy(payload, myself, deploy_id):
             ]
             for volume in common_volumes:
                 volume.restore()
+            newapp.deploy_pre_up()
             newapp.up()
             if newslave:
                 newapp.enable_replicate(
@@ -865,6 +882,7 @@ def deploy(payload, myself, deploy_id):
                 ]
                 for volume in common_volumes:
                     volume.restore()
+            newapp.deploy_pre_up()
             newapp.up()
             if newslave:
                 newapp.enable_replicate(
