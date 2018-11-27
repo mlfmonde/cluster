@@ -1,6 +1,7 @@
 import os
 import requests
 import subprocess
+import docker
 
 from . import const
 from . import base_case
@@ -153,6 +154,33 @@ class WhenDeployingANewServiceMasterSlave(base_case.ClusterTestCase):
             self.master,
             const.consul['container'],
             path,
+        )
+
+    def update_script_should_be_run(self):
+        # check that we pass in update.sh script
+        test_file = '/tmp/update.txt'
+        test_container = self.cluster.nodes[self.master][
+            'docker_cli'].containers.get(self.app.ct.test)
+
+        try:
+            res = self.cluster.nodes[self.master][
+                'docker_cli'].containers.run(
+                    'alpine:latest',
+                    "ls {}".format(test_file),
+                    volumes_from=[test_container.id],
+                    remove=True
+                )
+        except docker.errors.ContainerError:
+            # ls test_file not found exit non-zero
+            res = ''
+        assert res == test_file
+
+        self.cluster.nodes[self.master][
+            'docker_cli'].containers.run(
+                'alpine:latest',
+                "rm {}".format(test_file),
+                volumes_from=[test_container.id],
+                remove=True
         )
 
     def cleanup_destroy_service(self):
