@@ -12,7 +12,9 @@ class WhenDeployingANewServiceMasterSlave(base_case.ClusterTestCase):
     def given_a_cluster_without_test_service(self):
         self.application = cluster.Application(
             'https://github.com/mlfmonde/cluster_lab_test_service',
-            'master'
+            #'master'
+            'update_script'  # TODO merge update_script to master
+                             # and reactive master
         )
         self.cluster.cleanup_application(self.application)
         self.master = 'node1'
@@ -139,6 +141,20 @@ class WhenDeployingANewServiceMasterSlave(base_case.ClusterTestCase):
             [self.app.ct.anyblok, self.app.ct.dbserver, ],
             [self.master]
         )
+
+    def update_script_should_be_run(self):
+        # check that we pass in update.sh script
+        test_file = '/tmp/update.txt'
+        container = self.cluster.nodes['node2'].docker_cli.containers.get(
+            self.app.ct.anyblok)
+        assert container
+        # update.sh should have created the test file
+        res = container.exec_run('ls {}'.format(test_file))
+        assert res.output == test_file
+        # get rid of test file
+        container.exec_run('rm {}'.format(test_file))
+        res = container.exec_run('ls {}'.format(test_file))
+        assert res.output == ''
 
     def cleanup_destroy_service(self):
         self.cluster.cleanup_application(self.application)
