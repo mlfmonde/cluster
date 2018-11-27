@@ -142,19 +142,18 @@ class WhenDeployingANewServiceMasterSlave(base_case.ClusterTestCase):
             [self.master]
         )
 
-    def update_script_should_be_run(self):
-        # check that we pass in update.sh script
-        test_file = '/tmp/update.txt'
-        container = self.cluster.nodes['node2'].docker_cli.containers.get(
-            self.app.ct.anyblok)
-        assert container
-        # update.sh should have created the test file
-        res = container.exec_run('ls {}'.format(test_file))
-        assert res.output == test_file
-        # get rid of test file
-        container.exec_run('rm {}'.format(test_file))
-        res = container.exec_run('ls {}'.format(test_file))
-        assert res.output == ''
+    def update_script_should_be_deployed(self):
+        # check that update.sh is deployed on master
+        path = os.path.join(
+            cluster.DEPLOY_ROOT_DIR,
+            "{}-{}".format(self.application.name, self.app.deploy_id),
+            "update.sh"
+        )
+        self.test_file(
+            self.master,
+            const.consul['container'],
+            path,
+        )
 
     def cleanup_destroy_service(self):
         self.cluster.cleanup_application(self.application)
