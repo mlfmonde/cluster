@@ -1,7 +1,6 @@
 import os
 import requests
 import subprocess
-import docker
 
 from . import const
 from . import base_case
@@ -13,9 +12,7 @@ class WhenDeployingANewServiceMasterSlave(base_case.ClusterTestCase):
     def given_a_cluster_without_test_service(self):
         self.application = cluster.Application(
             'https://github.com/mlfmonde/cluster_lab_test_service',
-            #'master'
-            'update_script'  # TODO merge update_script to master
-                             # and reactive master
+            'master'
         )
         self.cluster.cleanup_application(self.application)
         self.master = 'node1'
@@ -141,46 +138,6 @@ class WhenDeployingANewServiceMasterSlave(base_case.ClusterTestCase):
         self.assert_container_running_on(
             [self.app.ct.anyblok, self.app.ct.dbserver, ],
             [self.master]
-        )
-
-    def update_script_should_be_deployed(self):
-        # check that update.sh is deployed on master
-        path = os.path.join(
-            cluster.DEPLOY_ROOT_DIR,
-            "{}-{}".format(self.application.name, self.app.deploy_id),
-            "update.sh"
-        )
-        self.test_file(
-            self.master,
-            const.consul['container'],
-            path,
-        )
-
-    def update_script_should_be_run(self):
-        # check that we pass in update.sh script
-        test_file = '/tmp/update.txt'
-        test_container = self.cluster.nodes[self.master][
-            'docker_cli'].containers.get(self.app.ct.test)
-
-        try:
-            res = self.cluster.nodes[self.master][
-                'docker_cli'].containers.run(
-                    'alpine:latest',
-                    "ls {}".format(test_file),
-                    volumes_from=[test_container.id],
-                    remove=True
-                )
-        except docker.errors.ContainerError:
-            # ls test_file not found exit non-zero
-            res = ''
-        assert res.startswith(test_file)  # get rid or cr/lf
-
-        self.cluster.nodes[self.master][
-            'docker_cli'].containers.run(
-                'alpine:latest',
-                "rm {}".format(test_file),
-                volumes_from=[test_container.id],
-                remove=True
         )
 
     def cleanup_destroy_service(self):
