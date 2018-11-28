@@ -362,20 +362,20 @@ class Application(object):
                 cwd=self.path
             )
 
-    def deploy_pre_up(self):
-        # TODO: operate update script only if asked for in payload
-        script_path = join(self.path, UPDATE_SCRIPT_NAME)
-        if exists(script_path):
-            log.info("running preup script {}".format(script_path))
-            # TODO: a snapshot to prevent any loss of data since last one
-            do(
-                'sh {} -r {} -b {}'.format(
-                    script_path,
-                    self.repo_url,
-                    self.branch
-                ),
-                cwd=self.path
-            )
+    def deploy_pre_up(self, run_update_script=False):
+        if run_update_script:
+            script_path = join(self.path, UPDATE_SCRIPT_NAME)
+            if exists(script_path):
+                log.info("running preup script {}".format(script_path))
+                # TODO: a snapshot to prevent any loss of data since last one
+                do(
+                    'sh {} -r {} -b {}'.format(
+                        script_path,
+                        self.repo_url,
+                        self.branch
+                    ),
+                    cwd=self.path
+                )
 
     def up(self):
         if self.path and exists(self.path):
@@ -770,6 +770,7 @@ def deploy(payload, myself, deploy_id):
         msg = "Branch is mandatory"
         log.error(msg)
         raise AssertionError(msg)
+    run_update_script = payload.get('update', False)
 
     oldapp = Application(repo_url, branch=branch, current_deploy_id=deploy_id)
     oldmaster = kv(oldapp.name, 'master')
@@ -802,7 +803,7 @@ def deploy(payload, myself, deploy_id):
             newapp.check(newmaster)
             newapp.pull()
             newapp.build()
-            newapp.deploy_pre_up()
+            newapp.deploy_pre_up(run_update_script)
             newapp.up()
             if newslave:
                 newapp.enable_replicate(
@@ -848,7 +849,7 @@ def deploy(payload, myself, deploy_id):
             ]
             for volume in common_volumes:
                 volume.restore()
-            newapp.deploy_pre_up()
+            newapp.deploy_pre_up(run_update_script)
             newapp.up()
             if newslave:
                 newapp.enable_replicate(
@@ -884,7 +885,7 @@ def deploy(payload, myself, deploy_id):
                 ]
                 for volume in common_volumes:
                     volume.restore()
-            newapp.deploy_pre_up()
+            newapp.deploy_pre_up(run_update_script)
             newapp.up()
             if newslave:
                 newapp.enable_replicate(
