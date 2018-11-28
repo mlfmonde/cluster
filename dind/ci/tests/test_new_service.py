@@ -173,7 +173,7 @@ class WhenDeployingANewServiceMasterSlave(base_case.ClusterTestCase):
         except docker.errors.ContainerError:
             # ls test_file not found exit non-zero
             res = ''
-        assert res == test_file
+        assert res.startswith(test_file)  # get rid or cr/lf
 
         self.cluster.nodes[self.master][
             'docker_cli'].containers.run(

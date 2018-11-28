@@ -350,6 +350,7 @@ class Application(object):
     def run_post_migrate(self, from_app):
         script_path = join(self.path, POST_MIGRATE_SCRIPT_NAME)
         if exists(script_path):
+            log.info("running migrate script {}".format(script_path))
             do(
                 '{} -R {} -B {} -r {} -b {}'.format(
                     script_path,
@@ -365,6 +366,7 @@ class Application(object):
         # TODO: operate update script only if asked for in payload
         script_path = join(self.path, UPDATE_SCRIPT_NAME)
         if exists(script_path):
+            log.info("running preup script {}".format(script_path))
             # TODO: a snapshot to prevent any loss of data since last one
             do(
                 'sh {} -r {} -b {}'.format(
@@ -372,7 +374,7 @@ class Application(object):
                     self.repo_url,
                     self.branch
                 ),
-                cwd = self.path
+                cwd=self.path
             )
 
     def up(self):
