@@ -756,7 +756,13 @@ def handle(events, myself):
 def deploy(payload, myself, deploy_id):
     """Keep in mind this is executed in the consul container
     Deployments are done in the DEPLOY folder. Needs:
-    {"repo"': <url>, "branch": <branch>, "master": <host>, "slave": <host>}
+    {
+        "repo"': <url>,
+        "branch": <branch>,
+        "master": <host>,
+        "slave": <host>,
+        "update": true/false
+    }
     """
     repo_url = payload['repo']
     newmaster = payload['master']
