@@ -347,12 +347,16 @@ class Application(object):
         else:
             log.warning("No deployment, cannot build %s", self.name)
 
-    def run_post_migrate(self, from_app):
+    def run_post_migrate(self, from_app, log_prefix=""):
         script_path = join(self.path, POST_MIGRATE_SCRIPT_NAME)
         if exists(script_path):
-            log.info("running migrate script {}".format(script_path))
+            log.info("{log_prefix}running migrate script {script_path}".format(
+                    log_prefix=log_prefix,
+                    script_path=script_path,
+                )
+            )
             do(
-                '{} -R {} -B {} -r {} -b {}'.format(
+                'sh {} -R {} -B {} -r {} -b {}'.format(
                     script_path,
                     from_app.repo_url,
                     from_app.branch,
@@ -362,10 +366,16 @@ class Application(object):
                 cwd=self.path
             )
 
-    def deploy_pre_up(self, run_update_script=False):
+    def deploy_pre_up(self, from_app, run_update_script=False):
         if run_update_script:
             script_path = join(self.path, UPDATE_SCRIPT_NAME)
             if exists(script_path):
+                # first, before update script, run potential migrate script
+                self.run_post_migrate(
+                    from_app,
+                    log_prefix="through preup script: "
+                )
+
                 log.info("running preup script {}".format(script_path))
                 # TODO: a snapshot to prevent any loss of data since last one
                 do(
@@ -809,7 +819,7 @@ def deploy(payload, myself, deploy_id):
             newapp.check(newmaster)
             newapp.pull()
             newapp.build()
-            newapp.deploy_pre_up(run_update_script)
+            newapp.deploy_pre_up(oldapp, run_update_script)
             newapp.up()
             if newslave:
                 newapp.enable_replicate(
@@ -855,7 +865,7 @@ def deploy(payload, myself, deploy_id):
             ]
             for volume in common_volumes:
                 volume.restore()
-            newapp.deploy_pre_up(run_update_script)
+            newapp.deploy_pre_up(oldapp, run_update_script)
             newapp.up()
             if newslave:
                 newapp.enable_replicate(
@@ -891,7 +901,7 @@ def deploy(payload, myself, deploy_id):
                 ]
                 for volume in common_volumes:
                     volume.restore()
-            newapp.deploy_pre_up(run_update_script)
+            newapp.deploy_pre_up(oldapp, run_update_script)
             newapp.up()
             if newslave:
                 newapp.enable_replicate(

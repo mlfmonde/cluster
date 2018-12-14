@@ -7,29 +7,36 @@ from . import cluster
 
 
 class UpdateScriptBase(base_case.ClusterTestCase):
-    script_name = 'update.sh'
-    test_file_path = '/tmp/update.txt'
+    update_script_name = 'update.sh'
+    migrate_script_name = 'post_migrate.sh'
 
-    def _is_script_deployed(self):
+    update_test_file_path = '/tmp/update.txt'
+    migrate_test_file_path = '/tmp/migrate.txt'
+
+    def _is_file_deployed(self, file_name):
         # check that update.sh is deployed on master
-        path = os.path.join(
+        file_path = os.path.join(
             cluster.DEPLOY_ROOT_DIR,
-            "{}-{}".format(self.application.name, self.app.deploy_id),
-            self.__class__.script_name
+            "{app_id}-{deploy_id}".format(
+                app_id=self.application.name,
+                deploy_id=self.app.deploy_id
+            ),
+            file_name
         )
         self.test_file(
             self.master,
             const.consul['container'],
-            path
+            file_path
         )
 
-    def _get_test_file_content(self):
+    def _get_test_file_content(self, file_path, clean_up_after=True):
         """
         check that we pass in update.sh script
         update.sh of cluster_lab_test_service will write in 'test_file_path'
         """
         test_container = self.cluster.nodes[self.master][
-            'docker_cli'].containers.get(self.app.ct.test)
+            'docker_cli'
+        ].containers.get(self.app.ct.test)
         if not test_container:
             return ''
 
@@ -37,27 +44,34 @@ class UpdateScriptBase(base_case.ClusterTestCase):
             res = self.cluster.nodes[self.master][
                 'docker_cli'].containers.run(
                     'alpine:latest',
-                    "ls {}".format(self.__class__.test_file_path),
+                    "ls {file_path}".format(file_path=file_path),
                     volumes_from=[test_container.id],
                     remove=True
                 )
         except docker.errors.ContainerError:
             # ls test_file not found exit non-zero
             res = ''
+            clean_up_after = False
 
+        if clean_up_after:
+            self._clean_up_test_file(
+                file_path,
+                test_container=test_container
+            )
         if res and not isinstance(res, str):
             res = res.decode("utf-8")
         return res or ''
 
-    def _clean_up_test_file(self):
-        test_container = self.cluster.nodes[self.master][
-            'docker_cli'].containers.get(self.app.ct.test)
+    def _clean_up_test_file(self, file_path, test_container=None):
+        test_container = test_container or self.cluster.nodes[self.master][
+            'docker_cli'
+        ].containers.get(self.app.ct.test)
 
         if test_container:
             self.cluster.nodes[self.master][
                 'docker_cli'].containers.run(
                     'alpine:latest',
-                    "rm {}".format(self.__class__.test_file_path),
+                    "rm {file_path}".format(file_path=file_path),
                     volumes_from=[test_container.id],
                     remove=True
             )
@@ -68,9 +82,8 @@ class WhenDeployingANewServiceMasterSlaveWithNotAnyUpdate(UpdateScriptBase):
     def given_a_cluster_without_test_service(self):
         self.application = cluster.Application(
             'https://github.com/mlfmonde/cluster_lab_test_service',
-            #'master'
-            'update_script'  # TODO merge update_script to master
-                             # and reactive master
+            'update_script'  # testing through specific branch
+                             # with dedicated post migrate script
         )
         self.cluster.cleanup_application(self.application)
         self.master = 'node1'
@@ -85,18 +98,20 @@ class WhenDeployingANewServiceMasterSlaveWithNotAnyUpdate(UpdateScriptBase):
         # give a chance to let anyblok setting up its db
         self.app = self.cluster.get_app_from_kv(self.application.app_key)
         self.cluster.wait_logs(
-            self.master, self.app.ct.anyblok, '--wsgi-host 0.0.0.0', timeout=30
+            self.master,
+            self.app.ct.anyblok,
+            '--wsgi-host 0.0.0.0',
+            timeout=30
         )
         self.cluster.wait_http_code(timeout=10)
 
     def update_script_should_be_deployed(self):
-        self._is_script_deployed()
+        self._is_file_deployed(self.__class__.update_script_name)
 
     def update_script_should_not_be_run(self):
-        content = self._get_test_file_content()
-        if content:
-            self._clean_up_test_file()
-        assert content == ''
+        assert self._get_test_file_content(
+            self.__class__.update_test_file_path
+        ) == ''
 
     def cleanup_destroy_service(self):
         self.cluster.cleanup_application(self.application)
@@ -125,19 +140,30 @@ class WhenDeployingANewServiceMasterSlaveWithUpdate(UpdateScriptBase):
         # give a chance to let anyblok setting up its db
         self.app = self.cluster.get_app_from_kv(self.application.app_key)
         self.cluster.wait_logs(
-            self.master, self.app.ct.anyblok, '--wsgi-host 0.0.0.0', timeout=30
+            self.master,
+            self.app.ct.anyblok,
+            '--wsgi-host 0.0.0.0',
+            timeout=30
         )
         self.cluster.wait_http_code(timeout=10)
 
+    def post_migrate_script_should_be_deployed(self):
+        # post_migrate should be applied before update script
+        self._is_file_deployed(self.__class__.migrate_script_name)
+
+    def post_migrate_script_should_be_run(self):
+        # post_migrate should be applied before update script
+        assert self._get_test_file_content(
+            self.__class__.migrate_test_file_path
+        ) != ''
+
     def update_script_should_be_deployed(self):
-        self._is_script_deployed()
+        self._is_file_deployed(self.__class__.update_script_name)
 
     def update_script_should_be_run(self):
-        content = self._get_test_file_content()
-        if content:
-            self._clean_up_test_file()
-
-        assert content.startswith(self.__class__.test_file_path)
+        assert self._get_test_file_content(
+            self.__class__.update_test_file_path
+        ).startswith(self.__class__.update_test_file_path)
 
     def cleanup_destroy_service(self):
         self.cluster.cleanup_application(self.application)
