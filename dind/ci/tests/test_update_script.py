@@ -105,7 +105,7 @@ class WhenDeployingANewServiceMasterSlaveWithNotAnyUpdate(UpdateScriptBase):
         self.cluster.deploy_and_wait(
             master=self.master,
             slave=self.slave,
-            application=self.application,
+            application=self.application
         )
         # give a chance to let anyblok setting up its db
         self.app = self.cluster.get_app_from_kv(self.application.app_key)
@@ -154,7 +154,7 @@ class WhenDeployingANewServiceMasterSlaveWithUpdate(UpdateScriptBase):
             master=self.master,
             slave=self.slave,
             application=self.application,
-            update=True,  # ask for update script
+            update=True  # ask for update script
         )
         # give a chance to let anyblok setting up its db
         self.app = self.cluster.get_app_from_kv(self.application.app_key)
