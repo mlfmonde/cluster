@@ -377,7 +377,6 @@ class Application(object):
                 )
 
                 log.info("running preup script {}".format(script_path))
-                # TODO: a snapshot to prevent any loss of data since last one
                 do(
                     'sh {} -r {} -b {}'.format(
                         script_path,
