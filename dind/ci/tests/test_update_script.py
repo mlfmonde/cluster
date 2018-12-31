@@ -117,14 +117,6 @@ class WhenDeployingANewServiceMasterSlaveWithNotAnyUpdate(UpdateScriptBase):
         )
         self.cluster.wait_http_code(timeout=10)
 
-    def post_migrate_script_should_be_deployed(self):
-        self._is_file_deployed(self.__class__.migrate_script_name)
-
-    def but_post_migrate_script_should_not_be_run(self):
-        assert self._get_test_file_content(
-            self.__class__.migrate_test_file_path
-        ) == ''
-
     def update_script_should_be_deployed(self):
         self._is_file_deployed(self.__class__.update_script_name)
 
@@ -165,16 +157,6 @@ class WhenDeployingANewServiceMasterSlaveWithUpdate(UpdateScriptBase):
             timeout=30
         )
         self.cluster.wait_http_code(timeout=10)
-
-    def post_migrate_script_should_be_deployed(self):
-        # post_migrate should be deployed
-        self._is_file_deployed(self.__class__.migrate_script_name)
-
-    def and_post_migrate_script_should_be_run(self):
-        # post_migrate should be applied before update script
-        assert self._get_test_file_content(
-            self.__class__.migrate_test_file_path
-        ) != ''
 
     def update_script_should_be_deployed(self):
         self._is_file_deployed(self.__class__.update_script_name)

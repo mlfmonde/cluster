@@ -347,11 +347,10 @@ class Application(object):
         else:
             log.warning("No deployment, cannot build %s", self.name)
 
-    def run_post_migrate(self, from_app, log_prefix=""):
+    def run_post_migrate(self, from_app):
         script_path = join(self.path, POST_MIGRATE_SCRIPT_NAME)
         if exists(script_path):
-            log.info("{log_prefix}running migrate script {script_path}".format(
-                    log_prefix=log_prefix,
+            log.info("running migrate script {script_path}".format(
                     script_path=script_path,
                 )
             )
@@ -370,12 +369,6 @@ class Application(object):
         if run_update_script:
             script_path = join(self.path, UPDATE_SCRIPT_NAME)
             if exists(script_path):
-                # first, before update script, run potential migrate script
-                self.run_post_migrate(
-                    from_app,
-                    log_prefix="through preup script: "
-                )
-
                 log.info("running preup script {}".format(script_path))
                 do(
                     'sh {} -r {} -b {}'.format(
