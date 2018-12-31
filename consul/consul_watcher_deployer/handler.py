@@ -365,7 +365,7 @@ class Application(object):
                 cwd=self.path
             )
 
-    def deploy_pre_up(self, from_app, run_update_script=False):
+    def deploy_pre_up(self, run_update_script=False):
         if run_update_script:
             script_path = join(self.path, UPDATE_SCRIPT_NAME)
             if exists(script_path):
@@ -811,7 +811,7 @@ def deploy(payload, myself, deploy_id):
             newapp.check(newmaster)
             newapp.pull()
             newapp.build()
-            newapp.deploy_pre_up(oldapp, run_update_script)
+            newapp.deploy_pre_up(run_update_script)
             newapp.up()
             if newslave:
                 newapp.enable_replicate(
@@ -857,7 +857,7 @@ def deploy(payload, myself, deploy_id):
             ]
             for volume in common_volumes:
                 volume.restore()
-            newapp.deploy_pre_up(oldapp, run_update_script)
+            newapp.deploy_pre_up(run_update_script)
             newapp.up()
             if newslave:
                 newapp.enable_replicate(
@@ -893,7 +893,7 @@ def deploy(payload, myself, deploy_id):
                 ]
                 for volume in common_volumes:
                     volume.restore()
-            newapp.deploy_pre_up(oldapp, run_update_script)
+            newapp.deploy_pre_up(run_update_script)
             newapp.up()
             if newslave:
                 newapp.enable_replicate(
