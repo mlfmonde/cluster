@@ -28,6 +28,7 @@ TEST = False
 log = logging.getLogger()
 BTRFSDRIVER = os.environ.get('BTRFSDRIVER', 'anybox/buttervolume:latest')
 POST_MIGRATE_SCRIPT_NAME = 'post_migrate.sh'
+UPDATE_SCRIPT_NAME = 'update.sh'
 
 
 def concat(l):
@@ -349,8 +350,12 @@ class Application(object):
     def run_post_migrate(self, from_app):
         script_path = join(self.path, POST_MIGRATE_SCRIPT_NAME)
         if exists(script_path):
+            log.info("running migrate script {script_path}".format(
+                    script_path=script_path,
+                )
+            )
             do(
-                '{} -R {} -B {} -r {} -b {}'.format(
+                'sh {} -R {} -B {} -r {} -b {}'.format(
                     script_path,
                     from_app.repo_url,
                     from_app.branch,
@@ -359,6 +364,20 @@ class Application(object):
                 ),
                 cwd=self.path
             )
+
+    def deploy_pre_up(self, run_update_script=False):
+        if run_update_script:
+            script_path = join(self.path, UPDATE_SCRIPT_NAME)
+            if exists(script_path):
+                log.info("running preup script {}".format(script_path))
+                do(
+                    'sh {} -r {} -b {}'.format(
+                        script_path,
+                        self.repo_url,
+                        self.branch
+                    ),
+                    cwd=self.path
+                )
 
     def up(self):
         if self.path and exists(self.path):
@@ -739,7 +758,13 @@ def handle(events, myself):
 def deploy(payload, myself, deploy_id):
     """Keep in mind this is executed in the consul container
     Deployments are done in the DEPLOY folder. Needs:
-    {"repo"': <url>, "branch": <branch>, "master": <host>, "slave": <host>}
+    {
+        "repo"': <url>,
+        "branch": <branch>,
+        "master": <host>,
+        "slave": <host>,
+        "update": true/false
+    }
     """
     repo_url = payload['repo']
     newmaster = payload['master']
@@ -753,6 +778,7 @@ def deploy(payload, myself, deploy_id):
         msg = "Branch is mandatory"
         log.error(msg)
         raise AssertionError(msg)
+    run_update_script = payload.get('update', False)
 
     oldapp = Application(repo_url, branch=branch, current_deploy_id=deploy_id)
     oldmaster = kv(oldapp.name, 'master')
@@ -785,6 +811,7 @@ def deploy(payload, myself, deploy_id):
             newapp.check(newmaster)
             newapp.pull()
             newapp.build()
+            newapp.deploy_pre_up(run_update_script)
             newapp.up()
             if newslave:
                 newapp.enable_replicate(
@@ -830,6 +857,7 @@ def deploy(payload, myself, deploy_id):
             ]
             for volume in common_volumes:
                 volume.restore()
+            newapp.deploy_pre_up(run_update_script)
             newapp.up()
             if newslave:
                 newapp.enable_replicate(
@@ -865,6 +893,7 @@ def deploy(payload, myself, deploy_id):
                 ]
                 for volume in common_volumes:
                     volume.restore()
+            newapp.deploy_pre_up(run_update_script)
             newapp.up()
             if newslave:
                 newapp.enable_replicate(

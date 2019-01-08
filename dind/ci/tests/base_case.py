@@ -119,6 +119,13 @@ class ClusterTestCase:
             else:
                 assert container is None
 
+    def _get_file_content(self, node, container, path):
+        return self.cluster.nodes.get(node)['docker_cli'].containers.get(
+            container
+        ).exec_run(
+            'sh -c "sleep 0.1; cat {}"'.format(path)
+        ).output.decode('utf-8')
+
     def assert_file(self, node, container, path, expected_content):
         """Make sure expected content is present in a container:
 
@@ -128,16 +135,22 @@ class ClusterTestCase:
                           assert content
         :param expected_content: content to assert
         """
-
-        content = self.cluster.nodes.get(node)['docker_cli'].containers.get(
-            container
-        ).exec_run(
-            'sh -c "sleep 0.1; cat {}"'.format(path)
-        ).output.decode('utf-8')
+        content = self._get_file_content(node, container, path)
         assert expected_content.strip() == content.strip(), \
             "Content not matched, expected: {} - got {}".format(
                 expected_content, content
             )
+
+    def test_file(self, node, container, path):
+        """Make sure not empty file present in a container:
+
+        :param node     : node where service is running
+        :param container: container name
+        :param path     : path to the file (inside the docker container) to
+                          assert content
+        """
+        content = self._get_file_content(node, container, path)
+        assert content
 
     def generate_run_id(self):
         allowedchars = string.ascii_lowercase + string.digits

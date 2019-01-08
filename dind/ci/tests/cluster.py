@@ -63,7 +63,8 @@ class Cluster:
         slave=None,
         application=None,
         timeout=DEFAULT_TIMEOUT,
-        event_consumed=None
+        event_consumed=None,
+        **payload_additions
     ):
         """Deploy a service waiting the end end of deployment before carry on
         """
@@ -85,17 +86,18 @@ class Cluster:
         if not event_consumed:
             event_consumed = deploy_finished
 
+        payload = {
+            'repo': application.repo_url,
+            'branch': application.branch,
+            'master': master,
+            'slave': slave,
+        }
+        payload.update(payload_additions)
+
         self.fire_event_and_wait(
             application,
             'deploy',
-            json.dumps(
-                {
-                    'repo': application.repo_url,
-                    'branch': application.branch,
-                    'master': master,
-                    'slave': slave,
-                }
-            ),
+            json.dumps(payload),
             event_consumed,
             timeout
         )
