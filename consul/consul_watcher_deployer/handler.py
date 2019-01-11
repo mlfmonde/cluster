@@ -364,6 +364,11 @@ class Application(object):
                 ),
                 cwd=self.path
             )
+        else:
+            log.warning("Migrate script not found {script_path}".format(
+                    script_path=script_path,
+                )
+            )
         self.deploy_pre_up(run_update_script=run_update_script)
 
     def deploy_pre_up(self, run_update_script=False):
@@ -378,6 +383,11 @@ class Application(object):
                         self.branch
                     ),
                     cwd=self.path
+                )
+            else:
+                log.warning("Update script not found {script_path}".format(
+                        script_path=script_path,
+                    )
                 )
 
     def up(self):
