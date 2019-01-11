@@ -347,7 +347,7 @@ class Application(object):
         else:
             log.warning("No deployment, cannot build %s", self.name)
 
-    def run_post_migrate(self, from_app):
+    def run_post_migrate(self, from_app, run_update_script=True):
         script_path = join(self.path, POST_MIGRATE_SCRIPT_NAME)
         if exists(script_path):
             log.info("running migrate script {script_path}".format(
@@ -364,6 +364,7 @@ class Application(object):
                 ),
                 cwd=self.path
             )
+        self.deploy_pre_up(run_update_script=run_update_script)
 
     def deploy_pre_up(self, run_update_script=False):
         if run_update_script:
@@ -955,14 +956,19 @@ def destroy(payload, myself):
 
 def migrate(payload, myself):
     """migrate volumes from one app to another. Needs:
-    {"repo"': <url>, "branch": <branch>,
-     "target": {"repo": <url>, "branch": <branch>}}
+    {
+        "repo"': <url>,
+        "branch": <branch>,
+        "target": {"repo": <url>, "branch": <branch>},
+        "update": true/false  # optional true by default
+    }
     If the "repo" or "branch" of the "target" is not given, it is the same as
     the source
     """
     repo_url = payload['repo']
     branch = payload['branch']
     target = payload['target']
+    run_update = payload.get('update', True)
     assert(target.get('repo') or target.get('branch'))
 
     sourceapp = Application(repo_url, branch=branch)
@@ -1003,7 +1009,7 @@ def migrate(payload, myself):
         for source_vol, target_vol in zip(source_volumes, target_volumes):
             if target_vol.migrable_volume:
                 source_vol.restore(target=target_vol.name)
-        targetapp.run_post_migrate(sourceapp)
+        targetapp.run_post_migrate(sourceapp, run_update_script=run_update)
         targetapp.up()
         targetapp.maintenance(enable=False)
     log.info('Restored %s to %s', sourceapp.name, targetapp.name)

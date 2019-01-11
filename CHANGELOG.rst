@@ -1,6 +1,9 @@
 Change log
 ==========
 
+* by default launch the update script define in order to process update if
+  target image are newer than source data. But run it after the migrate script.
+
 * Remove sshd support through consul. Was too limited and not working also
   becomes useless with the ``HAPROXY`` configuration.
 

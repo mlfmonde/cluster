@@ -455,6 +455,55 @@ target application:
 > volume environment as only commons volume name are restored to the target
 > app.
 
+Update script
+-------------
+
+While using deploy or migrate event you are able to call the update.sh script
+define in the service repo. its intent is to manage update processe while
+deploying a new version or while moving data from to service (ie: prod to qualif
+where qualif is ahead of prod)
+
+This script is called according the event:
+
+* ``deploy``: after pulling/building images and restoring data but before
+  creating and starting container.
+* ``migrate``: just after the migrate script before starting up the service.
+
+``update.sh``will receive following arguments to give you more controls about
+the context::
+
+    #!/bin/sh
+
+    # exit on error
+    set -e
+    # -x debug mode to display line before its execution
+    set +x
+
+
+    USAGE="
+    Usage: $0
+        -r REPO   Service repo: url should be the current service repo
+        -b BRANCH Service branch: should be the current branch
+    Post up of -r repo of -b branch application
+    Options:
+        -h               Show this help.
+    "
+
+
+    while getopts "r:b:h" OPTION
+    do
+        case $OPTION in
+            r) REPO=$OPTARG;;
+            b) BRANCH=$OPTARG;;
+            h) echo "$USAGE";
+               exit;;
+            *) echo "Unknown parameter... ";
+               echo "$USAGE";
+               exit 1;;
+        esac
+    done
+
+    echo "Running update script on $REPO branch: $BRANCH..."
 
 Post migrate script
 -------------------
@@ -515,6 +564,11 @@ controls about where come from restored data, here a basic template::
 Keep in mind this will be run in the consul container which is allowed to
 communicate with the docker daemon. The current working directory of this
 script will be the project where data are restored (the TARGET).
+
+By default (without ``"update": false`` in the migrate event payload) the
+update script is called if present.
+
+
 
 
 Local development environment
