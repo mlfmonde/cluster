@@ -3,7 +3,7 @@ sudo: required
 dist: xenial
 
 env:
-  DOCKER_COMPOSE_VERSION: 1.20.1
+  DOCKER_COMPOSE_VERSION: 1.23.2
 
 services:
   - docker
