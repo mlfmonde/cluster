@@ -3,7 +3,7 @@
 import argparse
 import hashlib
 import json
-import logging
+import logging.config
 import os
 import re
 import requests
@@ -354,7 +354,7 @@ class Application(object):
                     script_path=script_path,
                 )
             )
-            do(
+            logs = do(
                 'sh {} -R {} -B {} -r {} -b {}'.format(
                     script_path,
                     from_app.repo_url,
@@ -364,6 +364,7 @@ class Application(object):
                 ),
                 cwd=self.path
             )
+            log.info("migrate logs: {}".format(logs))
         else:
             log.warning("Migrate script not found {script_path}".format(
                     script_path=script_path,
@@ -376,7 +377,7 @@ class Application(object):
             script_path = join(self.path, UPDATE_SCRIPT_NAME)
             if exists(script_path):
                 log.info("running preup script {}".format(script_path))
-                do(
+                logs = do(
                     'sh {} -r {} -b {}'.format(
                         script_path,
                         self.repo_url,
@@ -384,6 +385,7 @@ class Application(object):
                     ),
                     cwd=self.path
                 )
+                log.info("update logs: {}".format(logs))
             else:
                 log.warning("Update script not found {script_path}".format(
                         script_path=script_path,
@@ -1174,6 +1176,13 @@ def deploy_handler():
         help="Logging handler file output",
         default=join(DEPLOY, 'handler.log')
     )
+    logging_group.add_argument(
+        '-f',
+        '--logging-config-file',
+        type=argparse.FileType('r'),
+        help='Logging configuration file, (logging-level and logging-format '
+             'are ignored if provide)'
+    )
     arguments = parser.parse_args()
     do("mkdir -p {}".format(os.path.dirname(arguments.logging_file)))
     logging.basicConfig(
@@ -1182,6 +1191,12 @@ def deploy_handler():
         filename=arguments.logging_file,
         style='{'
     )
+    if arguments.logging_config_file:
+        try:
+            json_config = json.loads(arguments.logging_config_file.read())
+            logging.config.dictConfig(json_config)
+        except json.JSONDecodeError:
+            logging.config.fileConfig(arguments.logging_config_file.name)
     ch = logging.StreamHandler()
     ch.setFormatter(logging.Formatter(arguments.logging_format, style='{'))
     logging.getLogger().addHandler(ch)

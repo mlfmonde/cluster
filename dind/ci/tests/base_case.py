@@ -119,12 +119,46 @@ class ClusterTestCase:
             else:
                 assert container is None
 
+    def assert_container_logs(self, node, container, expected):
+        """give 3s to found exepected string in container output on
+        each given nodes and require to not found it on other nodes"""
+        assert self.cluster.wait_logs(
+            node, container, message=expected, timeout=3
+        ), "Expected logs {} not found in 10s. node: {} - ct: {}".format(
+            expected, node, container
+        )
+
     def _get_file_content(self, node, container, path):
         return self.cluster.nodes.get(node)['docker_cli'].containers.get(
             container
         ).exec_run(
             'sh -c "sleep 0.1; cat {}"'.format(path)
         ).output.decode('utf-8')
+
+    def _grep(self, node, container, path, grep_content, grep_options="-o"):
+        return self.cluster.nodes.get(node)['docker_cli'].containers.get(
+            container
+        ).exec_run(
+            "sh -c 'sleep 0.1; grep {} \"{}\" {}'".format(
+                grep_options, grep_content, path
+            )
+        ).output.decode('utf-8')
+
+    def assert_in_file(self, node, container, path, expected_content):
+        """Make sure expected content is found in a file
+
+        :param node     : node where service is running
+        :param container: container name
+        :param path     : path to the file (inside the docker container) to
+                          assert looking content
+        :param expected_content: content to find in file
+        """
+        grep_res = self._grep(node, container, path, expected_content)
+        assert expected_content in grep_res, \
+            "Expected content: {} not found in file {} - ct: {} - node: {}\n" \
+            "grep res: {}".format(
+                expected_content, path, container, node, grep_res
+            )
 
     def assert_file(self, node, container, path, expected_content):
         """Make sure expected content is present in a container:

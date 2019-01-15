@@ -59,7 +59,7 @@ function nodeUp() {
     docker-compose exec "${nodeServicePrefix}$1" docker plugin ls
 
     # we use specific compose override file for consul config
-    docker-compose exec "${nodeServicePrefix}$1" docker-compose -f docker-compose.yml -f docker-compose.dind.yml up --force-recreate --build -d
+    docker-compose exec "${nodeServicePrefix}$1" docker-compose -f docker-compose.yml -f dind/docker-compose.dind.yml up --force-recreate --build -d
 
     # display env
     docker-compose exec "${nodeServicePrefix}$1" docker-compose exec consul sh -c "env"
