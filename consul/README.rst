@@ -47,6 +47,6 @@ destroying an app::
 
 migrating volumes between two apps::
 
-    $ handler.py migrate '{"target": {"branch": "preprod", "repo": "https://gitlab.example.com/hosting/foobar"}, "branch": "master", "repo": "https://gitlab.example.com/hosting/foobar", "update": true}'
+    $ handler.py migrate '{"target": {"branch": "preprod", "repo": "https://gitlab.example.com/hosting/foobar"}, "branch": "master", "repo": "https://gitlab.example.com/hosting/foobar", "update": false}'
 
 In the latter case, if the target repository is not provided, it will use the source repository. The repo URL is used to identify the application in the cluster.
