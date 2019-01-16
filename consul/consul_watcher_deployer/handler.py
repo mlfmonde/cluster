@@ -30,6 +30,7 @@ log = logging.getLogger()
 BTRFSDRIVER = os.environ.get('BTRFSDRIVER', 'anybox/buttervolume:latest')
 POST_MIGRATE_SCRIPT_NAME = 'post_migrate.sh'
 UPDATE_SCRIPT_NAME = 'update.sh'
+ANSI_ESCAPE = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
 
 def concat(l):
@@ -51,8 +52,16 @@ def do(cmd, cwd=None):
 
 
 def log_subprocess_output(pipe, logging_prefix):
-    for line in iter(pipe.readline, b''):  # b'\n'-separated lines
-        log.info('%s%r', logging_prefix, line.decode().strip())
+    for lines in iter(pipe.readline, b''):  # b'\n'-separated lines
+        lines = ANSI_ESCAPE.sub('', lines.decode().strip())
+        for line in lines.split('\r'):
+            strpline = line.strip()
+            if strpline:
+                log.info(
+                    '%s%r',
+                    logging_prefix,
+                    strpline
+                )
 
 
 def do_logs(cmd, cwd=None, logging_prefix=""):
