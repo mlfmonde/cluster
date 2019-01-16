@@ -204,6 +204,16 @@ class WhenMigrateDataBetweenServices(
             ['node1', ]
         )
 
+    def test_update_should_be_called(self):
+        self.assert_file(
+            'node1',
+            self.kvqualif.ct.anyblok,
+            "/var/test_service/update",
+            "run update data after migrate repo: "
+            "https://github.com/mlfmonde/cluster_lab_test_service "
+            "branch: qualif"
+        )
+
     def cleanup_destroy_service(self):
         self.cluster.cleanup_application(self.prod)
         self.cluster.cleanup_application(self.qualif)
