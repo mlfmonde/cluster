@@ -24,8 +24,11 @@ services:
       - /run/docker.sock:/run/docker.sock
       - /run/docker/plugins:/run/docker/plugins
       - /deploy:/deploy
-      - caddy_conf:/consul/template/caddy/:rw
-      - haproxy_conf:/consul/template/haproxy/:rw
+      - ./caddy/conf:/consul/template/caddy/:ro
+      - caddy_conf:/caddy/:rw
+      - ./haproxy/conf:/consul/template/haproxy/:ro
+      - haproxy_conf:/haproxy/:rw
+
 
   haproxy:
     container_name: cluster_haproxy_1
