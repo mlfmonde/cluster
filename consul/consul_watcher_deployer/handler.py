@@ -311,14 +311,13 @@ class Application(object):
             self.clean()
             deploy_date = datetime.now().strftime(DTFORMAT)
             path = self._path(deploy_date=deploy_date)
-            do_logs(
+            do(
                 'git clone --depth 1 {} "{}" "{}"'.format(
                     '-b "%s"' % self.branch if self.branch else '',
                     self.repo_url,
                     path
                 ),
                 cwd=DEPLOY,
-                logging_prefix="Clone project: "
             )
             with open(join(path, '.env'), 'a') as env:
                 # to ease manual management without '-p'
