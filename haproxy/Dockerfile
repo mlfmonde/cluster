@@ -1,4 +1,4 @@
-FROM haproxy:1.8.12
+FROM haproxy:1.8.17
 
 # deploy default haproxy.cfg to ensure initial up
 COPY ./conf/haproxy.default.cfg /usr/local/etc/haproxy/haproxy.cfg
