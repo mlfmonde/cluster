@@ -2,7 +2,7 @@ version: '3'
 services:
 
   caddy:
-    build: ./caddy
+    image: anybox/caddy:0.11.0
     restart: unless-stopped
     volumes:
       - caddy_ssl:/root/.caddy
@@ -10,7 +10,7 @@ services:
       - ./caddy/www/:/srv
 
   haproxy:
-    build: ./haproxy
+    image: haproxy:1.8.17
     restart: unless-stopped
     ports:
       - "80:80"
@@ -50,8 +50,10 @@ services:
       - /run/docker.sock:/run/docker.sock
       - /run/docker/plugins:/run/docker/plugins
       - /deploy:/deploy
-      - caddy_conf:/consul/template/caddy/:rw
-      - haproxy_conf:/consul/template/haproxy/:rw
+      - ./caddy/conf:/consul/template/caddy/:ro
+      - caddy_conf:/caddy/:rw
+      - ./haproxy/conf:/consul/template/haproxy/:ro
+      - haproxy_conf:/haproxy/:rw
 
 volumes:
   caddy_ssl:

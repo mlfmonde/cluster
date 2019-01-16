@@ -7,8 +7,7 @@
       "datefmt": "%H:%M:%S"
     },
     "file_fmt": {
-      "format": "%(asctime)s\t%(levelname)s\t%(message)s",
-      "datefmt": "%H:%M:%S"
+      "format": "%(asctime)s\t%(levelname)s\t%(message)s"
     },
     "fluentd_fmt": {
       "()": "fluent.handler.FluentRecordFormatter",

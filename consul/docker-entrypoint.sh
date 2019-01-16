@@ -2,8 +2,8 @@
 
 chown -R consul: /deploy
 
-caddytemplate="/consul/template/caddy/Caddyfile.ctmpl:/consul/template/caddy/Caddyfile:/reload_caddy.sh"
-haproxytemplate="/consul/template/haproxy/haproxy.cfg.ctmpl:/consul/template/haproxy/haproxy.cfg:/reload_haproxy.sh"
+caddytemplate="/consul/template/caddy/Caddyfile.ctmpl:/caddy/Caddyfile:/reload_caddy.sh"
+haproxytemplate="/consul/template/haproxy/haproxy.cfg.ctmpl:/haproxy/haproxy.cfg:/reload_haproxy.sh"
 
 /bin/consul-template -once -template=$caddytemplate -template=$haproxytemplate &
 /bin/consul-template       -template=$caddytemplate -template=$haproxytemplate &
