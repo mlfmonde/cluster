@@ -10,7 +10,7 @@ RUN apk add --no-cache \
       openssh-client \
       git \
       python3 \
-    && pip3 install --upgrade pip \
+    && pip3 install --upgrade pip fluent-logger \
     && pip install docker-compose==${DOCKERCOMPOSE} \
     && git clone https://github.com/anybox/buttervolume \
     && cd buttervolume \

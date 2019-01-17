@@ -10,13 +10,25 @@ services:
     environment:
         # important: use eth0
         CONSUL_BIND_INTERFACE: eth0
+        BTRFSDRIVER: anybox/buttervolume:latest
+        CONSUL_LOCAL_CONFIG: '{
+           "enable_script_checks": true,
+           "watches": [{
+               "type": "event",
+               "handler_type": "script",
+               "args": ["handler", "--logging-config-file", "/home/consul/etc/handler-logging.json"]}]
+        }'
     volumes:
       - consul_docker_cfg:/home/consul/.docker
+      - ./dind/handler-logging.json:/home/consul/etc/handler-logging.json
       - /run/docker.sock:/run/docker.sock
       - /run/docker/plugins:/run/docker/plugins
       - /deploy:/deploy
-      - caddy_conf:/consul/template/caddy/:rw
-      - haproxy_conf:/consul/template/haproxy/:rw
+      - ./caddy/conf:/consul/template/caddy/:ro
+      - caddy_conf:/caddy/:rw
+      - ./haproxy/conf:/consul/template/haproxy/:ro
+      - haproxy_conf:/haproxy/:rw
+
 
   haproxy:
     container_name: cluster_haproxy_1
@@ -33,3 +45,11 @@ services:
 
   rsyslog:
     container_name: cluster_rsyslog_1
+
+  fluentd:
+    container_name: cluster_fluentd_1
+    image: fluent/fluentd:stable
+    ports:
+      - 24224:24224
+    volumes:
+      - ./dind/fluentd/:/fluentd/etc

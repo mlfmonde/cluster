@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "disable_existing_loggers": true,
+  "formatters": {
+    "console_fmt": {
+      "format": "[%(asctime)s][%(levelname)s] %(name)s %(filename)s:%(funcName)s:%(lineno)d | %(message)s",
+      "datefmt": "%H:%M:%S"
+    },
+    "file_fmt": {
+      "format": "%(asctime)s\t%(levelname)s\t%(message)s"
+    },
+    "fluentd_fmt": {
+      "()": "fluent.handler.FluentRecordFormatter",
+      "format": {
+          "level": "%(levelname)s",
+          "hostname": "%(hostname)s",
+          "where": "%(module)s.%(funcName)s"
+      }
+    }
+  },
+  "handlers": {
+    "console": {
+      "level": "DEBUG",
+      "class": "logging.StreamHandler",
+      "formatter": "console_fmt"
+    },
+    "file": {
+      "level": "DEBUG",
+      "class": "logging.FileHandler",
+      "filename": "/deploy/handler.log",
+      "formatter": "file_fmt"
+    },
+    "fluentd": {
+      "level": "INFO",
+      "formatter": "fluentd_fmt",
+      "class": "fluent.handler.FluentHandler",
+      "host": "localhost",
+      "port": 24224,
+      "tag": "fluentd.test.dind",
+      "buffer_overflow_handler": "overflow_handler"
+    }
+  },
+  "loggers": {
+    "": {
+      "handlers": [
+        "console", "fluentd", "file"
+      ],
+      "level": "INFO",
+      "propagate": false
+    }
+  }
+}

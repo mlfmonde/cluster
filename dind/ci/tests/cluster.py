@@ -231,7 +231,7 @@ class Cluster:
         self, node_name, container_name, message, timeout=DEFAULT_TIMEOUT
     ):
         node = self.nodes.get(node_name)
-
+        found = False
         start_date = datetime.now()
         carry_on = True
         while carry_on:
@@ -244,6 +244,7 @@ class Cluster:
                         "%s where found in line %s (in %s s)",
                         message, line, (datetime.now() - start_date).seconds
                     )
+                    found = True
                     carry_on = False
                     break
 
@@ -256,6 +257,7 @@ class Cluster:
                     )
                     carry_on = False
                     break
+        return found
 
     def cleanup_application(self, application):
         logging.info("start cleanup applications")

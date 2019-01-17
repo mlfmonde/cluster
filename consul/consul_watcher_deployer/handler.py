@@ -3,10 +3,11 @@
 import argparse
 import hashlib
 import json
-import logging
+import logging.config
 import os
 import re
 import requests
+import shlex
 import socket
 import time
 import yaml
@@ -16,7 +17,7 @@ from datetime import datetime
 from docker import DockerClient
 from functools import reduce
 from os.path import basename, join, exists
-from subprocess import run, CalledProcessError, PIPE
+from subprocess import run, CalledProcessError, PIPE, STDOUT, Popen
 from sys import stdin, argv
 from urllib.parse import urlparse
 DTFORMAT = "%Y-%m-%dT%H%M%S.%f"
@@ -29,6 +30,7 @@ log = logging.getLogger()
 BTRFSDRIVER = os.environ.get('BTRFSDRIVER', 'anybox/buttervolume:latest')
 POST_MIGRATE_SCRIPT_NAME = 'post_migrate.sh'
 UPDATE_SCRIPT_NAME = 'update.sh'
+ANSI_ESCAPE = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
 
 def concat(l):
@@ -43,6 +45,32 @@ def do(cmd, cwd=None):
         res = run(cmd, shell=True, check=True,
                   stdout=PIPE, stderr=PIPE, cwd=cwd)
         return res.stdout.decode().strip()
+    except CalledProcessError as e:
+        log.error("Failed to run %s: return code = %s, %s",
+                  e.cmd, e.returncode, e.stderr.decode())
+        raise e
+
+
+def log_subprocess_output(pipe, logging_prefix):
+    for lines in iter(pipe.readline, b''):  # b'\n'-separated lines
+        lines = ANSI_ESCAPE.sub('', lines.decode().strip())
+        for line in lines.split('\r'):
+            strpline = line.strip()
+            if strpline:
+                log.info(
+                    '%s%r',
+                    logging_prefix,
+                    strpline
+                )
+
+
+def do_logs(cmd, cwd=None, logging_prefix=""):
+    """Run a command and send log output to python logging"""
+    try:
+        cmd = shlex.split(cmd)
+        log.info('Running %r: ', cmd)
+        with Popen(cmd, stdout=PIPE, stderr=STDOUT, cwd=cwd) as proc:
+            log_subprocess_output(proc.stdout, logging_prefix)
     except CalledProcessError as e:
         log.error("Failed to run %s: return code = %s, %s",
                   e.cmd, e.returncode, e.stderr.decode())
@@ -282,17 +310,24 @@ class Application(object):
 
     def clean(self):
         if self.path and exists(self.path):
-            do('rm -rf "{}"'.format(self.path))
+            do_logs(
+                'rm -rf "{}"'.format(self.path),
+                logging_prefix="Remove project dir: "
+            )
 
     def download(self, retrying=False):
         try:
             self.clean()
             deploy_date = datetime.now().strftime(DTFORMAT)
             path = self._path(deploy_date=deploy_date)
-            do('git clone --depth 1 {} "{}" "{}"'
-               .format('-b "%s"' % self.branch if self.branch else '',
-                       self.repo_url, path),
-               cwd=DEPLOY)
+            do(
+                'git clone --depth 1 {} "{}" "{}"'.format(
+                    '-b "%s"' % self.branch if self.branch else '',
+                    self.repo_url,
+                    path
+                ),
+                cwd=DEPLOY,
+            )
             with open(join(path, '.env'), 'a') as env:
                 # to ease manual management without '-p'
                 env.write('COMPOSE_PROJECT_NAME={}\n'.format(self.project))
@@ -323,9 +358,11 @@ class Application(object):
         if self.path and exists(self.path):
             log.info("Pulling images %s", self.name)
             ignore = '--ignore-pull-failures' if ignorefailures else ''
-            do('docker-compose -p "{}" pull {}'
-               .format(self.project, ignore),
-               cwd=self.path)
+            do_logs(
+                'docker-compose -p "{}" pull {}'.format(self.project, ignore),
+                cwd=self.path,
+                logging_prefix="Pull images: "
+            )
         else:
             log.warning("No deployment, cannot pull %s", self.name)
 
@@ -341,9 +378,13 @@ class Application(object):
             pull = '--pull' if pull else ''
             cache = '--no-cache' if nocache else ''
             rm = '--force-rm' if forecerm else ''
-            do('docker-compose -p "{}" build {} {} {}'
-               .format(self.project, pull, cache, rm),
-               cwd=self.path)
+            do_logs(
+                'docker-compose -p "{}" build {} {} {}'.format(
+                    self.project, pull, cache, rm
+                ),
+                cwd=self.path,
+                logging_prefix="Build project: "
+            )
         else:
             log.warning("No deployment, cannot build %s", self.name)
 
@@ -354,7 +395,7 @@ class Application(object):
                     script_path=script_path,
                 )
             )
-            do(
+            do_logs(
                 'sh {} -R {} -B {} -r {} -b {}'.format(
                     script_path,
                     from_app.repo_url,
@@ -362,7 +403,8 @@ class Application(object):
                     self.repo_url,
                     self.branch
                 ),
-                cwd=self.path
+                cwd=self.path,
+                logging_prefix="post_migrate.sh: "
             )
         else:
             log.warning("Migrate script not found {script_path}".format(
@@ -376,13 +418,14 @@ class Application(object):
             script_path = join(self.path, UPDATE_SCRIPT_NAME)
             if exists(script_path):
                 log.info("running preup script {}".format(script_path))
-                do(
+                do_logs(
                     'sh {} -r {} -b {}'.format(
                         script_path,
                         self.repo_url,
                         self.branch
                     ),
-                    cwd=self.path
+                    cwd=self.path,
+                    logging_prefix="update.sh: "
                 )
             else:
                 log.warning("Update script not found {script_path}".format(
@@ -393,9 +436,11 @@ class Application(object):
     def up(self):
         if self.path and exists(self.path):
             log.info("Starting %s", self.name)
-            do('docker-compose -p "{}" up -d'
-               .format(self.project),
-               cwd=self.path)
+            do_logs(
+                'docker-compose -p "{}" up -d'.format(self.project),
+                cwd=self.path,
+                logging_prefix="start project: "
+            )
         else:
             log.warning("No deployment, cannot start %s", self.name)
 
@@ -403,8 +448,11 @@ class Application(object):
         if self.path and exists(self.path):
             log.info("Stopping %s", self.name)
             v = '-v' if deletevolumes else ''
-            do('docker-compose -p "{}" down {}'.format(self.project, v),
-               cwd=self.path)
+            do_logs(
+                'docker-compose -p "{}" down {}'.format(self.project, v),
+                cwd=self.path,
+                logging_prefix="Stop project: "
+            )
         else:
             log.warning("Cannot stop %s", self.name)
 
@@ -683,26 +731,39 @@ class Volume(object):
     def schedule_snapshots(self, timer):
         """schedule snapshots of the volume
         """
-        do("buttervolume schedule snapshot {} {}"
-           .format(timer, self.name))
+        do_logs(
+            "buttervolume schedule snapshot {} {}".format(timer, self.name),
+            logging_prefix="schedul snapshot: "
+        )
 
     def schedule_replicate(self, timer, slavehost):
         """schedule a replication of the volume
         """
-        do("buttervolume schedule replicate:{} {} {}"
-           .format(slavehost, timer, self.name))
+        do_logs(
+            "buttervolume schedule replicate:{} {} {}".format(
+                slavehost, timer, self.name
+            ),
+            logging_prefix="schedul replicate: "
+        )
 
     def schedule_purge(self, timer, pattern):
         """schedule a purge of the snapshots
         """
-        do("buttervolume schedule purge:{} {} {}"
-           .format(pattern, timer, self.name))
+        do_logs(
+            "buttervolume schedule purge:{} {} {}".format(
+                pattern, timer, self.name
+            ),
+            logging_prefix="schedul purge: "
+        )
 
     def delete(self):
         """destroy a volume
         """
         log.info(u'Destroying volume: {}'.format(self.name))
-        return do("docker volume rm {}".format(self.name))
+        return do_logs(
+            "docker volume rm {}".format(self.name),
+            logging_prefix="Remove volume: "
+        )
 
     def restore(self, snapshot=None, target=''):
         if snapshot is None:  # use the latest snapshot
@@ -716,7 +777,10 @@ class Volume(object):
 
     def send(self, snapshot, target):
         log.info(u'Sending snapshot: {}'.format(snapshot))
-        do("buttervolume send {} {}".format(target, snapshot))
+        do_logs(
+            "buttervolume send {} {}".format(target, snapshot),
+            logging_prefix="Send snapshot: "
+        )
 
     def get_docker_client(self):
         return DockerClient(base_url=DOCKER_BASE_URL)
@@ -1174,6 +1238,13 @@ def deploy_handler():
         help="Logging handler file output",
         default=join(DEPLOY, 'handler.log')
     )
+    logging_group.add_argument(
+        '-f',
+        '--logging-config-file',
+        type=argparse.FileType('r'),
+        help='Logging configuration file, (logging-level and logging-format '
+             'are ignored if provide)'
+    )
     arguments = parser.parse_args()
     do("mkdir -p {}".format(os.path.dirname(arguments.logging_file)))
     logging.basicConfig(
@@ -1182,6 +1253,12 @@ def deploy_handler():
         filename=arguments.logging_file,
         style='{'
     )
+    if arguments.logging_config_file:
+        try:
+            json_config = json.loads(arguments.logging_config_file.read())
+            logging.config.dictConfig(json_config)
+        except json.JSONDecodeError:
+            logging.config.fileConfig(arguments.logging_config_file.name)
     ch = logging.StreamHandler()
     ch.setFormatter(logging.Formatter(arguments.logging_format, style='{'))
     logging.getLogger().addHandler(ch)
