@@ -1,5 +1,5 @@
 # cluster node docker in docker (dind)
-FROM docker:stable-dind
+FROM docker:18.06.3-dind
 LABEL maintainer "Vincent GREINER <vgreiner@anybox.fr>"
 
 ARG DOCKER_GROUP_ID
