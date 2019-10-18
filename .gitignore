@@ -2,3 +2,4 @@ caddy/conf/Caddyfile
 haproxy/conf/haproxy.cfg
 deploy/
 .idea/
+.vscode/
